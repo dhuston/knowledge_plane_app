@@ -17,6 +17,10 @@ import LoginPage from './pages/LoginPage';
 import WorkspacePage from './pages/WorkspacePage';
 import ProfilePage from './pages/ProfilePage';
 import HubPage from './pages/HubPage';
+import GoalsPage from './pages/GoalsPage';
+import TeamPage from './pages/TeamPage';
+import DepartmentPage from './pages/DepartmentPage';
+import ExplorePage from './pages/ExplorePage';
 
 // Import Layout Component
 import MainLayout from './components/layout/MainLayout';
@@ -44,6 +48,11 @@ function App() {
           <Route path="workspace" element={<WorkspacePage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="hub/:hubId" element={<HubPage />} />
+          <Route path="goals" element={<GoalsPage />} />
+          <Route path="team/:teamId" element={<TeamPage />} />
+          <Route path="profile/:userId" element={<ProfilePage />} />
+          <Route path="department/:deptId" element={<DepartmentPage />} />
+          <Route path="explore" element={<ExplorePage />} />
           {/* Default route within layout: Redirect to workspace */}
           <Route index element={<Navigate to="workspace" replace />} /> 
         </Route>

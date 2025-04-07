@@ -13,16 +13,24 @@ import {
   CardHeader, 
   CardBody, 
   SimpleGrid, 
-  Icon, 
   Avatar, 
   Container, 
   useColorModeValue, 
   Badge, 
   Tooltip, 
   IconButton, 
-  Divider 
+  Divider,
+  Link,
+  Icon,
+  Progress,
+  Wrap,
+  WrapItem
 } from "@chakra-ui/react"; 
-import { AddIcon, ChatIcon, SearchIcon, EditIcon, QuestionOutlineIcon, ViewIcon, InfoIcon, WarningIcon, ArrowForwardIcon, CheckIcon, BellIcon, CalendarIcon, StarIcon } from '@chakra-ui/icons';
+import { AddIcon, ChatIcon, SearchIcon, EditIcon, QuestionOutlineIcon, ViewIcon, InfoIcon, WarningIcon, ArrowForwardIcon, CheckIcon, BellIcon, CalendarIcon, StarIcon, CheckCircleIcon, RepeatClockIcon, SettingsIcon } from '@chakra-ui/icons';
+// Import shared mock data
+import { mockGoals, mockTeams, mockUsers, currentUser, mockProjects, mockActionButtons, findGoalById } from '../mockData'; // Adjust path as needed
+// Import type
+import type { MockGoal } from '../mockData'; // Use exported type
 
 // --- Helper Functions ---
 const getUserGreeting = () => {
@@ -40,59 +48,29 @@ const getCurrentDate = () => {
   });
 };
 
+// Helper to get icon based on goal type (simplified)
+const getGoalIcon = (type: string) => {
+  switch (type) {
+    case 'Enterprise': return SettingsIcon;
+    case 'Department': return RepeatClockIcon;
+    case 'Team': return CheckCircleIcon;
+    case 'Project': return CheckCircleIcon;
+    default: return CheckCircleIcon;
+  }
+}
+
+// --- Component ---
 export default function WorkspacePage() {
-  const demoUserName = "Demo User"; // Placeholder user name
+  const demoUserName = currentUser.name;
+  const userTeam = currentUser.teamId ? mockTeams[currentUser.teamId] : null;
+  const teamGoal = userTeam ? findGoalById(userTeam.id, mockGoals as MockGoal) : null;
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const highlightColor = useColorModeValue('brand.50', 'brand.900');
   const textColor = useColorModeValue('gray.600', 'gray.300');
-
-  // --- Static Demo Briefing Content (Enhanced Styling) ---
-  // const briefingItems = [ ... ]; 
-  // ------------------------------------
-
-  // --- Static Demo Hub List ---
-  const demoHubs = [
-    { 
-      id: 'phoenix', 
-      name: 'Project Phoenix', 
-      status: 'In Progress', 
-      statusColorScheme: 'blue', 
-      statusIcon: InfoIcon, // Example icon
-      subtext: 'Next step: Integration testing • Due EOW',
-      progress: 65,
-      priority: 'High'
-    },
-    { 
-      id: 'q3-strategy', 
-      name: 'Q3 Strategy Hub', 
-      status: 'Needs Review', 
-      statusColorScheme: 'orange', 
-      statusIcon: WarningIcon, // Example icon
-      subtext: 'Awaiting feedback on draft proposal',
-      progress: 40,
-      priority: 'Medium'
-    }
-  ];
-  // ---------------------------
-
-  // --- Action Button Placeholders ---
-  const actionButtons = [
-    { label: "Find Data", icon: SearchIcon, tooltip: "Search through your data sources" },
-    { label: "Search Literature", icon: QuestionOutlineIcon, tooltip: "Find relevant research papers" },
-    { label: "Design Experiment", icon: EditIcon, tooltip: "Create a new experiment" },
-    { label: "Create Project", icon: AddIcon, tooltip: "Start a new project" },
-    { label: "Search Knowledgebase", icon: ViewIcon, tooltip: "Browse the knowledge base" },
-  ];
-  // ----------------------------------
-
-  // --- Static Demo Team Data ---
-  const demoTeam = [
-    { name: "Sarah Chen", role: "Lead Researcher", online: true, avatar: "", lastActive: "Just now" },
-    { name: "Bob Smith", role: "Data Scientist", online: false, avatar: "", lastActive: "2h ago" },
-    { name: "Charlie Day", role: "Lab Technician", online: true, avatar: "", lastActive: "5m ago" }
-  ];
-  // -----------------------------
+  const teamMembers = Object.values(mockUsers).filter(user => user.teamId === currentUser.teamId);
+  // Use mockProjects directly now
+  const userProjects = Object.values(mockProjects).filter(h => h.teamId === currentUser.teamId);
 
   return (
     <Container maxW="container.xl" py={6}>
@@ -160,7 +138,7 @@ export default function WorkspacePage() {
 
         {/* Quick Actions */}
         <SimpleGrid columns={{ base: 2, sm: 3, md: 5 }} spacing={4}>
-          {actionButtons.map((action, index) => (
+          {mockActionButtons.map((action, index) => (
             <Tooltip key={index} label={action.tooltip} hasArrow>
               <Button 
                 leftIcon={<Icon as={action.icon} />} 
@@ -177,8 +155,8 @@ export default function WorkspacePage() {
           ))}
         </SimpleGrid>
 
-        {/* Main Content Grid */}
-        <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+        {/* Main Content Grid (Projects and Goals only) */}
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
           {/* Projects Card */}
           <Card variant="outline" boxShadow="sm" bg={bgColor} borderColor={borderColor}>
             <CardHeader>
@@ -191,27 +169,23 @@ export default function WorkspacePage() {
             </CardHeader>
             <CardBody>
               <VStack spacing={4} align="stretch">
-                {demoHubs.map(hub => (
+                {userProjects.map(hub => (
                   <Card key={hub.id} variant="outline" size="sm">
                     <CardBody>
                       <Flex direction={{ base: 'column', md: 'row' }} gap={4}>
                         <Box flex="1">
                           <HStack mb={2}>
                             <Heading size="sm">{hub.name}</Heading>
-                            <Badge colorScheme={hub.priority === 'High' ? 'red' : 'orange'}>
-                              {hub.priority}
+                            <Badge colorScheme={hub.statusColorScheme}>
+                              {hub.status}
                             </Badge>
                           </HStack>
                           <HStack mb={2}>
                             <Tag size="sm" variant="subtle" colorScheme={hub.statusColorScheme}>
                               <Icon as={hub.statusIcon} mr={1} />
-                              {hub.status}
+                              {hub.subtext}
                             </Tag>
-                            <Text fontSize="sm" color={textColor}>
-                              {hub.progress}% Complete
-                            </Text>
                           </HStack>
-                          <Text fontSize="sm" color={textColor}>{hub.subtext}</Text>
                         </Box>
                         <HStack spacing={2}>
                           <Button
@@ -238,54 +212,199 @@ export default function WorkspacePage() {
             </CardBody>
           </Card>
 
-          {/* Team Card */}
+          {/* Key Goals Card */}
           <Card variant="outline" boxShadow="sm" bg={bgColor} borderColor={borderColor}>
             <CardHeader>
-              <Flex justify="space-between" align="center">
-                <HStack>
-                  <Heading size="md">Your Team</Heading>
-                  <Tag size="sm" colorScheme="green" variant="subtle">
-                    {demoTeam.filter(m => m.online).length} ONLINE
-                  </Tag>
-                </HStack>
-                <Button leftIcon={<ChatIcon />} variant="ghost" size="sm" colorScheme="brand">
-                  Message Team
-                </Button>
-              </Flex>
+               <Flex justify="space-between" align="center">
+                <Heading size="md">Key Goals</Heading>
+                <Link as={RouterLink} to="/goals" fontSize="sm" color="brand.600">
+                   View All <Icon as={ArrowForwardIcon} mx={1}/>
+                </Link>
+               </Flex>
             </CardHeader>
             <CardBody>
-              <VStack spacing={4} align="stretch">
-                {demoTeam.map((member, index) => (
-                  <Flex 
-                    key={index} 
-                    p={3} 
-                    borderWidth="1px" 
-                    borderRadius="md" 
-                    borderColor={borderColor}
-                    align="center"
-                    justify="space-between"
-                  >
-                    <HStack spacing={3}>
-                      <Avatar size="sm" name={member.name} src={member.avatar} />
-                      <Box>
-                        <Text fontWeight="medium">{member.name}</Text>
-                        <Text fontSize="sm" color={textColor}>{member.role}</Text>
-                      </Box>
-                    </HStack>
-                    <HStack>
-                      <Text fontSize="sm" color={textColor}>{member.lastActive}</Text>
-                      {member.online && (
-                        <Tag size="sm" colorScheme="green" variant="subtle">
-                          <Icon as={CheckIcon} mr={1} boxSize="10px"/> online
-                        </Tag>
-                      )}
-                    </HStack>
+              <VStack align="stretch" spacing={3}>
+                {/* Display Team Goal directly */}
+                {teamGoal ? (
+                  <Flex key={teamGoal.id} alignItems="center">
+                    <Icon as={getGoalIcon(teamGoal.type)} color="blue.500" mr={2} /> { /* Hardcoded color for now */}
+                    <Link as={RouterLink} to={'/goals'} fontSize="sm" fontWeight="medium" color="brand.600">
+                      {teamGoal.title}
+                    </Link>
                   </Flex>
-                ))}
+                ) : (
+                   <Text fontSize="sm" color="gray.500">No specific team goals found.</Text>
+                )}
+                 {/* Add another placeholder goal if needed for demo */}
               </VStack>
             </CardBody>
           </Card>
         </SimpleGrid>
+
+        {/* Team Section - Full Width */}
+        <Card 
+          variant="outline" 
+          boxShadow="sm" 
+          bg={bgColor} 
+          borderColor="brand.200"
+          mt={8}
+        >
+          <CardHeader borderBottom="1px" borderColor={borderColor} bg={highlightColor} roundedTop="md">
+            <Flex justify="space-between" align="center">
+              {userTeam ? (
+                <HStack spacing={4}>
+                  <Link 
+                    as={RouterLink} 
+                    to={`/team/${userTeam.id}`} 
+                    _hover={{
+                      textDecoration: 'none',
+                      '& > .team-name': {
+                        color: 'brand.600',
+                        transform: 'translateX(2px)'
+                      },
+                      '& > .team-name-icon': {
+                        opacity: 1,
+                        transform: 'translateX(0)',
+                        color: 'brand.600'
+                      }
+                    }}
+                    display="flex"
+                    alignItems="center"
+                  >
+                    <Heading 
+                      size="md" 
+                      className="team-name"
+                      transition="all 0.2s"
+                      display="flex"
+                      alignItems="center"
+                      gap={2}
+                      color="brand.700"
+                    >
+                      {userTeam.name}
+                      <Icon
+                        as={ArrowForwardIcon}
+                        className="team-name-icon"
+                        boxSize={4}
+                        opacity={0.3}
+                        transform="translateX(-4px)"
+                        transition="all 0.2s"
+                        color="brand.700"
+                      />
+                    </Heading>
+                  </Link>
+                  <Tag size="sm" colorScheme="green" variant="solid">
+                    {teamMembers.filter(m => m.online).length} ONLINE
+                  </Tag>
+                  <Text fontSize="sm" color={textColor}>Led by {userTeam.lead}</Text>
+                </HStack>
+              ) : (
+                <Heading size="md">Your Team</Heading>
+              )}
+              <HStack>
+                <Button leftIcon={<ChatIcon />} variant="ghost" size="sm" colorScheme="brand">
+                  Team Chat
+                </Button>
+                <Button leftIcon={<CalendarIcon />} variant="ghost" size="sm" colorScheme="brand">
+                  Team Calendar
+                </Button>
+              </HStack>
+            </Flex>
+          </CardHeader>
+          <CardBody>
+            <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+              {/* Team Members Section */}
+              <Box>
+                <Heading size="sm" mb={4}>Team Members</Heading>
+                <Wrap spacing={4}>
+                  {teamMembers.map((member, index) => (
+                    <WrapItem key={index}>
+                      <Card 
+                        variant="outline" 
+                        size="sm" 
+                        w="250px"
+                        _hover={{ borderColor: "brand.200", transform: "translateY(-2px)" }}
+                        transition="all 0.2s"
+                      >
+                        <CardBody>
+                          <HStack spacing={3}>
+                            <Avatar size="md" name={member.name} src={member.avatar} />
+                            <Box>
+                              <Link 
+                                as={RouterLink} 
+                                to={`/profile/${member.id}`} 
+                                fontWeight="medium" 
+                                fontSize="sm" 
+                                color="brand.700"
+                                display="block"
+                              >
+                                {member.name}
+                              </Link>
+                              <Text fontSize="xs" color={textColor}>{member.title}</Text>
+                              <HStack mt={1}>
+                                {member.online && (
+                                  <Tag size="sm" colorScheme="green" variant="subtle">
+                                    <Icon as={CheckIcon} mr={1} boxSize="10px"/> online
+                                  </Tag>
+                                )}
+                                <IconButton
+                                  aria-label="Message"
+                                  icon={<ChatIcon />}
+                                  size="xs"
+                                  variant="ghost"
+                                  colorScheme="brand"
+                                />
+                              </HStack>
+                            </Box>
+                          </HStack>
+                        </CardBody>
+                      </Card>
+                    </WrapItem>
+                  ))}
+                </Wrap>
+              </Box>
+
+              {/* Team Activity & Stats */}
+              <Box>
+                <Heading size="sm" mb={4}>Team Activity</Heading>
+                <VStack spacing={4} align="stretch">
+                  <Card variant="outline" p={4}>
+                    <Text fontWeight="medium" mb={2}>Current Sprint Progress</Text>
+                    <Progress value={75} colorScheme="brand" rounded="full" size="sm" mb={2} />
+                    <Text fontSize="sm" color={textColor}>Sprint ends in 5 days</Text>
+                  </Card>
+                  
+                  <Card variant="outline" p={4}>
+                    <Text fontWeight="medium" mb={2}>Recent Achievements</Text>
+                    <VStack align="stretch" spacing={2}>
+                      <HStack>
+                        <Icon as={CheckCircleIcon} color="green.500" />
+                        <Text fontSize="sm">Completed Project Milestone</Text>
+                      </HStack>
+                      <HStack>
+                        <Icon as={StarIcon} color="yellow.500" />
+                        <Text fontSize="sm">Team Recognition Award</Text>
+                      </HStack>
+                    </VStack>
+                  </Card>
+
+                  <Card variant="outline" p={4}>
+                    <Text fontWeight="medium" mb={2}>Upcoming Team Events</Text>
+                    <VStack align="stretch" spacing={2}>
+                      <HStack>
+                        <Icon as={CalendarIcon} color="brand.500" />
+                        <Text fontSize="sm">Sprint Planning (Tomorrow, 10 AM)</Text>
+                      </HStack>
+                      <HStack>
+                        <Icon as={CalendarIcon} color="brand.500" />
+                        <Text fontSize="sm">Team Retrospective (Friday, 2 PM)</Text>
+                      </HStack>
+                    </VStack>
+                  </Card>
+                </VStack>
+              </Box>
+            </SimpleGrid>
+          </CardBody>
+        </Card>
       </VStack>
     </Container>
   );

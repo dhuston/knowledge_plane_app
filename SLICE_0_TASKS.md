@@ -48,4 +48,26 @@
 ### General
 
 *   **FE-TASK-018: Ensure Responsiveness (Basic):** Apply basic responsive design principles using Chakra UI's utilities so the demo looks acceptable on common screen sizes.
-*   **FE-TASK-019: Code Cleanup & Review:** Basic code formatting, linting, and internal review before finalizing the demo build. 
+*   **FE-TASK-019: Code Cleanup & Review:** Basic code formatting, linting, and internal review before finalizing the demo build.
+
+---
+
+## Slice 0.5: Vision Demo - Organizational Context (Target: + ~1-2 Weeks)
+
+**Goal:** Enhance the Slice 0 demo with mocked UI views that illustrate organizational context, alignment (Goals/OKRs), and multi-level value, using static data.
+
+**Epics Involved (Conceptual):** Emergent Organizational Model, Strategic Alignment Engine.
+
+**Tasks:**
+
+*   **FE-TASK-020:** Define Static Goal Data: Create a static data structure (e.g., in `WorkspacePage.tsx` or a separate mock data file) representing a simple goal hierarchy (Enterprise -> Dept -> Team -> Project).
+*   **FE-TASK-021:** Create Goals Page Component (`src/pages/GoalsPage.tsx`): Build a new page component that renders the static goal hierarchy visually (e.g., using nested Cards or a simple list structure).
+*   **FE-TASK-022:** Add Goals Page Route: Update routing in `App.tsx` to include the `/goals` route rendering `GoalsPage`.
+*   **FE-TASK-023:** Add Goals Link to Main Nav: Update `MainLayout.tsx` to include a link to the new `/goals` page in the top navigation.
+*   **FE-TASK-024 (Revised Scope):** Enhance Workspace Page (Add My Context Widget): Replace the "Your Team" card with a more detailed "My Context" card showing user's team, dept, manager, key goal/project links (using static data and linking to relevant entity pages).
+*   **FE-TASK-025:** Enhance Hub Page (Link Goal Tag): Modify `HubPage.tsx` to make the "Goal" tag (displaying `alignedGoal`) a link, potentially linking to an anchor on the `/goals` page (simulation).
+*   **FE-TASK-026 (New):** Define Static Team/Dept Data: Augment mock data structures to include team leads, department leads, and relationships between teams and departments.
+*   **FE-TASK-027 (New):** Create Mocked Team Page Component (`src/pages/TeamPage.tsx`) & Route: Build page showing team name, lead, members, projects, goals, department link.
+*   **FE-TASK-028 (New):** Create Mocked Department Page Component (`src/pages/DepartmentPage.tsx`) & Route: Build page showing dept name, lead, team list.
+*   **FE-TASK-029 (New - was implicit in FE-TASK-030):** Update Contextual Links: Ensure links on Profile, Hub, Team, Dept pages point correctly to the relevant simulated entity pages.
+*   **FE-TASK-030 (New - was FE-TASK-031):** Add "Explore Organization" Link & Placeholder Page: Add link in main nav leading to a static page explaining the future org graph vision. 

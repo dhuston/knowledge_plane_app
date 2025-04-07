@@ -23,7 +23,8 @@ import {
   MenuDivider,
   MenuGroup,
   useBreakpointValue,
-  Icon
+  Icon,
+  Spacer
 } from "@chakra-ui/react"; 
 import { 
   ChevronDownIcon, 
@@ -99,17 +100,29 @@ export default function MainLayout() {
                   </Button>
                   <Button
                     as={RouterLink}
-                    to="/hub/phoenix"
+                    to="/goals"
                     variant="ghost"
                     size="sm"
-                    color={location.pathname.startsWith('/hub') ? brandColor : undefined}
-                    fontWeight={location.pathname.startsWith('/hub') ? 'semibold' : 'normal'}
+                    color={location.pathname === '/goals' ? brandColor : undefined}
+                    fontWeight={location.pathname === '/goals' ? 'semibold' : 'normal'}
                   >
-                    Projects
+                    Goals
+                  </Button>
+                  <Button
+                    as={RouterLink}
+                    to="/explore"
+                    variant="ghost"
+                    size="sm"
+                    color={location.pathname === '/explore' ? brandColor : undefined}
+                    fontWeight={location.pathname === '/explore' ? 'semibold' : 'normal'}
+                  >
+                    Explore
                   </Button>
                 </HStack>
               )}
             </HStack>
+
+            <Spacer />
 
             {/* Right Side Actions */}
             <HStack spacing={2}>
@@ -146,7 +159,8 @@ export default function MainLayout() {
                   />
                   <MenuList>
                     <MenuItem as={RouterLink} to="/workspace">Workspace</MenuItem>
-                    <MenuItem as={RouterLink} to="/hub/phoenix">Projects</MenuItem>
+                    <MenuItem as={RouterLink} to="/goals">Goals</MenuItem>
+                    <MenuItem as={RouterLink} to="/explore">Explore</MenuItem>
                     <MenuDivider />
                     <MenuItem as={RouterLink} to="/profile">Profile</MenuItem>
                     <MenuItem>Settings</MenuItem>

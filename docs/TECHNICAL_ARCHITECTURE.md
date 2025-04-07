@@ -82,7 +82,7 @@
 
 ## 9. Security Considerations
 
-*   **Tenant Isolation:** As detailed in Section 4 & 5.
+*   **Tenant Isolation:** As detailed in Section 4.
 *   **Authentication:** Robust SSO integration (SAML, OIDC).
 *   **Authorization:** Enforce permissions rigorously at the API gateway and service level based on tenant context and user roles.
 *   **Data Encryption:** Encrypt data at rest and in transit (TLS everywhere).

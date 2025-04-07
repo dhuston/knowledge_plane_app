@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link as RouterLink } from 'react-router-dom';
 import { 
   Box, 
   Heading, 
@@ -13,7 +13,7 @@ import {
   TabPanels, 
   Tab, 
   TabPanel, 
-  Icon,
+  Icon, 
   Container,
   useColorModeValue,
   Card,
@@ -34,8 +34,9 @@ import {
   SimpleGrid,
   List,
   ListItem,
-  ListIcon
-} from "@chakra-ui/react";
+  ListIcon,
+  Link,
+} from "@chakra-ui/react"; 
 import { 
   CheckIcon, 
   LinkIcon, 
@@ -49,7 +50,7 @@ import {
   TimeIcon,
   AttachmentIcon,
   EditIcon,
-  WarningIcon
+  WarningIcon,
 } from '@chakra-ui/icons';
 import { TbRobot, TbBulb } from 'react-icons/tb';
 
@@ -68,6 +69,9 @@ export default function HubPage() {
     dueDate: string;
     progress: number;
     priority: 'High' | 'Medium' | 'Low';
+    owningTeam?: string;
+    alignedGoal?: string;
+    goalId?: string;
   } } = {
     'phoenix': { 
       name: 'Project Phoenix', 
@@ -75,7 +79,10 @@ export default function HubPage() {
       status: 'In Progress',
       dueDate: '2024-06-30',
       progress: 65,
-      priority: 'High'
+      priority: 'High',
+      owningTeam: 'R&D Platform Team',
+      alignedGoal: 'Launch Platform V2',
+      goalId: 'team-platform'
     },
     'q3-strategy': { 
       name: 'Q3 Strategy Hub', 
@@ -83,7 +90,10 @@ export default function HubPage() {
       status: 'Needs Review',
       dueDate: '2024-04-15',
       progress: 40,
-      priority: 'Medium'
+      priority: 'Medium',
+      owningTeam: 'Leadership Team',
+      alignedGoal: 'Finalize Q3 OKRs',
+      goalId: 'dept-sales'
     }
   };
 
@@ -109,7 +119,7 @@ Success Metrics:
 • Deployment pipeline metrics
 • Customer satisfaction scores
 • Team velocity metrics
-`;
+  `;
 
   const notesContent = [
     { 
@@ -139,10 +149,10 @@ Success Metrics:
   ];
 
   const membersContent = [
-    { name: "Alice", role: "Lead", avatar: "", status: "online" },
-    { name: "Bob", role: "Engineer", avatar: "", status: "offline" },
-    { name: "Charlie", role: "Design", avatar: "", status: "online" },
-    { name: "Demo User", role: "Stakeholder", avatar: "", status: "online" }
+    { name: "Alice", role: "Lead", avatar: "", team: "R&D Platform" },
+    { name: "Bob", role: "Engineer", avatar: "", team: "R&D Platform" },
+    { name: "Charlie", role: "Design", avatar: "", team: "Product Design" },
+    { name: "Demo User", role: "Stakeholder", avatar: "", team: "Leadership" }
   ];
 
   const docsContent = [
@@ -188,7 +198,7 @@ Success Metrics:
       <VStack spacing={6} align="stretch">
         {/* Header Section */}
         <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" align={{ base: 'flex-start', md: 'center' }} gap={4}>
-          <Box>
+    <Box>
             <HStack mb={2}>
               <Heading size="lg">{hubData.name}</Heading>
               <Badge colorScheme={hubData.priority === 'High' ? 'red' : hubData.priority === 'Medium' ? 'orange' : 'green'}>
@@ -222,6 +232,24 @@ Success Metrics:
             </Menu>
           </HStack>
         </Flex>
+
+        {/* Display Connections Below Header */}
+        <HStack spacing={4} fontSize="sm">
+          {hubData.owningTeam && (
+            <Flex alignItems="center">
+              <Text as="span" fontWeight="bold" mr={2}>Team:</Text> 
+              <Tag size="sm" colorScheme="blue">{hubData.owningTeam}</Tag>
+            </Flex>
+          )}
+          {hubData.alignedGoal && hubData.goalId && (
+             <Flex alignItems="center">
+              <Text as="span" fontWeight="bold" mr={2}>Goal:</Text> 
+              <Link as={RouterLink} to={`/goals#${hubData.goalId}`} _hover={{textDecoration: 'none'}} title={`Link to goal: ${hubData.alignedGoal}`}>
+                <Tag size="sm" colorScheme="green" _hover={{opacity: 0.8}} cursor="pointer">{hubData.alignedGoal}</Tag>
+              </Link>
+            </Flex>
+          )}
+        </HStack>
 
         {/* AI Assistant Section */}
         <Card bg={aiCardBg} borderColor={aiCardBorder} borderWidth={1}>
@@ -310,7 +338,7 @@ Success Metrics:
                     <Text mb={1}>{hubData.progress}%</Text>
                     <Progress 
                       value={hubData.progress} 
-                      size="sm" 
+                size="sm" 
                       colorScheme={hubData.progress > 66 ? 'green' : hubData.progress > 33 ? 'orange' : 'red'} 
                       borderRadius="full"
                     />
@@ -392,16 +420,15 @@ Success Metrics:
                       <HStack>
                         <Avatar size="sm" name={member.name} src={member.avatar} />
                         <Box>
-                          <Text fontWeight="medium">{member.name}</Text>
-                          <Text fontSize="sm" color={textColor}>{member.role}</Text>
+                          <Link as={RouterLink} to={`/profile/${member.name.toLowerCase().replace(' ', '-')}`} fontWeight="bold" color="brand.700" fontSize="sm">
+                            {member.name}
+                          </Link>
+                          <Text fontSize="xs" color={textColor}>{member.role} - {member.team}</Text>
                         </Box>
                       </HStack>
-                      <Badge colorScheme={member.status === 'online' ? 'green' : 'gray'}>
-                        {member.status}
-                      </Badge>
-                    </Flex>
-                  ))}
-                </VStack>
+                </Flex>
+              ))}
+            </VStack>
               </CardBody>
             </Card>
 
@@ -421,12 +448,12 @@ Success Metrics:
                     <Flex key={idx} justify="space-between" align="center" p={2} _hover={{ bg: 'gray.50', _dark: { bg: 'gray.700' } }} borderRadius="md">
                       <HStack>
                         <Icon as={ViewIcon} color={textColor} />
-                        <Box>
+                  <Box>
                           <Text fontWeight="medium">{doc.name}</Text>
                           <Text fontSize="sm" color={textColor}>
                             {doc.source} • {doc.lastModified}
                           </Text>
-                        </Box>
+                  </Box>
                       </HStack>
                       <Text fontSize="sm" color={textColor}>{doc.size}</Text>
                     </Flex>
@@ -454,12 +481,12 @@ Success Metrics:
             </TabPanel>
             <TabPanel>
               <Text>Project timeline and milestones will go here...</Text>
-            </TabPanel>
-            <TabPanel>
+          </TabPanel>
+          <TabPanel>
               <Text>Additional resources and links will go here...</Text>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
       </VStack>
     </Container>
   );
