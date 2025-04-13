@@ -6,8 +6,8 @@ Tasks currently being worked on.
 
 ---
 
-*   **FE-TASK-030 (New - was FE-TASK-031):** Add "Explore Organization" Link & Placeholder Page: Add link in main nav leading to a static page explaining the future org graph vision.
-    *   Assignee: [Your Name/Handle]
-    *   Start Date: [Current Date]
+* **FE-TASK-030 (New - was FE-TASK-031):** Add "Explore Organization" Link & Placeholder Page: Add link in main nav leading to a static page explaining the future org graph vision.
+* Assignee: [Your Name/Handle]
+* Start Date: [Current Date]
 
---- 
+---
