@@ -1,4 +1,14 @@
-import { InfoIcon, WarningIcon, CheckCircleIcon, SettingsIcon } from '@chakra-ui/icons';
+import { 
+  InfoIcon, 
+  WarningIcon, 
+  CheckCircleIcon, 
+  SettingsIcon, 
+  SearchIcon, 
+  QuestionOutlineIcon, 
+  EditIcon, 
+  AddIcon, 
+  ViewIcon 
+} from '@chakra-ui/icons';
 
 // --- Types (Centralized) ---
 export type Goal = {
@@ -197,7 +207,11 @@ export const mockProjects: Record<string, Project> = {
 };
 
 export const mockActionButtons = [
-  // ... keep as is ...
+  { label: "Find Data", icon: SearchIcon, tooltip: "Search through your data sources" },
+  { label: "Search Literature", icon: QuestionOutlineIcon, tooltip: "Find relevant research papers" },
+  { label: "Design Experiment", icon: EditIcon, tooltip: "Create a new experiment" },
+  { label: "Create Project", icon: AddIcon, tooltip: "Start a new project" },
+  { label: "Search Knowledgebase", icon: ViewIcon, tooltip: "Browse the knowledge base" },
 ];
 
 // Recursive helper to find a goal by ID

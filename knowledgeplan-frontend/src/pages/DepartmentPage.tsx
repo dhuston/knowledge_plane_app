@@ -1,4 +1,3 @@
-import React from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import { 
   Box, 
@@ -12,7 +11,8 @@ import {
   Icon, 
   Link, 
   SimpleGrid,
-  Avatar
+  Avatar,
+  useColorModeValue
 } from "@chakra-ui/react";
 import { 
   // Removed unused icons

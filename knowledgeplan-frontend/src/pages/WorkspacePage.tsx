@@ -24,13 +24,22 @@ import {
   Icon,
   Progress,
   Wrap,
-  WrapItem
+  WrapItem,
+  Spacer
 } from "@chakra-ui/react"; 
-import { AddIcon, ChatIcon, SearchIcon, EditIcon, QuestionOutlineIcon, ViewIcon, InfoIcon, WarningIcon, ArrowForwardIcon, CheckIcon, BellIcon, CalendarIcon, StarIcon, CheckCircleIcon, RepeatClockIcon, SettingsIcon } from '@chakra-ui/icons';
+import { 
+  AddIcon, 
+  TimeIcon, 
+  ChatIcon, 
+  ArrowForwardIcon, 
+  CheckIcon,
+  LinkIcon
+} from '@chakra-ui/icons';
+import { GoTag as TagIcon } from "react-icons/go";
 // Import shared mock data
 import { mockGoals, mockTeams, mockUsers, currentUser, mockProjects, mockActionButtons, findGoalById } from '../mockData'; // Adjust path as needed
 // Import type
-import type { MockGoal } from '../mockData'; // Use exported type
+import type { Goal } from '../mockData'; // Corrected type import
 
 // --- Helper Functions ---
 const getUserGreeting = () => {
@@ -50,12 +59,14 @@ const getCurrentDate = () => {
 
 // Helper to get icon based on goal type (simplified)
 const getGoalIcon = (type: string) => {
+  // Remove unused icons from switch case
   switch (type) {
-    case 'Enterprise': return SettingsIcon;
-    case 'Department': return RepeatClockIcon;
-    case 'Team': return CheckCircleIcon;
-    case 'Project': return CheckCircleIcon;
-    default: return CheckCircleIcon;
+    // case 'Enterprise': return SettingsIcon;
+    // case 'Department': return RepeatClockIcon;
+    // case 'Team': return CheckCircleIcon;
+    // case 'Project': return CheckCircleIcon;
+    // default: return CheckCircleIcon;
+    default: return undefined; // Or a default icon if preferred
   }
 }
 
@@ -63,7 +74,7 @@ const getGoalIcon = (type: string) => {
 export default function WorkspacePage() {
   const demoUserName = currentUser.name;
   const userTeam = currentUser.teamId ? mockTeams[currentUser.teamId] : null;
-  const teamGoal = userTeam ? findGoalById(userTeam.id, mockGoals as MockGoal) : null;
+  const teamGoal = userTeam ? findGoalById(userTeam.id, mockGoals as Goal) : null;
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const highlightColor = useColorModeValue('brand.50', 'brand.900');
@@ -71,6 +82,23 @@ export default function WorkspacePage() {
   const teamMembers = Object.values(mockUsers).filter(user => user.teamId === currentUser.teamId);
   // Use mockProjects directly now
   const userProjects = Object.values(mockProjects).filter(h => h.teamId === currentUser.teamId);
+
+  // Updated Briefing Text with more simulated links/tags
+  const briefingText = (
+    <Text fontSize="md" lineHeight="tall">
+      Today you have <Tooltip label="Linked to Goal: team-ml"><Tag size="sm" variant="solid" colorScheme="blue">2 active experiments</Tag></Tooltip> running, including your <Tooltip label="Linked to Experiment: EMT-Inhib-Screen"><Tag size="sm" variant="solid" colorScheme="purple">EMT inhibitor screening</Tag></Tooltip> which is showing <Text as="strong" color="green.600">promising drug response patterns</Text>. 
+      Your recent paper on <Tooltip label="Linked to Topic: Resistance Mechanisms"><Tag size="sm" variant="outline" colorScheme="gray">resistance mechanisms</Tag></Tooltip> has received <Text as="strong" color="brand.700">+12 new citations</Text> this month. 
+      Your <Tooltip label="Linked to Project: drug-review-proj"><Tag size="sm" variant="solid" colorScheme="orange">drug resistance review meeting</Tag></Tooltip> is scheduled for <Text as="strong">tomorrow at 10:00 AM</Text>, and there's a <Tooltip label="Linked to Task: data-sub-task"><Tag size="sm" variant="solid" colorScheme="red">resistance mechanism data submission</Tag></Tooltip> due today at <Text as="strong">5:00 PM</Text>. 
+      <Tooltip label="Linked to Team: team-platform"><Link as={RouterLink} to={`/team/team-platform`} color="brand.600" fontWeight="medium">3 team members</Link></Tooltip> are currently analyzing related PDX models.
+    </Text>
+  );
+
+  // Placeholder AI Suggestions
+  const aiSuggestions = [
+    { label: "Link 'drug response patterns' to Goal?", icon: LinkIcon },
+    { label: "Tag 'resistance mechanisms'?", icon: TagIcon },
+    { label: "Assign 'data submission' task to Bob?", icon: AddIcon }
+  ];
 
   return (
     <Container maxW="container.xl" py={6}>
@@ -83,11 +111,11 @@ export default function WorkspacePage() {
               <Text fontSize="lg">{getCurrentDate()}</Text>
               <Divider orientation="vertical" height="20px" />
               <HStack>
-                <CalendarIcon />
+                <TimeIcon />
                 <Text>3 meetings today</Text>
               </HStack>
               <HStack>
-                <BellIcon />
+                <TimeIcon />
                 <Text>2 notifications</Text>
               </HStack>
             </HStack>
@@ -95,13 +123,13 @@ export default function WorkspacePage() {
           <HStack spacing={2}>
             <IconButton
               aria-label="View notifications"
-              icon={<BellIcon />}
+              icon={<TimeIcon />}
               variant="ghost"
               colorScheme="brand"
             />
             <IconButton
               aria-label="View calendar"
-              icon={<CalendarIcon />}
+              icon={<TimeIcon />}
               variant="ghost"
               colorScheme="brand"
             />
@@ -121,20 +149,34 @@ export default function WorkspacePage() {
           <CardHeader pb={2}>
             <Flex alignItems="center" justify="space-between">
               <HStack>
-                <StarIcon color="brand.500" />
+                <TimeIcon color="brand.500" />
                 <Text fontSize="lg" fontWeight="bold" color="brand.700">Daily Summary</Text>
               </HStack>
               <Tag size="sm" variant="subtle" colorScheme="brand">AI GENERATED</Tag> 
             </Flex>
           </CardHeader>
           <CardBody pt={0}>
-            <Text fontSize="md" lineHeight="tall">
-              Your recent paper on resistance mechanisms has received <Text as="strong" color="brand.700">+12 new citations</Text> this month. 
-              Your <Tag size="sm" variant="solid" colorScheme="orange">drug resistance review meeting</Tag> is scheduled for tomorrow at <Text as="strong">10:00 AM</Text>, and there's a <Tag size="sm" variant="solid" colorScheme="red">resistance mechanism data submission</Tag> due today at <Text as="strong">5:00 PM</Text>. 
-              <Text as="strong">3 team members</Text> are currently analyzing related PDX models.
-            </Text>
+            {briefingText}
           </CardBody>
         </Card>
+
+        {/* AI Suggestions Section */}
+        <Divider my={4} />
+        <HStack spacing={2}>
+          <Text fontSize="xs" fontWeight="bold" color="gray.500">AI SUGGESTIONS:</Text>
+          {aiSuggestions.map((sug, i) => (
+            <Button 
+              key={i} 
+              size="xs" 
+              variant="outline" 
+              colorScheme="gray" 
+              leftIcon={<Icon as={sug.icon} boxSize={3}/>}
+              isDisabled
+            >
+              {sug.label}
+            </Button>
+          ))}
+        </HStack>
 
         {/* Quick Actions */}
         <SimpleGrid columns={{ base: 2, sm: 3, md: 5 }} spacing={4}>
@@ -156,7 +198,7 @@ export default function WorkspacePage() {
         </SimpleGrid>
 
         {/* Main Content Grid (Projects and Goals only) */}
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+        <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={6}>
           {/* Projects Card */}
           <Card variant="outline" boxShadow="sm" bg={bgColor} borderColor={borderColor}>
             <CardHeader>
@@ -172,8 +214,8 @@ export default function WorkspacePage() {
                 {userProjects.map(hub => (
                   <Card key={hub.id} variant="outline" size="sm">
                     <CardBody>
-                      <Flex direction={{ base: 'column', md: 'row' }} gap={4}>
-                        <Box flex="1">
+                      <Flex alignItems="center" justify="space-between">
+                        <VStack align="stretch" spacing={1}>
                           <HStack mb={2}>
                             <Heading size="sm">{hub.name}</Heading>
                             <Badge colorScheme={hub.statusColorScheme}>
@@ -186,23 +228,29 @@ export default function WorkspacePage() {
                               {hub.subtext}
                             </Tag>
                           </HStack>
-                        </Box>
-                        <HStack spacing={2}>
-                          <Button
-                            as={RouterLink}
-                            to={`/hub/${hub.id}`}
-                            size="sm"
-                            colorScheme="brand"
-                            variant="ghost"
+                        </VStack>
+                        <Spacer />
+                        <HStack>
+                          <Link 
+                            as={RouterLink} 
+                            to={`/hub/${hub.id}`} 
+                            fontSize="sm" 
+                            color="brand.600"
+                            fontWeight="medium"
+                            mr={2}
                           >
-                            View Details
-                          </Button>
-                          <IconButton
-                            aria-label="Chat about project"
-                            icon={<ChatIcon />}
-                            size="sm"
-                            variant="ghost"
-                          />
+                            View Details <Icon as={ArrowForwardIcon} mx={1}/>
+                          </Link>
+                          <Tooltip label="Connect this project...">
+                            <IconButton
+                               aria-label="Connect project"
+                               icon={<LinkIcon />}
+                               size="xs"
+                               variant="ghost"
+                               colorScheme="gray"
+                               isDisabled
+                             />
+                          </Tooltip>
                         </HStack>
                       </Flex>
                     </CardBody>
@@ -304,7 +352,7 @@ export default function WorkspacePage() {
                 <Button leftIcon={<ChatIcon />} variant="ghost" size="sm" colorScheme="brand">
                   Team Chat
                 </Button>
-                <Button leftIcon={<CalendarIcon />} variant="ghost" size="sm" colorScheme="brand">
+                <Button leftIcon={<TimeIcon />} variant="ghost" size="sm" colorScheme="brand">
                   Team Calendar
                 </Button>
               </HStack>
@@ -377,11 +425,11 @@ export default function WorkspacePage() {
                     <Text fontWeight="medium" mb={2}>Recent Achievements</Text>
                     <VStack align="stretch" spacing={2}>
                       <HStack>
-                        <Icon as={CheckCircleIcon} color="green.500" />
+                        <Icon as={CheckIcon} color="green.500" />
                         <Text fontSize="sm">Completed Project Milestone</Text>
                       </HStack>
                       <HStack>
-                        <Icon as={StarIcon} color="yellow.500" />
+                        <Icon as={TimeIcon} color="yellow.500" />
                         <Text fontSize="sm">Team Recognition Award</Text>
                       </HStack>
                     </VStack>
@@ -391,11 +439,11 @@ export default function WorkspacePage() {
                     <Text fontWeight="medium" mb={2}>Upcoming Team Events</Text>
                     <VStack align="stretch" spacing={2}>
                       <HStack>
-                        <Icon as={CalendarIcon} color="brand.500" />
+                        <Icon as={TimeIcon} color="brand.500" />
                         <Text fontSize="sm">Sprint Planning (Tomorrow, 10 AM)</Text>
                       </HStack>
                       <HStack>
-                        <Icon as={CalendarIcon} color="brand.500" />
+                        <Icon as={TimeIcon} color="brand.500" />
                         <Text fontSize="sm">Team Retrospective (Friday, 2 PM)</Text>
                       </HStack>
                     </VStack>
