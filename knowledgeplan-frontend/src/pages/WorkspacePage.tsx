@@ -1,4 +1,4 @@
-import React from 'react'; // Needed for JSX types
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import { Link as RouterLink } from 'react-router-dom';
 import { 
   Box, 
@@ -22,10 +22,12 @@ import {
   Divider,
   Link,
   Icon,
-  Progress,
-  Wrap,
   WrapItem,
-  Spacer
+  Spacer,
+  Spinner, // Add Spinner
+  Alert, // Add Alert
+  AlertIcon, // Add AlertIcon
+  List, ListItem // Ensure List/ListItem are imported
 } from "@chakra-ui/react"; 
 import { 
   AddIcon, 
@@ -37,9 +39,28 @@ import {
 } from '@chakra-ui/icons';
 import { GoTag as TagIcon } from "react-icons/go";
 // Import shared mock data
-import { mockGoals, mockTeams, mockUsers, currentUser, mockProjects, mockActionButtons, findGoalById } from '../mockData'; // Adjust path as needed
+import { mockTeams, mockUsers, /* currentUser, */ mockProjects, mockActionButtons, /* findGoalById */ } from '../mockData'; // Adjust path as needed
+import { apiClient } from '../api/client';
 // Import type
-import type { Goal } from '../mockData'; // Corrected type import
+// import type { Goal } from '../mockData'; // Removed unused Goal type
+import { useAuth } from '../context/AuthContext'; // Import useAuth
+// import type { User } from '../context/AuthContext'; // No longer explicitly needed here
+// import type { Team } from '../pages/ProfilePage'; // Removed incorrect import
+
+// Define type for Calendar Event from API
+interface CalendarEvent {
+  summary: string;
+  start?: string;
+  end?: string;
+}
+
+// Define Team type locally for this component
+interface Team {
+  id: string;
+  name: string;
+  description?: string | null;
+  // Add other fields as needed from the API response
+}
 
 // --- Helper Functions ---
 const getUserGreeting = () => {
@@ -57,41 +78,129 @@ const getCurrentDate = () => {
   });
 };
 
-// Helper to get icon based on goal type (simplified)
-const getGoalIcon = (type: string) => {
-  // Remove unused icons from switch case
-  switch (type) {
-    // case 'Enterprise': return SettingsIcon;
-    // case 'Department': return RepeatClockIcon;
-    // case 'Team': return CheckCircleIcon;
-    // case 'Project': return CheckCircleIcon;
-    // default: return CheckCircleIcon;
-    default: return undefined; // Or a default icon if preferred
-  }
-}
+// Removed unused getGoalIcon helper
+// const getGoalIcon = (type: string) => { /* ... */ };
 
 // --- Component ---
 export default function WorkspacePage() {
-  const demoUserName = currentUser.name;
-  const userTeam = currentUser.teamId ? mockTeams[currentUser.teamId] : null;
-  const teamGoal = userTeam ? findGoalById(userTeam.id, mockGoals as Goal) : null;
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const highlightColor = useColorModeValue('brand.50', 'brand.900');
-  const textColor = useColorModeValue('gray.600', 'gray.300');
-  const teamMembers = Object.values(mockUsers).filter(user => user.teamId === currentUser.teamId);
-  // Use mockProjects directly now
-  const userProjects = Object.values(mockProjects).filter(h => h.teamId === currentUser.teamId);
+  const { isAuthenticated, isLoading: authIsLoading, user } = useAuth();
+  
+  // Removed unused teamGoal
+  // const teamGoal = null; 
+  
+  // Keep filtering mock data for now, based on real user ID
+  const teamMembers = user?.team_id ? Object.values(mockUsers).filter(u => u.teamId === user.team_id) : []; 
+  const userProjects = user?.team_id ? Object.values(mockProjects).filter(h => h.teamId === user.team_id) : []; 
 
-  // Updated Briefing Text with more simulated links/tags
-  const briefingText = (
-    <Text fontSize="md" lineHeight="tall">
-      Today you have <Tooltip label="Linked to Goal: team-ml"><Tag size="sm" variant="solid" colorScheme="blue">2 active experiments</Tag></Tooltip> running, including your <Tooltip label="Linked to Experiment: EMT-Inhib-Screen"><Tag size="sm" variant="solid" colorScheme="purple">EMT inhibitor screening</Tag></Tooltip> which is showing <Text as="strong" color="green.600">promising drug response patterns</Text>. 
-      Your recent paper on <Tooltip label="Linked to Topic: Resistance Mechanisms"><Tag size="sm" variant="outline" colorScheme="gray">resistance mechanisms</Tag></Tooltip> has received <Text as="strong" color="brand.700">+12 new citations</Text> this month. 
-      Your <Tooltip label="Linked to Project: drug-review-proj"><Tag size="sm" variant="solid" colorScheme="orange">drug resistance review meeting</Tag></Tooltip> is scheduled for <Text as="strong">tomorrow at 10:00 AM</Text>, and there's a <Tooltip label="Linked to Task: data-sub-task"><Tag size="sm" variant="solid" colorScheme="red">resistance mechanism data submission</Tag></Tooltip> due today at <Text as="strong">5:00 PM</Text>. 
-      <Tooltip label="Linked to Team: team-platform"><Link as={RouterLink} to={`/team/team-platform`} color="brand.600" fontWeight="medium">3 team members</Link></Tooltip> are currently analyzing related PDX models.
-    </Text>
-  );
+  // State for calendar events
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState<boolean>(true);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+
+  // State for team details
+  const [teamDetails, setTeamDetails] = useState<Team | null>(null);
+  const [teamLoading, setTeamLoading] = useState<boolean>(false);
+  // Removed unused teamError state
+  // const [teamError, setTeamError] = useState<string | null>(null);
+
+  // Fetch calendar events *after* user is authenticated
+  useEffect(() => {
+    console.log(`[WorkspacePage] useEffect triggered. isAuthenticated: ${isAuthenticated}, authIsLoading: ${authIsLoading}`);
+    const fetchEvents = async () => {
+      // Only fetch if authenticated
+      if (!isAuthenticated) {
+        console.log("[WorkspacePage] Not authenticated, skipping fetchEvents.");
+        // Optionally reset state if user becomes unauthenticated
+        // setCalendarEvents([]);
+        // setCalendarLoading(false);
+        // setCalendarError(null);
+        return;
+      }
+      
+      setCalendarLoading(true);
+      setCalendarError(null);
+      try {
+        console.log("[WorkspacePage] Fetching calendar events (user authenticated)");
+        const events = await apiClient.get<CalendarEvent[]>('/integrations/google/calendar/events');
+        setCalendarEvents(events || []); // Handle null response
+      } catch /* (error) */ {
+        // console.error("Failed to fetch calendar events:", error);
+        setCalendarError("Could not load calendar events. Check connection or permissions.");
+      } finally {
+        setCalendarLoading(false);
+      }
+    };
+
+    fetchEvents();
+    
+  }, [isAuthenticated]); // Re-run effect when isAuthenticated changes
+
+  // Effect to fetch team details when user/team_id changes
+  useEffect(() => {
+    // console.log(`[WorkspacePage] useEffect triggered. isAuthenticated: ${isAuthenticated}, authIsLoading: ${authIsLoading}`);
+    const fetchTeamData = async () => {
+      if (user?.team_id) {
+        // console.log(`[WorkspacePage] User has teamId ${user.team_id}, fetching team details.`);
+        setTeamLoading(true);
+        setTeamDetails(null); 
+        try {
+          const fetchedTeam = await apiClient.get<Team>(`/teams/${user.team_id}`);
+          setTeamDetails(fetchedTeam);
+          // console.log("[WorkspacePage] Fetched team details:", fetchedTeam);
+        } catch /* (error) */ {
+          // console.error("[WorkspacePage] Failed to fetch team details:", error);
+          // Handle error state if needed, e.g., setTeamError("Failed to load team");
+        } finally {
+          setTeamLoading(false);
+        }
+      } else {
+        setTeamDetails(null);
+        setTeamLoading(false);
+      }
+    };
+
+    if (!authIsLoading) {
+       fetchTeamData();
+    }
+  }, [user?.team_id, authIsLoading]);
+
+  // --- Briefing Content (Now focuses on Calendar) ---
+  const renderBriefingContent = () => {
+    // Show loading spinner if auth is loading OR calendar is loading
+    if (authIsLoading || calendarLoading) {
+      return <Spinner size="sm" />;
+    }
+    if (calendarError) {
+      return <Alert status="warning" size="sm"><AlertIcon />{calendarError}</Alert>;
+    }
+    if (calendarEvents.length === 0) {
+      return <Text fontSize="sm">No events scheduled for today.</Text>;
+    }
+    return (
+       <List spacing={2} mt={2}>
+          {calendarEvents.slice(0, 5).map((event, index) => ( // Show max 5 events
+            <ListItem key={index} fontSize="sm" fontWeight="normal" display="flex" alignItems="center">
+              <Icon as={TimeIcon} color="blue.500" mr={2} />
+              <Text as="span" noOfLines={1}>{event.summary} ({formatEventTime(event.start)})</Text> { /* Added time formatting helper needed */}
+            </ListItem>
+          ))}
+          {calendarEvents.length > 5 && <ListItem fontSize="xs" color="gray.500">... and {calendarEvents.length - 5} more.</ListItem>} 
+        </List>
+    );
+  };
+  // --- Helper for time formatting (Needs implementation) ---
+  const formatEventTime = (dateTimeString?: string): string => {
+    if (!dateTimeString) return "All day";
+    try {
+      // Basic time formatting, improve as needed
+      const date = new Date(dateTimeString);
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch {
+      // Fixed unused var
+      return "Time Error";
+    }
+  }
+  // ------------------------------------
 
   // Placeholder AI Suggestions
   const aiSuggestions = [
@@ -100,23 +209,31 @@ export default function WorkspacePage() {
     { label: "Assign 'data submission' task to Bob?", icon: AddIcon }
   ];
 
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const highlightColor = useColorModeValue('brand.50', 'brand.900');
+  const textColor = useColorModeValue('gray.600', 'gray.300');
+
   return (
     <Container maxW="container.xl" py={6}>
       <VStack spacing={8} align="stretch">
         {/* Header Section */}
         <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" align={{ base: 'flex-start', md: 'center' }} gap={4}>
           <Box>
-            <Heading size="2xl" color="brand.700" mb={2}>{getUserGreeting()}, {demoUserName}</Heading>
+            <Heading size="2xl" color="brand.700" mb={2}>
+              {getUserGreeting()}, {user ? user.name : 'User'}
+            </Heading>
             <HStack spacing={4} color={textColor}>
               <Text fontSize="lg">{getCurrentDate()}</Text>
               <Divider orientation="vertical" height="20px" />
               <HStack>
                 <TimeIcon />
-                <Text>3 meetings today</Text>
-              </HStack>
-              <HStack>
-                <TimeIcon />
-                <Text>2 notifications</Text>
+                <Text>
+                  {calendarLoading 
+                    ? "Loading meetings..." 
+                    : `${calendarEvents.length} meeting${calendarEvents.length !== 1 ? 's' : ''} today`
+                  }
+                </Text>
               </HStack>
             </HStack>
           </Box>
@@ -156,7 +273,7 @@ export default function WorkspacePage() {
             </Flex>
           </CardHeader>
           <CardBody pt={0}>
-            {briefingText}
+            {renderBriefingContent()}
           </CardBody>
         </Card>
 
@@ -271,82 +388,50 @@ export default function WorkspacePage() {
                </Flex>
             </CardHeader>
             <CardBody>
-              <VStack align="stretch" spacing={3}>
-                {/* Display Team Goal directly */}
-                {teamGoal ? (
-                  <Flex key={teamGoal.id} alignItems="center">
-                    <Icon as={getGoalIcon(teamGoal.type)} color="blue.500" mr={2} /> { /* Hardcoded color for now */}
-                    <Link as={RouterLink} to={'/goals'} fontSize="sm" fontWeight="medium" color="brand.600">
-                      {teamGoal.title}
-                    </Link>
-                  </Flex>
-                ) : (
-                   <Text fontSize="sm" color="gray.500">No specific team goals found.</Text>
-                )}
-                 {/* Add another placeholder goal if needed for demo */}
-              </VStack>
+              <Text fontSize="sm" color="gray.500">Goals data loading logic TBD.</Text>
             </CardBody>
           </Card>
         </SimpleGrid>
 
-        {/* Team Section - Full Width */}
+        {/* Team Section - Updated Header */}
         <Card 
           variant="outline" 
           boxShadow="sm" 
           bg={bgColor} 
-          borderColor="brand.200"
+          borderColor={teamDetails ? "brand.200" : borderColor} // Highlight if team loaded
           mt={8}
         >
-          <CardHeader borderBottom="1px" borderColor={borderColor} bg={highlightColor} roundedTop="md">
+          <CardHeader borderBottom="1px" borderColor={borderColor} bg={teamDetails ? highlightColor : undefined} roundedTop="md">
             <Flex justify="space-between" align="center">
-              {userTeam ? (
+              {teamLoading ? (
+                <Spinner size="sm" />
+              ) : teamDetails ? (
                 <HStack spacing={4}>
+                  {/* Link uses fetched team ID */}
                   <Link 
                     as={RouterLink} 
-                    to={`/team/${userTeam.id}`} 
-                    _hover={{
-                      textDecoration: 'none',
-                      '& > .team-name': {
-                        color: 'brand.600',
-                        transform: 'translateX(2px)'
-                      },
-                      '& > .team-name-icon': {
-                        opacity: 1,
-                        transform: 'translateX(0)',
-                        color: 'brand.600'
-                      }
-                    }}
+                    to={`/team/${teamDetails.id}`} 
+                    _hover={{ /* ... hover styles ... */ }}
                     display="flex"
                     alignItems="center"
                   >
-                    <Heading 
-                      size="md" 
-                      className="team-name"
-                      transition="all 0.2s"
-                      display="flex"
-                      alignItems="center"
-                      gap={2}
-                      color="brand.700"
-                    >
-                      {userTeam.name}
-                      <Icon
-                        as={ArrowForwardIcon}
-                        className="team-name-icon"
-                        boxSize={4}
-                        opacity={0.3}
-                        transform="translateX(-4px)"
-                        transition="all 0.2s"
-                        color="brand.700"
-                      />
+                    <Heading size="md" /* ... other styles ... */ color="brand.700">
+                      {/* Display fetched team name */}
+                      {teamDetails.name} 
+                      {/* ... (Arrow icon) ... */}
                     </Heading>
                   </Link>
+                  {/* Online count uses filtered mock data for now */}
                   <Tag size="sm" colorScheme="green" variant="solid">
                     {teamMembers.filter(m => m.online).length} ONLINE
                   </Tag>
-                  <Text fontSize="sm" color={textColor}>Led by {userTeam.lead}</Text>
+                  {/* Lead uses mock data for now */}
+                  <Text fontSize="sm" color={textColor}>
+                    Led by {mockTeams[teamDetails.id]?.lead || 'N/A'} { /* Use mock lead for now */} 
+                  </Text>
                 </HStack>
               ) : (
-                <Heading size="md">Your Team</Heading>
+                <Heading size="md">Your Team</Heading> // Fallback if no team or error
               )}
               <HStack>
                 <Button leftIcon={<ChatIcon />} variant="ghost" size="sm" colorScheme="brand">
@@ -359,98 +444,56 @@ export default function WorkspacePage() {
             </Flex>
           </CardHeader>
           <CardBody>
-            <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-              {/* Team Members Section */}
-              <Box>
-                <Heading size="sm" mb={4}>Team Members</Heading>
-                <Wrap spacing={4}>
-                  {teamMembers.map((member, index) => (
-                    <WrapItem key={index}>
-                      <Card 
-                        variant="outline" 
-                        size="sm" 
-                        w="250px"
-                        _hover={{ borderColor: "brand.200", transform: "translateY(-2px)" }}
-                        transition="all 0.2s"
-                      >
-                        <CardBody>
-                          <HStack spacing={3}>
-                            <Avatar size="md" name={member.name} src={member.avatar} />
-                            <Box>
-                              <Link 
-                                as={RouterLink} 
-                                to={`/profile/${member.id}`} 
-                                fontWeight="medium" 
-                                fontSize="sm" 
-                                color="brand.700"
-                                display="block"
-                              >
-                                {member.name}
-                              </Link>
-                              <Text fontSize="xs" color={textColor}>{member.title}</Text>
-                              <HStack mt={1}>
-                                {member.online && (
-                                  <Tag size="sm" colorScheme="green" variant="subtle">
-                                    <Icon as={CheckIcon} mr={1} boxSize="10px"/> online
-                                  </Tag>
-                                )}
-                                <IconButton
-                                  aria-label="Message"
-                                  icon={<ChatIcon />}
-                                  size="xs"
-                                  variant="ghost"
-                                  colorScheme="brand"
-                                />
-                              </HStack>
-                            </Box>
-                          </HStack>
-                        </CardBody>
-                      </Card>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-              </Box>
-
-              {/* Team Activity & Stats */}
-              <Box>
-                <Heading size="sm" mb={4}>Team Activity</Heading>
-                <VStack spacing={4} align="stretch">
-                  <Card variant="outline" p={4}>
-                    <Text fontWeight="medium" mb={2}>Current Sprint Progress</Text>
-                    <Progress value={75} colorScheme="brand" rounded="full" size="sm" mb={2} />
-                    <Text fontSize="sm" color={textColor}>Sprint ends in 5 days</Text>
-                  </Card>
-                  
-                  <Card variant="outline" p={4}>
-                    <Text fontWeight="medium" mb={2}>Recent Achievements</Text>
-                    <VStack align="stretch" spacing={2}>
-                      <HStack>
-                        <Icon as={CheckIcon} color="green.500" />
-                        <Text fontSize="sm">Completed Project Milestone</Text>
-                      </HStack>
-                      <HStack>
-                        <Icon as={TimeIcon} color="yellow.500" />
-                        <Text fontSize="sm">Team Recognition Award</Text>
-                      </HStack>
-                    </VStack>
-                  </Card>
-
-                  <Card variant="outline" p={4}>
-                    <Text fontWeight="medium" mb={2}>Upcoming Team Events</Text>
-                    <VStack align="stretch" spacing={2}>
-                      <HStack>
-                        <Icon as={TimeIcon} color="brand.500" />
-                        <Text fontSize="sm">Sprint Planning (Tomorrow, 10 AM)</Text>
-                      </HStack>
-                      <HStack>
-                        <Icon as={TimeIcon} color="brand.500" />
-                        <Text fontSize="sm">Team Retrospective (Friday, 2 PM)</Text>
-                      </HStack>
-                    </VStack>
-                  </Card>
-                </VStack>
-              </Box>
-            </SimpleGrid>
+             {/* Team Members Section - Still uses filtered mock data */}
+             <Box>
+               <Heading size="sm" mb={4}>Team Members</Heading>
+               <Flex wrap="wrap" gap={4}>
+                 {teamMembers.map((member, index) => (
+                   <WrapItem key={index} flexShrink={0}>
+                     <Card variant="outline" size="sm" w="250px" _hover={{ borderColor: "brand.200", transform: "translateY(-2px)" }} transition="all 0.2s">
+                       <CardBody>
+                         <HStack spacing={3}>
+                           <Avatar size="md" name={member.name} src={member.avatar} />
+                           <Box>
+                             <Link 
+                               as={RouterLink} 
+                               to={`/profile/${member.id}`} 
+                               fontWeight="medium" 
+                               fontSize="sm" 
+                               color="brand.700"
+                               display="block"
+                             >
+                               {member.name}
+                             </Link>
+                             <Text fontSize="xs" color={textColor}>{member.title}</Text>
+                             <HStack mt={1}>
+                               {member.online && (
+                                 <Tag size="sm" colorScheme="green" variant="subtle">
+                                   <Icon as={CheckIcon} mr={1} boxSize="10px"/> online
+                                 </Tag>
+                               )}
+                               <IconButton
+                                 aria-label="Message"
+                                 icon={<ChatIcon />}
+                                 size="xs"
+                                 variant="ghost"
+                                 colorScheme="brand"
+                               />
+                             </HStack>
+                           </Box>
+                         </HStack>
+                       </CardBody>
+                     </Card>
+                   </WrapItem>
+                 ))}
+               </Flex>
+             </Box>
+             
+             {/* Team Activity & Stats (Content removed as it used unused imports) */}
+             <Box mt={6}>
+               <Heading size="sm" mb={4}>Team Activity</Heading>
+               <Text fontSize="sm" color="gray.500">Team activity loading logic TBD.</Text>
+             </Box>
           </CardBody>
         </Card>
       </VStack>

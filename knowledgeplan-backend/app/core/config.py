@@ -1,4 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import PostgresDsn, computed_field
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -8,20 +10,33 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "KnowledgePlane AI Backend"
 
     # Database
-    # Example: POSTGRES_SERVER: str = "localhost"
-    # POSTGRES_USER: str = "postgres"
-    # POSTGRES_PASSWORD: str = "password"
-    # POSTGRES_DB: str = "knowledgeplane"
-    # DATABASE_URL: str | None = None # Constructed from parts
+    POSTGRES_SERVER: str = "db" # Service name in docker-compose
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "password"
+    POSTGRES_DB: str = "knowledgeplan_dev"
+    POSTGRES_PORT: int = 5432
+
+    # Construct SQLAlchemy Database URL asynchronously
+    @computed_field # type: ignore[misc]
+    @property
+    def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
+        return PostgresDsn.build(
+            scheme="postgresql+asyncpg",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD,
+            host=self.POSTGRES_SERVER,
+            port=self.POSTGRES_PORT,
+            path=self.POSTGRES_DB,
+        )
 
     # Security
-    # Example: SECRET_KEY: str = "your_secret_key"
-    # ALGORITHM: str = "HS256"
-    # ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SECRET_KEY: str = "a_very_secret_key_change_this"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8 # 8 days for example
 
     # Google OAuth
-    # Example: GOOGLE_CLIENT_ID: str | None = None
-    # GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
 
     # Use .env file for environment variables
     model_config = SettingsConfigDict(env_file=".env", extra='ignore')

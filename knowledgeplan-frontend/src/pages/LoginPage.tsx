@@ -1,14 +1,18 @@
 import React from 'react'; // Needed for JSX types
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom"; // Removed unused hook
 import { Box, Heading, Text, Flex, Button, VStack } from "@chakra-ui/react"; 
 import { EmailIcon } from '@chakra-ui/icons';
 
-export default function LoginPage() {
-  const navigate = useNavigate(); // Hook for navigation
+// Get backend API base URL (adjust if needed, could use env var later)
+const API_BASE_URL = "http://localhost:8001"; // As defined in docker-compose
 
-  // Simulate navigation on button click for Slice 0
-  const handleFakeLogin = () => {
-    navigate('/workspace', { replace: true }); 
+export default function LoginPage() {
+  // Remove navigate hook if no longer needed for fake login
+  // const navigate = useNavigate();
+
+  // Redirect to backend Google login endpoint
+  const handleGoogleLogin = () => {
+    window.location.href = `${API_BASE_URL}/api/v1/auth/login/google`;
   };
 
   return (
@@ -32,17 +36,18 @@ export default function LoginPage() {
         <VStack spacing={4}> { /* Use VStack for vertical spacing */ }
           <Button 
             colorScheme="blue" 
-            leftIcon={<EmailIcon />} // Placeholder icon
-            onClick={handleFakeLogin}
+            leftIcon={<EmailIcon />} 
+            onClick={handleGoogleLogin} // Use real login handler
             width="100%"
           >
             Sign in with Google
           </Button>
           <Button 
             colorScheme="gray" 
-            leftIcon={<EmailIcon />} // Placeholder icon
-            onClick={handleFakeLogin}
+            leftIcon={<EmailIcon />} 
+            // onClick={handleFakeLogin} // Keep Microsoft button disabled/fake for now
             width="100%"
+            isDisabled // Disable Microsoft login for now
           >
             Sign in with Microsoft
           </Button>

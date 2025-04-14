@@ -1,0 +1,116 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+from uuid import UUID
+from sqlalchemy.future import select
+from typing import Any, Dict, Optional, Union, List
+
+from app.models.user import User as UserModel
+from app.schemas.user import UserCreate, UserUpdate
+
+async def get_user(db: AsyncSession, user_id: UUID) -> UserModel | None:
+    result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
+    return result.scalar_one_or_none()
+
+async def get_user_by_email(db: AsyncSession, *, email: str) -> Optional[UserModel]:
+    statement = select(UserModel).where(UserModel.email == email)
+    result = await db.execute(statement)
+    return result.scalar_one_or_none()
+
+async def get_user_by_auth_id(db: AsyncSession, auth_provider: str, auth_provider_id: str) -> UserModel | None:
+    result = await db.execute(
+        select(UserModel).filter(
+            UserModel.auth_provider == auth_provider,
+            UserModel.auth_provider_id == auth_provider_id
+        )
+    )
+    return result.scalar_one_or_none()
+
+async def create_user(db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID) -> UserModel:
+    create_data = obj_in.model_dump()
+    create_data['tenant_id'] = tenant_id
+    db_obj = UserModel(**create_data)
+    db.add(db_obj)
+    await db.commit()
+    await db.refresh(db_obj)
+    return db_obj
+
+async def update_user(db: AsyncSession, *, db_obj: UserModel, obj_in: Union[UserUpdate, Dict[str, Any]]) -> UserModel:
+    """Updates a user SQLAlchemy model instance."""
+    if isinstance(obj_in, dict):
+        update_data = obj_in
+    else:
+        # Get data from the Pydantic model
+        update_data = obj_in.model_dump(exclude_unset=True) 
+    
+    # Iterate over the fields in the update data
+    for field, value in update_data.items():
+        # Check if the SQLAlchemy model has this attribute
+        if hasattr(db_obj, field):
+            setattr(db_obj, field, value)
+        # else: handle unexpected fields?
+            
+    db.add(db_obj)
+    await db.commit()
+    await db.refresh(db_obj)
+    return db_obj
+
+class CRUDUser():
+    async def get(self, db: AsyncSession, id: UUID) -> UserModel | None:
+        return await get_user(db, user_id=id)
+
+    async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[UserModel]:
+        return await get_user_by_email(db, email=email)
+
+    async def get_by_auth_id(self, db: AsyncSession, auth_provider: str, auth_provider_id: str) -> UserModel | None:
+        return await get_user_by_auth_id(db, auth_provider=auth_provider, auth_provider_id=auth_provider_id)
+
+    async def create(self, db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID) -> UserModel:
+        return await create_user(db=db, obj_in=obj_in, tenant_id=tenant_id)
+
+    async def update(self, db: AsyncSession, *, db_obj: UserModel, obj_in: Union[UserUpdate, Dict[str, Any]]) -> UserModel:
+        return await update_user(db=db, db_obj=db_obj, obj_in=obj_in)
+
+    async def upsert_by_email(
+        self, db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID
+    ) -> UserModel:
+        db_user = await self.get_by_email(db, email=obj_in.email)
+        if db_user:
+            print(f"Updating existing user: {obj_in.email}")
+            update_data = obj_in.model_dump(exclude_unset=True)
+            # If manager_id/team_id are None in obj_in, don't overwrite potentially existing ones
+            if 'manager_id' in update_data and update_data['manager_id'] is None:
+                 del update_data['manager_id']
+            if 'team_id' in update_data and update_data['team_id'] is None:
+                 del update_data['team_id']
+            return await self.update(db, db_obj=db_user, obj_in=update_data)
+        else:
+            print(f"Creating new user: {obj_in.email}")
+            # Pass tenant_id explicitly to create
+            return await self.create(db, obj_in=obj_in, tenant_id=tenant_id)
+
+    async def upsert_by_auth(
+        self, db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID
+    ) -> UserModel:
+        """Find user by auth provider ID, update if found, else create."""
+        # Look for existing user based on provider and provider_id
+        stmt = select(UserModel).where(
+            UserModel.auth_provider == obj_in.auth_provider, 
+            UserModel.auth_provider_id == obj_in.auth_provider_id
+        )
+        result = await db.execute(stmt)
+        db_user = result.scalar_one_or_none()
+
+        if db_user:
+            # User exists, update required fields (including tokens, last_login)
+            print(f"Updating user via auth: {obj_in.email}")
+            update_data = obj_in.model_dump(exclude_unset=True)
+            # We want to update tokens, last_login etc. from UserCreate here
+            return await self.update(db, db_obj=db_user, obj_in=update_data)
+        else:
+            # User does not exist, create them
+            print(f"Creating new user via auth: {obj_in.email}")
+            # Pass tenant_id explicitly to create
+            return await self.create(db, obj_in=obj_in, tenant_id=tenant_id)
+            
+user = CRUDUser() 

@@ -24,7 +24,10 @@ import {
   MenuGroup,
   useBreakpointValue,
   Icon,
-  Spacer
+  Spacer,
+  Spinner,
+  Center,
+  useColorMode
 } from "@chakra-ui/react"; 
 import { 
   ChevronDownIcon, 
@@ -34,14 +37,29 @@ import {
   HamburgerIcon
 } from '@chakra-ui/icons';
 import { TbAtom } from 'react-icons/tb';
+import { useAuth } from '../../context/AuthContext';
 
 export default function MainLayout() {
-  const demoUserName = "Demo User";
   const location = useLocation();
+  const { user, isLoading, isAuthenticated, setToken } = useAuth();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const brandColor = useColorModeValue('brand.600', 'brand.400');
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const ThemeIconComponent = useColorModeValue(MoonIcon, SunIcon);
+  const { toggleColorMode } = useColorMode();
+
+  const handleLogout = () => {
+    setToken(null);
+  };
+
+  if (isLoading) {
+    return (
+      <Center h="100vh">
+        <Spinner size="xl" />
+      </Center>
+    );
+  }
 
   return (
     <Box w="100%">
@@ -141,7 +159,8 @@ export default function MainLayout() {
               <Tooltip label="Toggle Theme">
                 <IconButton
                   aria-label="Toggle Theme"
-                  icon={useColorModeValue(<MoonIcon />, <SunIcon />)}
+                  icon={<ThemeIconComponent />}
+                  onClick={toggleColorMode}
                   variant="ghost"
                   size="sm"
                 />
@@ -169,8 +188,8 @@ export default function MainLayout() {
                 </Menu>
               )}
 
-              {/* User Menu */}
-              {!isMobile && (
+              {/* User Menu - Use real user data */}
+              {isAuthenticated && user ? (
                 <Menu>
                   <MenuButton 
                     as={Button} 
@@ -178,27 +197,19 @@ export default function MainLayout() {
                     size="sm" 
                     rightIcon={<ChevronDownIcon />}
                   >
-                    <HStack spacing={2}>
-                      <Avatar size="sm" name={demoUserName} /> 
-                      <Box textAlign="left">
-                        <Text fontWeight="medium" fontSize="sm">{demoUserName}</Text>
-                        <Text fontSize="xs" color="gray.500">Demo Account</Text>
-                      </Box>
-                    </HStack>
+                    <Flex alignItems="center">
+                      <Avatar size="sm" name={user.name} src={user.avatar_url || undefined} mr={2} /> 
+                      <Text >{user.name}</Text> 
+                    </Flex>
                   </MenuButton>
                   <MenuList>
-                    <MenuGroup title="Account">
-                      <MenuItem as={RouterLink} to="/profile" icon={<Avatar size="xs" name={demoUserName} />}>
-                        Profile
-                      </MenuItem>
-                      <MenuItem>Settings</MenuItem>
-                    </MenuGroup>
-                    <MenuDivider />
-                    <MenuItem as={RouterLink} to="/login" color="red.500">
-                      Logout
-                    </MenuItem>
+                    <MenuItem as={RouterLink} to={`/profile/${user.id}`}>Profile</MenuItem>
+                    <MenuItem isDisabled>Settings (TBD)</MenuItem>
+                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
                   </MenuList>
                 </Menu>
+              ) : (
+                <Button as={RouterLink} to="/login" size="sm">Login</Button>
               )}
             </HStack>
           </Flex>

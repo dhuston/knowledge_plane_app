@@ -1,0 +1,1 @@
+# Service layer: Interacts with external APIs or complex business logic 

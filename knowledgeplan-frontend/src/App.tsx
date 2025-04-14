@@ -21,9 +21,11 @@ import GoalsPage from './pages/GoalsPage';
 import TeamPage from './pages/TeamPage';
 import DepartmentPage from './pages/DepartmentPage';
 import ExplorePage from './pages/ExplorePage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 
 // Import Layout Component
 import MainLayout from './components/layout/MainLayout';
+import { AuthProvider } from "./context/AuthContext";
 
 // --- Placeholder Page Components (REMOVED) --- 
 // function LoginPage() { ... } 
@@ -39,28 +41,31 @@ import MainLayout from './components/layout/MainLayout';
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* Routes without the main layout */}
-        <Route path="/login" element={<LoginPage />} />
+      <AuthProvider>
+        <Routes>
+          {/* Routes without the main layout */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-        {/* Routes wrapped by the main layout */}
-        <Route path="/" element={<MainLayout />}>
-          <Route path="workspace" element={<WorkspacePage />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="hub/:hubId" element={<HubPage />} />
-          <Route path="goals" element={<GoalsPage />} />
-          <Route path="team/:teamId" element={<TeamPage />} />
-          <Route path="profile/:userId" element={<ProfilePage />} />
-          <Route path="department/:deptId" element={<DepartmentPage />} />
-          <Route path="explore" element={<ExplorePage />} />
-          {/* Default route within layout: Redirect to workspace */}
-          <Route index element={<Navigate to="workspace" replace />} /> 
-        </Route>
+          {/* Routes wrapped by the main layout */}
+          <Route path="/" element={<MainLayout />}>
+            <Route path="workspace" element={<WorkspacePage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="hub/:hubId" element={<HubPage />} />
+            <Route path="goals" element={<GoalsPage />} />
+            <Route path="team/:teamId" element={<TeamPage />} />
+            <Route path="profile/:userId" element={<ProfilePage />} />
+            <Route path="department/:deptId" element={<DepartmentPage />} />
+            <Route path="explore" element={<ExplorePage />} />
+            {/* Default route within layout: Redirect to workspace */}
+            <Route index element={<Navigate to="workspace" replace />} /> 
+          </Route>
 
-        {/* Catch-all for unmatched routes (within layout or outside) */}
-        {/* For Slice 0, redirect unknown routes back to login */} 
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          {/* Catch-all for unmatched routes (within layout or outside) */}
+          {/* For Slice 0, redirect unknown routes back to login */} 
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }
