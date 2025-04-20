@@ -15,10 +15,13 @@
     "@chakra-ui/react": "^2.10.7",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@types/axios": "^0.9.36",
+    "axios": "^1.8.4",
     "framer-motion": "^6.5.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^6.27.1"
+    "react-router-dom": "^6.27.1",
+    "reactflow": "^11.11.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

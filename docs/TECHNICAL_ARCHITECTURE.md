@@ -26,9 +26,10 @@
   * **Rationale:** FastAPI provides high performance (async), automatic OpenAPI docs, and excellent developer experience. Python's extensive AI/ML ecosystem is critical for the platform's vision. Large talent pool and rapid iteration speed are advantageous for a startup. Specific, performance-critical modules could potentially use Go in the future if needed.
 * **Frontend Language/Framework:** **React (using TypeScript)** paired with the **Chakra UI** component library.
   * **Rationale:** Mature ecosystem, component-based architecture, and Chakra UI enables rapid development of a polished, accessible UI.
+  * **Note on Visualization:** Will likely require integrating a dedicated graph visualization library (e.g., D3.js, react-flow, sigma.js, vis.js) capable of handling dynamic data, complex layouts (force-directed, clustered), interactivity (zoom, pan, hover, select), and semantic zooming for the **Living Map**. Performance rendering large, interactive graphs will be a key consideration.
 * **Database(s):** Initial focus on **PostgreSQL** (via AWS RDS).
   * **Rationale:** Robust relational storage for core structured data. Handles initial relationships adequately. Managed service simplifies ops.
-  * **Future Evolution:** Dedicated **Graph Database** (e.g., AWS Neptune) planned for `Org Model` queries later.
+  * **Future Evolution:** Dedicated **Graph Database** (e.g., AWS Neptune) planned for `Org Model` queries later. **This becomes increasingly important to efficiently support complex relationship queries needed for the Living Map and Scenario Simulator.**
 * **Infrastructure:**
   * **Local Development:** Docker Compose.
   * **Initial Deployment:** Docker containers potentially running on EC2/Fargate or similar simple compute.
@@ -52,7 +53,7 @@
   * **Initial Provider:** Likely OpenAI API (GPT-3.5/4) due to capability and ease of use.
   * **Future Options:** Anthropic Claude, local models via Ollama/llama.cpp, fine-tuned models, etc.
 * **Pipeline:** Orchestrate data fetching -> LLM interaction (prompting, potentially RAG later) -> Structured output processing -> API response.
-* **Future:** More sophisticated models, fine-tuning, RAG using vector databases, potential use of frameworks like LangChain/LlamaIndex.
+* **Future:** More sophisticated models, fine-tuning, RAG using vector databases, potential use of frameworks like LangChain/LlamaIndex. **AI will be crucial for generating insights surfaced on the Living Map, detecting non-obvious connections, and powering the predictive modeling within the Scenario Simulator.**
 
 ## 6. Integration Framework
 
@@ -65,6 +66,10 @@
   * Agent executes the request locally and returns the result.
   * Requires clear configuration and security documentation for the customer.
 * **Extensibility:** Design the `Integration Service` to be pluggable, allowing new integrations (cloud or agent-based) to be added relatively easily.
+* **Style:** RESTful APIs for frontend-backend communication, potentially gRPC for inter-service communication (performance benefits).
+* **Specification:** OpenAPI (Swagger) for REST APIs for clear documentation and contract definition.
+* **Authentication/Authorization:** JWT-based authentication, tenant context embedded in tokens or resolved via middleware. Permissions based on user roles and relationship to data within the tenant context.
+* **Living Map API Considerations:** Will require efficient APIs to serve graph data (nodes, edges, metadata) to the frontend. Consider patterns like delta updates for real-time changes, endpoints supporting filters/queries specific to map views, and potentially GraphQL for flexible data fetching by the frontend. APIs must support fetching historical data for the Org Time Machine and executing/retrieving results for the Scenario Simulator.
 
 ## 7. API Design
 
@@ -75,9 +80,10 @@
 ## 8. Scalability & Performance
 
 * **Horizontal Scaling:** Leverage microservices architecture and Kubernetes for scaling individual services based on load.
-* **Asynchronous Processing:** Use message queues (e.g., RabbitMQ, Kafka, SQS) for background tasks, integration processing, AI analysis to avoid blocking user requests.
-* **Caching:** Implement caching strategies (e.g., Redis, Memcached) at various levels (API Gateway, service responses, database queries).
-* **Database Optimization:** Appropriate indexing, query optimization, potential read replicas.
+* **Asynchronous Processing:** Use message queues (e.g., RabbitMQ, Kafka, SQS) for background tasks, integration processing, AI analysis to avoid blocking user requests. **Real-time updates for the Living Map might leverage WebSockets or similar push mechanisms.**
+* **Caching:** Implement caching strategies (e.g., Redis, Memcached) at various levels (API Gateway, service responses, database queries). **Caching aggregated graph views or simulation results could be beneficial.**
+* **Database Optimization:** Appropriate indexing, query optimization, potential read replicas. **Graph database optimization will be critical later.**
+* **Backend Calculations:** Be mindful of performance implications for graph layout calculations, simulation runs, and AI analysis required for the Living Map features.
 
 ## 9. Security Considerations
 

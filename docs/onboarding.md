@@ -4,7 +4,7 @@ Welcome to the KnowledgePlane AI project!
 
 ## 1. Vision & Goal
 
-Our mission is to "Get your organization on the same page, enabling seamless collaboration, alignment, and adaptation."
+Our mission is to "Get your organization on the same page, enabling seamless collaboration, alignment, and adaptation." **The core user experience centers around an interactive, AI-powered "Living Map" of your organization's work.**
 
 Read the full details in [VISION_STRATEGY.md](./VISION_STRATEGY.md).
 

@@ -39,4 +39,4 @@ class User(Base):
     tenant = relationship("Tenant", back_populates="users")
     manager = relationship("User", remote_side=[id], back_populates="reports")
     reports = relationship("User", back_populates="manager")
-    team = relationship("Team", back_populates="members")
+    team = relationship("Team", back_populates="members", foreign_keys=[team_id])

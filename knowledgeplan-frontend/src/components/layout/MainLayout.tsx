@@ -1,8 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Outlet,
   Link as RouterLink,
-  useLocation
 } from "react-router-dom";
 import { 
   Box, 
@@ -21,26 +19,30 @@ import {
   IconButton,
   Tooltip,
   MenuDivider,
-  MenuGroup,
   useBreakpointValue,
   Icon,
   Spacer,
   Spinner,
   Center,
-  useColorMode
+  useColorMode,
+  useDisclosure,
 } from "@chakra-ui/react"; 
 import { 
   ChevronDownIcon, 
   SearchIcon, 
   MoonIcon, 
   SunIcon,
-  HamburgerIcon
+  HamburgerIcon,
+  AddIcon
 } from '@chakra-ui/icons';
 import { TbAtom } from 'react-icons/tb';
 import { useAuth } from '../../context/AuthContext';
+import CreateProjectModal from '../modals/CreateProjectModal';
+import LivingMap from '../map/LivingMap';
+import BriefingPanel from '../panels/BriefingPanel';
+import { MapNode } from '../../types/map';
 
 export default function MainLayout() {
-  const location = useLocation();
   const { user, isLoading, isAuthenticated, setToken } = useAuth();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -48,9 +50,25 @@ export default function MainLayout() {
   const isMobile = useBreakpointValue({ base: true, md: false });
   const ThemeIconComponent = useColorModeValue(MoonIcon, SunIcon);
   const { toggleColorMode } = useColorMode();
+  const { isOpen: isCreateProjectOpen, onOpen: onCreateProjectOpen, onClose: onCreateProjectClose } = useDisclosure();
+
+  const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
 
   const handleLogout = () => {
     setToken(null);
+  };
+
+  const handleNodeClick = (nodeData: MapNode | null) => {
+    setSelectedNode(nodeData);
+  };
+
+  const handleBriefingPanelClose = () => {
+    setSelectedNode(null);
+  };
+
+  const handleCreateProjectClick = () => {
+    console.log("Create Project button clicked!");
+    onCreateProjectOpen();
   };
 
   if (isLoading) {
@@ -62,19 +80,16 @@ export default function MainLayout() {
   }
 
   return (
-    <Box w="100%">
+    <Box w="100vw" h="100vh" display="flex" flexDirection="column" overflow="hidden">
       {/* Top Navigation Bar */}
       <Box 
         as="nav" 
-        position="fixed"
-        top={0}
-        left={0}
-        right={0}
         zIndex={1000}
         bg={bgColor}
         borderBottomWidth="1px"
         borderColor={borderColor}
         boxShadow="sm"
+        flexShrink={0}
       >
         <Container maxW="container.xl">
           <Flex 
@@ -87,7 +102,7 @@ export default function MainLayout() {
               <HStack 
                 spacing={2} 
                 as={RouterLink} 
-                to="/workspace"
+                to="/map" 
                 _hover={{ color: 'brand.500' }}
               >
                 <Icon 
@@ -106,36 +121,11 @@ export default function MainLayout() {
               
               {!isMobile && (
                 <HStack spacing={1}>
-                  <Button
-                    as={RouterLink}
-                    to="/workspace"
-                    variant="ghost"
-                    size="sm"
-                    color={location.pathname === '/workspace' ? brandColor : undefined}
-                    fontWeight={location.pathname === '/workspace' ? 'semibold' : 'normal'}
-                  >
-                    Workspace
-                  </Button>
-                  <Button
-                    as={RouterLink}
-                    to="/goals"
-                    variant="ghost"
-                    size="sm"
-                    color={location.pathname === '/goals' ? brandColor : undefined}
-                    fontWeight={location.pathname === '/goals' ? 'semibold' : 'normal'}
-                  >
-                    Goals
-                  </Button>
-                  <Button
-                    as={RouterLink}
-                    to="/explore"
-                    variant="ghost"
-                    size="sm"
-                    color={location.pathname === '/explore' ? brandColor : undefined}
-                    fontWeight={location.pathname === '/explore' ? 'semibold' : 'normal'}
-                  >
-                    Explore
-                  </Button>
+                  {/* Removed old Nav Buttons (Workspace, Goals, Explore) */}
+                  {/* We might add context-specific actions later */}
+                  {/* <Button ... >Workspace</Button> */}
+                  {/* <Button ... >Goals</Button> */}
+                  {/* <Button ... >Explore</Button> */}
                 </HStack>
               )}
             </HStack>
@@ -154,6 +144,17 @@ export default function MainLayout() {
                   isDisabled
                 />
               </Tooltip>
+
+              {/* Create Project Button */}
+              <Button 
+                variant={'solid'}
+                colorScheme={'brand'}
+                size={'sm'}
+                leftIcon={<AddIcon />}
+                onClick={handleCreateProjectClick}
+              >
+                Create Project
+              </Button>
 
               {/* Theme Toggle */}
               <Tooltip label="Toggle Theme">
@@ -177,13 +178,14 @@ export default function MainLayout() {
                     size="sm"
                   />
                   <MenuList>
-                    <MenuItem as={RouterLink} to="/workspace">Workspace</MenuItem>
-                    <MenuItem as={RouterLink} to="/goals">Goals</MenuItem>
-                    <MenuItem as={RouterLink} to="/explore">Explore</MenuItem>
+                    {/* <MenuItem as={RouterLink} to="/workspace">Workspace</MenuItem> */}
+                    <MenuItem as={RouterLink} to="/map">Map View</MenuItem>
+                    <MenuItem as={RouterLink} to="/goals">Goals (TBD)</MenuItem>
+                    <MenuItem as={RouterLink} to="/explore">Explore (TBD)</MenuItem>
                     <MenuDivider />
-                    <MenuItem as={RouterLink} to="/profile">Profile</MenuItem>
+                    <MenuItem as={RouterLink} to={`/profile/${user?.id}`}>Profile</MenuItem>
                     <MenuItem>Settings</MenuItem>
-                    <MenuItem as={RouterLink} to="/login">Logout</MenuItem>
+                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
                   </MenuList>
                 </Menu>
               )}
@@ -216,12 +218,25 @@ export default function MainLayout() {
         </Container>
       </Box>
 
-      {/* Main Content Area */}
-      <Box pt="60px">
-        <Container maxW="container.xl" py={6}>
-          <Outlet />
-        </Container>
-      </Box>
+      {/* Main Content Area - Now holds the Map and Panel */}
+      <Flex flex={1} position="relative" overflow="hidden">
+        {/* Living Map takes up available space */}
+        <Box flex={1} h="full">
+          <LivingMap onNodeClick={handleNodeClick} /> 
+        </Box>
+
+        {/* Briefing Panel slides in from the right */}
+        <BriefingPanel 
+          nodeData={selectedNode} 
+          isOpen={!!selectedNode}
+          onClose={handleBriefingPanelClose} 
+        />
+      </Flex>
+
+      <CreateProjectModal 
+        isOpen={isCreateProjectOpen}
+        onClose={onCreateProjectClose}
+      />
     </Box>
   );
 } 

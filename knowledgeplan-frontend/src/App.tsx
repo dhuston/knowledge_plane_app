@@ -14,13 +14,13 @@ import {
 
 // Import Page Components
 import LoginPage from './pages/LoginPage';
-import WorkspacePage from './pages/WorkspacePage';
-import ProfilePage from './pages/ProfilePage';
-import HubPage from './pages/HubPage';
-import GoalsPage from './pages/GoalsPage';
-import TeamPage from './pages/TeamPage';
-import DepartmentPage from './pages/DepartmentPage';
-import ExplorePage from './pages/ExplorePage';
+// import WorkspacePage from './pages/WorkspacePage'; // Removed
+import ProfilePage from './pages/ProfilePage'; // Keep for now, might be removed later
+// import HubPage from './pages/HubPage'; // Removed - Handled by BriefingPanel
+// import GoalsPage from './pages/GoalsPage'; // Removed - Handled by BriefingPanel/Map
+// import TeamPage from './pages/TeamPage'; // Removed - Handled by BriefingPanel
+// import DepartmentPage from './pages/DepartmentPage'; // Removed - Handled by BriefingPanel
+// import ExplorePage from './pages/ExplorePage'; // Removed - Handled by Map/BriefingPanel
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
 // Import Layout Component
@@ -47,23 +47,22 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-          {/* Routes wrapped by the main layout */}
-          <Route path="/" element={<MainLayout />}>
-            <Route path="workspace" element={<WorkspacePage />} />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="hub/:hubId" element={<HubPage />} />
-            <Route path="goals" element={<GoalsPage />} />
-            <Route path="team/:teamId" element={<TeamPage />} />
-            <Route path="profile/:userId" element={<ProfilePage />} />
-            <Route path="department/:deptId" element={<DepartmentPage />} />
-            <Route path="explore" element={<ExplorePage />} />
-            {/* Default route within layout: Redirect to workspace */}
-            <Route index element={<Navigate to="workspace" replace />} /> 
-          </Route>
+          {/* Main route rendering the Layout which contains the Map */}
+          <Route path="/map" element={<MainLayout />} />
+          
+          {/* Specific entity views - might be removed if BriefingPanel handles all */}
+          <Route path="/profile/:userId" element={<ProfilePage />} />
+          {/* <Route path="/hub/:hubId" element={<HubPage />} /> */} 
+          {/* <Route path="/goals" element={<GoalsPage />} /> */} 
+          {/* <Route path="/team/:teamId" element={<TeamPage />} /> */} 
+          {/* <Route path="/department/:deptId" element={<DepartmentPage />} /> */}
+          {/* <Route path="/explore" element={<ExplorePage />} /> */}
 
-          {/* Catch-all for unmatched routes (within layout or outside) */}
-          {/* For Slice 0, redirect unknown routes back to login */} 
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Default route: Redirect to map view */}
+          <Route path="/" element={<Navigate to="/map" replace />} /> 
+
+          {/* Catch-all: Redirect unknown routes to map or login? For now, map */}
+          <Route path="*" element={<Navigate to="/map" replace />} /> 
         </Routes>
       </AuthProvider>
     </Router>

@@ -4,9 +4,11 @@ from sqlalchemy.dialects.postgresql import insert
 from uuid import UUID
 from sqlalchemy.future import select
 from typing import Any, Dict, Optional, Union, List
+from datetime import datetime
 
 from app.models.user import User as UserModel
 from app.schemas.user import UserCreate, UserUpdate
+from app.core.security import get_password_hash, verify_password
 
 async def get_user(db: AsyncSession, user_id: UUID) -> UserModel | None:
     result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
@@ -112,5 +114,14 @@ class CRUDUser():
             print(f"Creating new user via auth: {obj_in.email}")
             # Pass tenant_id explicitly to create
             return await self.create(db, obj_in=obj_in, tenant_id=tenant_id)
-            
+
+    async def get_by_refresh_token(self, db: AsyncSession, *, refresh_token: str) -> Optional[UserModel]:
+        """Finds a user by their stored Google refresh token."""
+        # TODO: Add index on google_refresh_token column for performance
+        # TODO: Ensure refresh tokens are stored securely (encryption)
+        result = await db.execute(
+            select(UserModel).where(UserModel.google_refresh_token == refresh_token)
+        )
+        return result.scalar_one_or_none()
+
 user = CRUDUser() 

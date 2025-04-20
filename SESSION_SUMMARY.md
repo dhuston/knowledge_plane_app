@@ -113,4 +113,12 @@
 *   Implement Google OAuth token refresh logic.
 *   Add more robust authorization checks to backend endpoints.
 *   Address `TODO` comments in the codebase.
-*   Plan and begin implementation of Slice 2 features (e.g., Project/Goal models and APIs). 
+*   Plan and begin implementation of Slice 2 features (e.g., Project/Goal models and APIs).
+
+---
+
+## UX Vision Update - April 19th, 2025
+
+**Note:** A significant refinement of the core UX vision was introduced, centering the application experience around an interactive, AI-powered **"Living Map"** of the organization's work fabric. This includes concepts like dynamic visualization of entities (people, projects, goals, knowledge) and relationships, contextual overlays/panels, an Org Time Machine, and a Scenario Simulator.
+
+This "Living Map" concept supersedes earlier, more fragmented workspace/overlay ideas and will guide the design and implementation priorities moving forward, particularly for Slice 2 (Pilot MVP) and beyond. Relevant documentation (Vision, Architecture, Backlog, Data Model) has been updated to reflect this direction. 
