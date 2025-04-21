@@ -29,7 +29,7 @@ class TeamInDBBase(TeamBase):
         from_attributes = True # Pydantic V2
 
 # Properties to return to client
-class Team(TeamInDBBase):
+class TeamRead(TeamInDBBase):
     pass
 
 # Properties stored in DB

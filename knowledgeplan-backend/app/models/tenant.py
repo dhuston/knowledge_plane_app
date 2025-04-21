@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .user import User  # noqa: F401
     from .project import Project # noqa: F401
+    from .team import Team # noqa: F401
+    from .department import Department # Add Department import for TYPE_CHECKING
 
 class Tenant(Base):
     __tablename__ = "tenants"
@@ -28,6 +30,9 @@ class Tenant(Base):
 
     # Relationship to Projects (One-to-Many)
     projects = relationship("Project", back_populates="tenant", cascade="all, delete-orphan")
+
+    # Relationship to Departments (One-to-Many) - ADDED
+    departments = relationship("Department", back_populates="tenant", cascade="all, delete-orphan")
 
     # Relationships can be added later (e.g., users = relationship("User", back_populates="tenant")) 
 

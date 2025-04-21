@@ -41,7 +41,7 @@ To balance the need for rapid demonstration (for VCs, early customers) with buil
 
 * **Goal:** Deliver the full MVP scope as defined in the Epics below, featuring a **functional and interactive Living Map** as the core UX, ready for carefully selected pilot customers.
 * **Target Audience:** Initial pilot customers.
-* **Technology Focus:** Complete MVP features, robust integration handling, enhanced map visualization (interactivity, basic filtering, contextual panels), initial AI insights surfaced, basic monitoring/logging, initial deployment pipeline.
+* **Technology Focus:** Complete MVP features, robust integration handling, enhanced map visualization (**initial visual polish**, interactivity, basic filtering, contextual panels), initial AI insights surfaced, basic monitoring/logging, initial deployment pipeline.
 
 ---
 
@@ -60,13 +60,13 @@ To balance the need for rapid demonstration (for VCs, early customers) with buil
 
 ### Epic: Living Map & Individual AI Workspace (MVP)
 
-* **Goal:** Provide immediate value via the **interactive Living Map and an AI assistant that surfaces relevant information contextually within the map interface**. Offer basic native collaboration accessible from the map.
+* **Goal:** Provide immediate value via the **interactive Living Map and an AI assistant that surfaces relevant information contextually within the map interface**. Offer basic native collaboration accessible from the map. _(Addresses core navigation, context, and efficiency needs for Scientist, PI, and initial Director visibility)_
 * **User Stories (MVP Focus):**
   * **[Living Map]** As a user, I want to see an **interactive network graph (Living Map)** visualizing key entities (myself, my team, my manager, projects I'm involved in) and their basic relationships (reports-to, team membership, project assignment).
   * **[Living Map]** As a user, I want to **pan and zoom** the Living Map to explore the organizational network.
   * **[Living Map]** As a user, when I **hover over a node** (person, team, project) on the map, I want to see basic information in a tooltip or small overlay.
-  * **[Living Map]** As a user, when I **click on a node** on the map, I want a detailed **Briefing Panel** to open showing relevant context (profile info, team members, project status, etc.).
-  * **[AI Assistant]** As a user, when I start my day, I want to see an **AI-generated Daily Briefing** presented in a panel, summarizing key information (e.g., upcoming meetings from calendar, mentions, key project updates - *initial version may be simple*) **and potentially highlighting relevant nodes on the map**.
+  * **[Living Map]** As a user, when I **click on a node** on the map, I want a detailed **Briefing Panel** to open showing relevant context (profile info, team members, project status, etc.). _(Crucial for delivering persona-specific context)_
+  * **[AI Assistant]** As a user, when I start my day, I want to see an **AI-generated Daily Briefing** presented in a panel, summarizing key information (e.g., upcoming meetings from calendar, mentions, key project updates - *initial version may be simple*) **and potentially highlighting relevant nodes on the map**. _(Initial step towards Scientist's desired assistant)_
   * **[AI Assistant]** As the system (AI), I want to generate the Daily Briefing by pulling data from integrated sources (initially Calendar, basic profile info) **and relating it to entities in the organizational model/map**.
   * **[AI Assistant]** As a user, I want the Daily Briefing presented in clear prose, potentially highlighting key entities (people, projects, meetings) **which link back to their nodes/panels on the map**.
   * **[Collaboration Hub]** As a user, I want to create a basic **Project Collaboration Hub** (e.g., a simple page/space associated with a project name), **represented as a node on the Living Map**.
@@ -115,13 +115,28 @@ To balance the need for rapid demonstration (for VCs, early customers) with buil
 
 ## Future Epics (Post-MVP - Examples)
 
-* **Epic: Living Map - Advanced Visualization & Interaction** (Filtering, layouts, heatmaps, Org Time Machine)
-* **Epic: Scenario Simulator & Predictive Insights** (What-if analysis on the map, AI-driven forecasts)
-* **Epic: Emergent Organizational Model - Enrichment & Visualization** (Visualizing inferred structure, allowing manual edits/suggestions directly on the map)
-* **Epic: Individual AI Workspace - Advanced Features** (AI suggestions within map context, goal tracking linked to map nodes)
+* **Epic: Living Map - Advanced Visualization & Interaction**
+  * **Goal:** Enhance the Living Map's usability and clarity, especially for larger, more complex organizations. Address visual polish and scalability challenges.
+  * **Key Features/Stories (Examples):**
+    *   Implement advanced **filtering** controls (by type, status, custom attributes, relationships).
+    *   Introduce automatic **node clustering/grouping** at higher zoom levels (e.g., collapsing team members into a team node).
+    *   Develop **semantic zooming** capabilities (showing different levels of detail based on zoom).
+    *   Implement **focus & context** views (expanding neighbors, dimming the rest).
+    *   Integrate powerful **search functionality** to find and highlight nodes/edges on the map.
+    *   Explore and implement more sophisticated **layout algorithms** (hierarchical, constrained force-directed, potentially user-selectable).
+    *   Add a **mini-map/overview** component for large graph navigation.
+    *   Refine **visual aesthetics** for an enterprise-grade experience (custom node/edge rendering, smooth animations, potentially evaluating alternative libraries like GoJS or yFiles if react-flow limitations are hit).
+    *   Implement the **Org Time Machine** feature.
+* **Epic: Scenario Simulator & Predictive Insights** (What-if analysis on the map, AI-driven forecasts) _(Directly addresses needs of R&D Director, Head of Innovation)_
+* **Epic: Emergent Organizational Model - Enrichment & Visualization** (Visualizing inferred structure, allowing manual edits/suggestions directly on the map) _(Helps all personas understand the real network)_
+* **Epic: Individual AI Workspace - Advanced Features** (AI suggestions within map context, goal tracking linked to map nodes) _(Builds on Scientist/PI needs)_
 * **Epic: Team Collaboration Features** (Shared spaces visualized on map, contextual discussions linked to map nodes)
-* **Epic: Strategic Alignment Engine** (Goal definition (OKRs) visualized and tracked on the map, linking work to goals visually)
+* **Epic: Strategic Alignment Engine** (Goal definition (OKRs) visualized and tracked on the map, linking work to goals visually) _(Key for PI, Director, Innovation Head)_
 * **Epic: Native Tool Augmentation** (Building integrated tools like project registry, knowledge base represented as nodes/panels within the map)
-* **Epic: Adaptive Intelligence & Insights** (Proactive suggestions surfaced on map, risk detection highlighted on map, cross-functional insights visualized)
-* **Epic: Advanced Integrations** (Project Management tools like Jira/Asana, CRM tools, etc. - represented as nodes and links on the map)
+* **Epic: Adaptive Intelligence & Insights** (Proactive suggestions surfaced on map, risk detection highlighted on map, cross-functional insights visualized) _(Core value for all personas, especially PI, Director, Translational Lead, Innovation Head)_
+  * _(Example Future Story): As a Research Scientist, I want the AI assistant (in the briefing panel or contextually on the map) to suggest potential causes or related internal experiments when it detects anomalies in my recently logged data._
+  * _(Example Future Story): As a PI, I want the AI to proactively surface relevant findings or newly created knowledge assets (notes, reports) from other internal projects that share keywords or concepts with my active projects._
+  * _(Example Future Story): As a Translational Lead, I want the AI to automatically compare key biomarker results between linked preclinical asset nodes and incoming clinical data nodes, flagging significant discrepancies in the Briefing Panel or directly on the map._
+  * _(Example Future Story): As an R&D Director, I want the Adaptive Intelligence system to highlight projects on the map that are showing early indicators of risk (based on historical patterns) or drifting from their aligned strategic goals._
+* **Epic: Advanced Integrations** (Project Management tools like Jira/Asana, CRM tools, etc. - represented as nodes and links on the map) _(Further addresses tool fragmentation)_
 * **Epic: Administration & Configuration** (Tenant settings, integration management, user roles/permissions impacting map visibility)

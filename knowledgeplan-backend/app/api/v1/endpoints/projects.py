@@ -5,17 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, models, schemas
-from app.api import deps
+from app.db.session import get_db_session
+from app.core.security import get_current_user
 
 router = APIRouter()
 
 
-@router.post("/", response_model=schemas.Project, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=schemas.ProjectRead, status_code=status.HTTP_201_CREATED)
 async def create_project(
     *, # Enforces keyword-only arguments after this
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     project_in: schemas.ProjectCreate,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Create new project for the current user's tenant.
@@ -27,12 +28,12 @@ async def create_project(
     return project
 
 
-@router.get("/", response_model=List[schemas.Project])
+@router.get("/", response_model=List[schemas.ProjectRead])
 async def read_projects(
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Retrieve projects for the current user's tenant.
@@ -44,12 +45,12 @@ async def read_projects(
     return projects
 
 
-@router.get("/{project_id}", response_model=schemas.Project)
+@router.get("/{project_id}", response_model=schemas.ProjectRead)
 async def read_project(
     *, # Enforces keyword-only arguments after this
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     project_id: UUID,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Get project by ID.
@@ -64,13 +65,13 @@ async def read_project(
     return project
 
 
-@router.put("/{project_id}", response_model=schemas.Project)
+@router.put("/{project_id}", response_model=schemas.ProjectRead)
 async def update_project(
     *, # Enforces keyword-only arguments after this
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     project_id: UUID,
     project_in: schemas.ProjectUpdate,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Update a project.
@@ -107,10 +108,10 @@ async def update_project(
 @router.post("/{project_id}/notes", response_model=schemas.KnowledgeAsset, status_code=status.HTTP_201_CREATED)
 async def create_note_for_project(
     *, 
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     project_id: UUID,
     note_in: schemas.KnowledgeAssetCreate, # Expects content, project_id will be overridden
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Create a new note (KnowledgeAsset) associated with a project.
@@ -134,11 +135,11 @@ async def create_note_for_project(
 @router.get("/{project_id}/notes", response_model=List[schemas.KnowledgeAsset])
 async def read_notes_for_project(
     *, 
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     project_id: UUID,
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Retrieve notes associated with a specific project.

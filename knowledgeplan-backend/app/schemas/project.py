@@ -30,11 +30,13 @@ class ProjectInDBBase(ProjectBase):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     # goal_id: Optional[UUID4] = None # Match base
 
-    class Config:
-        orm_mode = True
+    # Use Pydantic V2 config
+    model_config = {
+        "from_attributes": True,
+    }
 
 # Properties to return to client
-class Project(ProjectInDBBase):
+class ProjectRead(ProjectInDBBase):
     pass
 
 # Properties stored in DB

@@ -29,7 +29,7 @@ class TenantInDBBase(TenantBase):
         from_attributes = True # Pydantic V2 uses this instead of orm_mode
 
 # Properties to return to client
-class Tenant(TenantInDBBase):
+class TenantRead(TenantInDBBase):
     pass
 
 # Properties stored in DB

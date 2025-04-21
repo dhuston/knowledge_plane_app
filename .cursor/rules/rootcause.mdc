@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Root Cause
+
+Prioritize Root Cause Fixes: When troubleshooting, always aim to identify and address the underlying root cause of an issue rather than implementing temporary hacks or workarounds. If a workaround is necessary, clearly state it and explain why.
+
+# Systematic Error Diagnosis
+
+
+When errors occur, systematically check logs (backend, frontend, database), configurations (environment variables, connection strings, cloud settings), relevant code, and the execution context (local vs. container). CORS errors might mask underlying backend issues.

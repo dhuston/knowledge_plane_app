@@ -91,10 +91,24 @@ def upgrade() -> None:
                type_=sa.DateTime(),
                nullable=False,
                existing_server_default=sa.text('now()'))
+    
+    # Update existing NULL updated_at values
+    op.execute('UPDATE teams SET updated_at = NOW() WHERE updated_at IS NULL')
+    # Explicitly commit the update before altering schema
+    op.execute('COMMIT') 
+
+    # Alter type separately first
     op.alter_column('teams', 'updated_at',
                existing_type=postgresql.TIMESTAMP(timezone=True),
-               type_=sa.DateTime(),
-               nullable=False)
+               type_=sa.DateTime() 
+               # Removed nullable=False here
+               )
+               
+    # Now set NOT NULL in a separate execute call
+    op.execute('ALTER TABLE teams ALTER COLUMN updated_at SET NOT NULL')
+    # Start a new transaction block if necessary (depends on how alembic/psycopg handles this)
+    op.execute('BEGIN') 
+
     op.create_index(op.f('ix_teams_lead_id'), 'teams', ['lead_id'], unique=False)
     op.create_index(op.f('ix_teams_tenant_id'), 'teams', ['tenant_id'], unique=False)
     op.create_foreign_key(op.f('fk_teams_lead_id_users'), 'teams', 'users', ['lead_id'], ['id'])

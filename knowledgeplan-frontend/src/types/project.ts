@@ -33,4 +33,20 @@ export interface ProjectUpdate {
     status?: string | null;
     owning_team_id?: string | null;
     // ...
+}
+
+// Based on knowledgeplan-backend/app/schemas/project.py ProjectRead
+export interface ProjectRead {
+    id: string; // UUID as string
+    name: string;
+    tenant_id: string; // UUID as string
+    description?: string | null;
+    status?: string | null; // Consider using an enum later if status values are fixed
+    owning_team_id?: string | null; // UUID as string
+    owner_id?: string | null; // UUID as string
+    goal_id?: string | null; // UUID as string
+    created_at: string; // Or Date
+    updated_at: string; // Or Date
+    // Add properties if defined in backend schema (e.g., budget, risk_level)
+    properties?: Record<string, unknown> | null; // Use unknown for safer typing
 } 

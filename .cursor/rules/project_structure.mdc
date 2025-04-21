@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Define the overall structure and main languages/frameworks
+# This helps Cursor understand the project context broadly.
+project:
+  language: [Python, TypeScript]
+  framework: [FastAPI, React, Vite]
+  structure: Monorepo # Indicates separate frontend/backend folders

@@ -18,8 +18,8 @@ export default function AuthCallbackPage() {
       // console.log("[AuthCallbackPage] Received token:", token);
       setToken(token);
       // console.log("[AuthCallbackPage] Called setToken via context.");
-      navigate('/workspace', { replace: true });
-      // console.log("[AuthCallbackPage] Navigated to /workspace.");
+      navigate('/map', { replace: true });
+      // console.log("[AuthCallbackPage] Navigated to /map.");
     } else if (error) {
       // console.error("[AuthCallbackPage] Authentication error received:", error);
       setToken(null); 

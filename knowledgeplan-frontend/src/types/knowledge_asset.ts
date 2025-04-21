@@ -4,40 +4,47 @@
 // Basic Knowledge Asset structure based on common fields and potential relationships
 // Mirroring backend schemas/knowledge_asset.py if possible
 
-// Could potentially be an enum later if more types are added
-export type KnowledgeAssetType = 'note' | 'link' | 'document'; 
+// Type definitions for Knowledge Assets
+// import { UUID } from 'crypto'; // Removed unused import
 
-// Base interface for all knowledge assets
-export interface KnowledgeAsset {
-    id: string; // Assuming UUID
-    type: KnowledgeAssetType;
-    title?: string | null;
-    created_at?: string; // ISO date string
-    updated_at?: string; // ISO date string
-    creator_id?: string | null; // Foreign key to User
-    // creator?: User; // Eager/lazy loaded relationship
-    project_id?: string | null; // Foreign key to Project
-    // project?: Project; // Eager/lazy loaded relationship
-    // Add other common fields as needed
+// Enum mirroring backend
+export enum KnowledgeAssetTypeEnum {
+    NOTE = "NOTE",
+    DOCUMENT = "DOCUMENT",
+    MESSAGE = "MESSAGE",
+    MEETING = "MEETING",
+    REPORT = "REPORT",
+    SUBMISSION = "SUBMISSION",
+    PRESENTATION = "PRESENTATION",
 }
 
-// Specific type for Notes, extending the base
-export interface Note extends KnowledgeAsset {
-    type: 'note';
-    content: string;
-}
+// --- Note Specific Types --- 
 
-// Type for creating a new Note (based on BriefingPanel usage)
+// What the frontend needs to send to create a note
+// Matches backend NoteCreate which inherits content, title?, properties?
+// Backend derives project_id, owner_id, type.
 export interface NoteCreate {
     content: string;
-    project_id: string; // Required for association
-    type: 'note'; // Explicitly set type for backend endpoint differentiation
-    title?: string | null; // Optional title
+    title?: string | null; 
+    properties?: Record<string, unknown> | null;
 }
 
-// Optional: Define update type if needed elsewhere
-export interface NoteUpdate {
-    content?: string;
+// What the backend returns for a note (based on NoteRead schema)
+export interface Note {
+    id: string; 
+    tenant_id: string;
+    project_id: string;
+    owner_id: string;
+    type: KnowledgeAssetTypeEnum; // Should always be NOTE
+    content: string;
     title?: string | null;
-    // ... other updatable fields
-} 
+    properties?: Record<string, unknown> | null;
+    created_at: string; // Or Date
+    updated_at: string; // Or Date
+}
+
+// --- REMOVED Conflicting Generic Definitions --- 
+// export type KnowledgeAssetType = 'note' | 'link' | 'document'; 
+// export interface KnowledgeAsset { ... }
+// export interface Note extends KnowledgeAsset { ... }
+// export interface NoteUpdate { ... } 

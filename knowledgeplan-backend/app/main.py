@@ -1,3 +1,4 @@
+import logging # Import logging
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,14 +6,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router as api_v1_router
 
+# Import API Routers
+from app.api.routers import auth as auth_router
+from app.api.routers import users as users_router
+from app.api.routers import teams as teams_router # Assuming this exists from Slice 1
+from app.api.routers import integrations as integrations_router # Assuming this exists
+from app.api.routers import map as map_router # New map router
+from app.api.routers import projects as projects_router # Import the new projects router
+from app.api.routers import goals as goals_router # Import goals router
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # --- Temporary Header Logging Middleware ---
 # async def log_headers_middleware(request: Request, call_next):
 #     ...
 # ----------------------------------------
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    title="KnowledgePlane AI API",
+    # openapi_url=f"{settings.API_V1_STR}/openapi.json" # Example if using settings
+    openapi_url="/api/v1/openapi.json"
 )
 
 # --- Add Middlewares --- #
@@ -26,7 +41,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True, 
     allow_methods=["*"],    
-    allow_headers=["Authorization", "Content-Type", "Accept"], 
+    allow_headers=["*"], # Change this to allow all headers
 )
 
 # Add the temporary logging middleware FIRST (COMMENTED OUT)
@@ -41,13 +56,23 @@ app.add_middleware(
     # https_only=True, # Recommended for production
 )
 
-# Include V1 API routes
-app.include_router(api_v1_router, prefix=settings.API_V1_STR)
+# Include API Routers
+# Prefix common path for all routes under this router
+api_prefix = "/api/v1"
+
+app.include_router(auth_router.router, prefix=f"{api_prefix}/auth", tags=["auth"])
+app.include_router(users_router.router, prefix=f"{api_prefix}/users", tags=["users"])
+app.include_router(teams_router.router, prefix=f"{api_prefix}/teams", tags=["teams"])
+app.include_router(integrations_router.router, prefix=f"{api_prefix}/integrations", tags=["integrations"])
+app.include_router(map_router.router, prefix=f"{api_prefix}/map", tags=["map"]) # Include the map router
+app.include_router(projects_router.router, prefix=f"{api_prefix}/projects", tags=["projects"]) # Register projects router
+app.include_router(goals_router.router, prefix=f"{api_prefix}/goals", tags=["goals"]) # Register goals router
 
 # Add root endpoint or additional setup if needed
 @app.get("/")
-def read_root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME}"}
+async def root():
+    logger.info("Root endpoint / accessed.") # Add logging here too
+    return {"message": "KnowledgePlane AI API is running"}
 
 # Add CORSMiddleware if needed later (for frontend interaction)
 # from fastapi.middleware.cors import CORSMiddleware

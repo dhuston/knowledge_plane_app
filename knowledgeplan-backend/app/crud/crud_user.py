@@ -8,7 +8,7 @@ from datetime import datetime
 
 from app.models.user import User as UserModel
 from app.schemas.user import UserCreate, UserUpdate
-from app.core.security import get_password_hash, verify_password
+from app.core.security import create_access_token
 
 async def get_user(db: AsyncSession, user_id: UUID) -> UserModel | None:
     result = await db.execute(select(UserModel).filter(UserModel.id == user_id))

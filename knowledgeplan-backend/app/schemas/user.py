@@ -58,7 +58,7 @@ class UserInDBBase(UserBase):
     }
 
 # Schema for returning user data to the client (API response model)
-class User(UserInDBBase):
+class UserRead(UserInDBBase):
     model_config = {
         "fields": {
             'google_access_token': {'exclude': True},

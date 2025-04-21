@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, date
 from typing import Any, Optional
 from enum import Enum as PyEnum
+from uuid import UUID
 
 from pydantic import BaseModel, Field, UUID4
 
@@ -13,38 +14,51 @@ class GoalTypeEnum(str, PyEnum):
 
 # Shared properties
 class GoalBase(BaseModel):
-    title: str = Field(..., min_length=1, max_length=255)
+    title: str
     description: Optional[str] = None
-    type: GoalTypeEnum = Field(..., description="The level this goal applies to")
-    parent_id: Optional[UUID4] = Field(None, description="Link to parent goal for hierarchy")
-    status: Optional[str] = Field(default="on_track", max_length=50)
-    progress: Optional[int] = Field(default=0, ge=0, le=100)
-    due_date: Optional[date] = None
-    properties: Optional[dict[str, Any]] = None
+    type: Optional[str] = None # Consider Enum later: Enterprise/Dept/Team
+    status: Optional[str] = None
+    progress: Optional[int] = Field(None, ge=0, le=100)
+    dueDate: Optional[date] = Field(None, alias='dueDate') # Match frontend if needed
+    parent_id: Optional[UUID] = None
+    # properties: Optional[dict] = {} # Replaced with JSON type below
+
+    class Config:
+        allow_population_by_field_name = True # Allow using dueDate alias
 
 # Properties to receive via API on creation
 class GoalCreate(GoalBase):
-    pass
+    pass # Inherits all from GoalBase for now
 
 # Properties to receive via API on update
 class GoalUpdate(GoalBase):
-    title: Optional[str] = Field(None, min_length=1, max_length=255)
-    type: Optional[GoalTypeEnum] = None
+    # Make all fields optional for update
+    title: Optional[str] = None
+    description: Optional[str] = None
+    type: Optional[str] = None
+    status: Optional[str] = None
+    progress: Optional[int] = Field(None, ge=0, le=100)
+    dueDate: Optional[date] = Field(None, alias='dueDate')
+    parent_id: Optional[UUID] = None
+    # properties: Optional[dict] = None
 
 # Properties shared by models stored in DB
 class GoalInDBBase(GoalBase):
-    id: UUID4 = Field(default_factory=uuid.uuid4)
-    tenant_id: UUID4
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    id: UUID
+    tenant_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    # properties: Optional[Any] = None # Use JSON type from SQLAlchemy
 
-    class Config:
-        orm_mode = True
+    # Use Pydantic V2 config
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True, # Replaces allow_population_by_field_name
+    }
 
 # Properties to return to client
-# We might want to include children or related projects here later
-class Goal(GoalInDBBase):
-    pass
+class GoalRead(GoalInDBBase):
+    pass # Inherits all needed fields
 
 # Properties stored in DB
 class GoalInDB(GoalInDBBase):

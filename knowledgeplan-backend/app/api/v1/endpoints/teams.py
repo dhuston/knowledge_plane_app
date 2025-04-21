@@ -8,7 +8,7 @@ from app.db.session import get_db_session
 
 router = APIRouter()
 
-@router.get("/{team_id}", response_model=schemas.Team)
+@router.get("/{team_id}", response_model=schemas.TeamRead)
 async def read_team(
     team_id: UUID,
     db: AsyncSession = Depends(get_db_session),

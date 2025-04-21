@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -8,7 +6,10 @@ services:
     ports:
       - "8001:8000" # Expose backend on host port 8001
     volumes:
-      - ./knowledgeplan-backend/app:/app/app # Mount app code for hot reloading
+      # Map entire backend directory for hot reloading of all code/scripts
+      - ./knowledgeplan-backend:/app
+      # Use a named volume for the venv to prevent overwriting
+      - backend_venv:/app/.venv
     env_file:
       - ./knowledgeplan-backend/.env # Load environment variables
     environment:
@@ -36,3 +37,4 @@ services:
 
 volumes:
   postgres_data: # Define the volume for data persistence 
+  backend_venv: # Define the named volume for the virtual environment 

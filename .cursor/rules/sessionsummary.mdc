@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Maintain Session Summary
+
+
+At the end of a session or upon request, update SESSION_SUMMARY.md. Add a dated section summarizing progress, challenges/learnings, and defining clear, actionable next steps.

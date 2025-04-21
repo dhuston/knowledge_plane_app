@@ -1,60 +1,51 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Box, Text, Icon, VStack, Badge } from '@chakra-ui/react';
-import { GoProject } from 'react-icons/go'; // Example icon
+import { Box, Text, Icon, HStack, Badge } from '@chakra-ui/react';
+import { GoProject } from 'react-icons/go'; // Example icon for project
+import { ProjectRead } from '../../types/project'; // Adjust path as needed
 
-// Define the expected structure of the data prop for a ProjectNode
+// Assuming data structure includes label and ProjectRead
 interface ProjectNodeData {
-    label: string; // Project Name
+    label: string;
+    // Add other ProjectRead fields if needed (e.g., status)
     status?: string;
-    // Add other relevant project data
+    originalApiNode?: { data: ProjectRead };
 }
 
 const ProjectNode: React.FC<NodeProps<ProjectNodeData>> = ({ data }) => {
-    // Map status to Chakra Badge color scheme
-    const getStatusColorScheme = (status?: string) => {
-        switch (status?.toLowerCase()) {
-            case 'active':
-            case 'on_track':
-                return 'green';
-            case 'at_risk':
-            case 'delayed':
-                return 'orange';
-            case 'completed':
-                return 'blue';
-            default:
-                return 'gray';
-        }
-    };
+    const projectData = data.originalApiNode?.data;
+    const status = projectData?.status || data.status || 'Unknown'; // Get status
+
+    // Define badge color based on status (example)
+    let statusColorScheme = 'gray';
+    if (status?.toLowerCase().includes('active')) statusColorScheme = 'green';
+    if (status?.toLowerCase().includes('planning')) statusColorScheme = 'blue';
+    if (status?.toLowerCase().includes('paused')) statusColorScheme = 'orange';
 
     return (
         <Box
-            p={3}
-            borderRadius="md" // Rounded rectangle
-            bg="purple.100"
-            border="1px solid"
+            p={2}
+            borderWidth="1px"
+            borderRadius="lg" // Slightly larger radius
+            bg="purple.50"
             borderColor="purple.300"
-            minW="150px"
-            textAlign="center"
-            boxShadow="sm"
+            shadow="sm"
+            minWidth="170px"
         >
-            <Handle type="target" position={Position.Top} />
-            <Handle type="source" position={Position.Bottom} />
-            <Handle type="target" position={Position.Left} />
-            <Handle type="source" position={Position.Right} />
-            <VStack spacing={1} align="center">
-                <Icon as={GoProject} boxSize={5} color="purple.600" />
-                <Text fontSize="sm" fontWeight="bold" noOfLines={1} px={2}>
-                    {data.label}
-                </Text>
-                {data.status && (
-                    <Badge size="xs" colorScheme={getStatusColorScheme(data.status)}>
-                        {data.status}
-                    </Badge>
-                )}
-            </VStack>
+            <HStack spacing={2} mb={1}>
+                <Icon as={GoProject} color="purple.600" />
+                <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{data.label}</Text>
+            </HStack>
+            <Badge colorScheme={statusColorScheme} size="sm" variant="subtle">
+                {status}
+            </Badge>
+            {/* Handles */}
+            <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+            <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+            <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+            <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
         </Box>
     );
 };
 
-export default ProjectNode; 
+export default memo(ProjectNode); 

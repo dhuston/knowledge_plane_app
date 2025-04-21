@@ -5,7 +5,7 @@
 
 export interface Goal {
     id: string; // Assuming UUID
-    name: string;
+    name: string; // Use title preferably from GoalRead
     description?: string | null;
     // status?: string | null; // Or an enum (e.g., On Track, At Risk)
     // progress?: number | null; // e.g., 0-100
@@ -32,4 +32,22 @@ export interface GoalUpdate {
     progress?: number | null;
     parent_id?: string | null;
     // ...
+}
+
+// Added based on backend schemas/goal.py GoalRead
+export interface GoalRead {
+    id: string;
+    tenant_id: string;
+    title: string;
+    type?: string | null; // Enum: Enterprise/Dept/Team
+    parentId?: string | null; // Note: Backend schema might use parent_id
+    parent_id?: string | null; // Adding based on backend schema convention
+    status?: string | null;
+    progress?: number | null;
+    dueDate?: string | null; // Date as string
+    created_at: string;
+    updated_at: string;
+    properties?: Record<string, unknown> | null;
+    // Add description if available in backend schema
+    description?: string | null;
 } 

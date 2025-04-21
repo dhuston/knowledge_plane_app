@@ -1,44 +1,51 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Box, Text, Avatar, VStack } from '@chakra-ui/react';
+import { Box, Text, Avatar, HStack, VStack } from '@chakra-ui/react';
+import { UserRead } from '../../../types/user'; // Adjust path as necessary
 
-// Define the expected structure of the data prop for a UserNode
+// Assuming data structure passed from LivingMap includes label and UserRead object
 interface UserNodeData {
-    label: string; // Name
-    title?: string;
+    label: string;
+    // Add other UserRead fields you want to display directly on the node
+    email?: string;
     avatar_url?: string;
-    // Add other relevant user data from backend MapNode.data payload
+    title?: string;
+    // Include the original UserRead data if needed for interactions
+    originalApiNode?: { data: UserRead }; 
 }
 
 const UserNode: React.FC<NodeProps<UserNodeData>> = ({ data }) => {
-    // Basic styling for a user node
+    const userData = data.originalApiNode?.data;
+
     return (
         <Box
             p={2}
-            borderRadius="full" // Make it circular
-            bg="blue.100"
-            border="1px solid"
-            borderColor="blue.300"
-            minW="100px"
-            textAlign="center"
+            borderWidth="1px"
+            borderRadius="md"
+            bg="white"
+            borderColor="gray.300"
+            shadow="sm"
+            minWidth="150px" // Ensure minimum width
         >
-            {/* Handles are connection points */}
-            <Handle type="target" position={Position.Top} />
-            <VStack spacing={1} align="center">
-                <Avatar size="sm" name={data.label} src={data.avatar_url} />
-                <Text fontSize="xs" fontWeight="bold" noOfLines={1}>
-                    {data.label}
-                </Text>
-                {data.title && (
-                    <Text fontSize="xx-small" color="gray.600" noOfLines={1}>
-                        {data.title}
-                    </Text>
-                )}
-            </VStack>
-            <Handle type="source" position={Position.Bottom} />
-            {/* Add more handles if needed, e.g., Left/Right */}
+            <HStack spacing={3}>
+                <Avatar 
+                    size="sm" 
+                    name={data.label} 
+                    src={userData?.avatar_url || undefined} 
+                />
+                <VStack align="start" spacing={0}>
+                    <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{data.label}</Text>
+                    {userData?.title && <Text fontSize="xs" color="gray.500" noOfLines={1}>{userData.title}</Text>}
+                </VStack>
+            </HStack>
+            {/* Handles allow connecting edges */}
+            <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+            <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+            {/* Add Left/Right handles if needed for different layouts */}
+            {/* <Handle type="target" position={Position.Left} style={{ background: '#555' }} /> */}
+            {/* <Handle type="source" position={Position.Right} style={{ background: '#555' }} /> */}
         </Box>
     );
 };
 
-export default UserNode; 
+export default memo(UserNode); 

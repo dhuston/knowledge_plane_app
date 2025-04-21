@@ -12,13 +12,16 @@ import ReactFlow, {
     Connection,
     BackgroundVariant,
     NodeTypes,
+    Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import dagre from 'dagre';
 
 import { useAuth } from '../../context/AuthContext';
-import { apiClient } from '../../api/client'; // Correct: Named export
-import { MapData, MapNode, MapEdge, MapNodeTypeEnum, MapEdgeTypeEnum } from '../../types/map'; // Single import for MapNode
+// import { apiClient } from '../../api/client'; // Remove unused import
+import { MapData, MapNode, MapEdge, MapNodeTypeEnum, MapEdgeTypeEnum } from '../../types/map';
 import { Box, Spinner, Text, useToast } from '@chakra-ui/react';
+import { useApiClient } from '../../hooks/useApiClient'; // Trying corrected path
 
 // Import custom node components
 import UserNode from './nodes/UserNode';
@@ -46,6 +49,7 @@ const transformApiNode = (apiNode: MapNode): Node => {
             nodeType = 'projectNode';
             break;
         // Add cases for GOAL, KNOWLEDGE_ASSET etc. later
+        // default: console.warn("Unknown node type:", apiNode.type); // Optional warning
     }
 
     return {
@@ -101,6 +105,47 @@ const transformApiEdge = (apiEdge: MapEdge): Edge => {
     };
 };
 
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const nodeWidth = 172; // Example width, adjust as needed
+const nodeHeight = 50; // Example height, adjust as needed
+
+// Function to calculate layout using Dagre
+const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
+    dagreGraph.setGraph({ rankdir: direction });
+
+    nodes.forEach((node) => {
+        // Use dimensions from node object if available, otherwise use defaults
+        const width = node.width || nodeWidth;
+        const height = node.height || nodeHeight;
+        dagreGraph.setNode(node.id, { width, height });
+    });
+
+    edges.forEach((edge) => {
+        dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    nodes.forEach((node) => {
+        const nodeWithPosition = dagreGraph.node(node.id);
+        // Adjust handle positions back for TB layout
+        node.targetPosition = Position.Top;
+        node.sourcePosition = Position.Bottom;
+
+        // Center the node position based on its dimensions
+        const width = node.width || nodeWidth;
+        const height = node.height || nodeHeight;
+        node.position = {
+            x: nodeWithPosition.x - width / 2,
+            y: nodeWithPosition.y - height / 2,
+        };
+    });
+
+    return { nodes, edges };
+};
+
 // Pass props to the component
 const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -109,13 +154,14 @@ const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick }) => {
     const [error, setError] = useState<string | null>(null);
     const { token } = useAuth();
     const toast = useToast();
+    const apiClient = useApiClient();
 
-    // Define the custom node types
+    // Define the custom node types and memoize them
     const nodeTypes: NodeTypes = useMemo(() => ({
         userNode: UserNode,
         teamNode: TeamNode,
         projectNode: ProjectNode,
-        // Add goalNode etc. here
+        // Add goalNode etc. here later when implemented
     }), []);
 
     useEffect(() => {
@@ -130,9 +176,9 @@ const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick }) => {
             setIsLoading(true);
             setError(null);
             try {
-                const response = await apiClient.get('/map/data');
+                const response = await apiClient.get<MapData>('/map/data');
                 console.log("[LivingMap] API response received:", response);
-                const mapData = (response as { data: MapData }).data; 
+                const mapData: MapData = response.data;
                 console.log("[LivingMap] Map data extracted:", mapData);
 
                 if (!mapData || !mapData.nodes || !mapData.edges) {
@@ -140,11 +186,19 @@ const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick }) => {
                     throw new Error("Received invalid map data structure from API.");
                 }
 
-                const fetchedNodes = mapData.nodes.map(transformApiNode);
-                const fetchedEdges = mapData.edges.map(transformApiEdge);
-                console.log("[LivingMap] Setting nodes and edges:", fetchedNodes, fetchedEdges);
-                setNodes(fetchedNodes);
-                setEdges(fetchedEdges);
+                const initialNodes = mapData.nodes.map(transformApiNode);
+                const initialEdges = mapData.edges.map(transformApiEdge);
+                console.log("[LivingMap] Initial nodes/edges:", initialNodes, initialEdges);
+                
+                // Calculate layout
+                const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+                    initialNodes,
+                    initialEdges
+                );
+                console.log("[LivingMap] Layouted nodes/edges:", layoutedNodes, layoutedEdges);
+
+                setNodes(layoutedNodes);
+                setEdges(layoutedEdges);
             } catch (err: unknown) {
                 console.error("[LivingMap] Error fetching map data:", err);
                 let errorMessage = "Failed to load map data.";
@@ -164,7 +218,7 @@ const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick }) => {
         };
 
         fetchMapData();
-    }, [token, setNodes, setEdges, toast]);
+    }, [token, setNodes, setEdges, toast, apiClient]);
 
     const onConnect = useCallback(
         (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -220,7 +274,7 @@ const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick }) => {
                 onPaneClick={handlePaneClick}
             >
                 <Controls />
-                <MiniMap />
+                <MiniMap nodeStrokeWidth={3} zoomable pannable />
                 <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
             </ReactFlow>
         </div>

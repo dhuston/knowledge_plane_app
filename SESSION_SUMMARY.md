@@ -122,3 +122,110 @@
 **Note:** A significant refinement of the core UX vision was introduced, centering the application experience around an interactive, AI-powered **"Living Map"** of the organization's work fabric. This includes concepts like dynamic visualization of entities (people, projects, goals, knowledge) and relationships, contextual overlays/panels, an Org Time Machine, and a Scenario Simulator.
 
 This "Living Map" concept supersedes earlier, more fragmented workspace/overlay ideas and will guide the design and implementation priorities moving forward, particularly for Slice 2 (Pilot MVP) and beyond. Relevant documentation (Vision, Architecture, Backlog, Data Model) has been updated to reflect this direction. 
+
+---
+
+## Session Summary - April 20th, 2025
+
+**Goal:** Expand the data model to include Projects, Goals, and Knowledge Assets, seed comprehensive sample data, and prepare the backend for the "Living Map" visualization.
+
+**Overall Progress:**
+
+*   **Expanded Backend Models & Schemas:**
+    *   Added `Project`, `Goal`, and `KnowledgeAsset` SQLAlchemy models (`models/`).
+    *   Added `KnowledgeAssetTypeEnum` with initial values (`NOTE`, `DOCUMENT`, `MESSAGE`, `MEETING`).
+    *   Created corresponding Pydantic schemas (`schemas/`).
+*   **Updated Model Relationships:**
+    *   Added `User` -> `KnowledgeAsset` relationship.
+    *   Added `Project` -> `User` (owner), `Project` -> `Team`, `Project` -> `Goal` relationships.
+*   **Database Migrations:**
+    *   Generated and applied migration `2d117f7393a2` for the new models and relationships.
+*   **Expanded Seed Script (`scripts/seed_data.py`):**
+    *   Enhanced script to create sample Departments, Teams, Users (with manager/team links).
+    *   Added logic to create sample Projects (with owners/teams) and Goals.
+    *   Added logic to link Projects to Goals.
+    *   Added logic to create sample Knowledge Assets (initially with existing types) linked to Users/Projects.
+*   **Added New Knowledge Asset Types:**
+    *   Added `REPORT`, `SUBMISSION`, `PRESENTATION` to `KnowledgeAssetTypeEnum` (`models/knowledge_asset.py`).
+    *   Generated migration `f5081054e612` to add these new enum values to the database.
+*   **Resolved Enum Migration Issues:**
+    *   Diagnosed that initial `alembic upgrade` and `seed_data.py` runs were targeting the wrong database instance (local `localhost:5433` vs Docker `db:5432`).
+    *   Executed `alembic upgrade head` and `python scripts/seed_data.py` within the `backend` Docker container using `docker-compose exec` to target the correct database.
+    *   Identified persistent `InvalidTextRepresentationError` for the new enum values even when targeting the correct DB.
+    *   Modified migration `f5081054e612` to explicitly `DROP TYPE` and `CREATE TYPE` for `knowledgeassettypeenum` instead of using `ALTER TYPE ... ADD VALUE`.
+    *   Successfully applied the modified migration and ran the seed script within the container.
+
+**Challenges & Learnings:**
+
+*   PostgreSQL enum modifications (`ALTER TYPE ... ADD VALUE`) can sometimes be problematic or have caching issues when used via Alembic/SQLAlchemy; dropping and recreating the type can be a more reliable (though potentially destructive) workaround.
+*   Ensuring that database operations (migrations, seeding) target the correct database instance is crucial, especially when using Docker Compose. Running commands *inside* the relevant container (`docker-compose exec`) is often necessary.
+*   Carefully check the logs of commands run both locally and inside containers to understand which database connection is being used.
+
+**Next Steps (Focus on Living Map Implementation - Slice 2 MVP):**
+
+*   **Backend: Living Map API Endpoint:**
+    *   Create a new API endpoint (e.g., `/map/data`) in the backend.
+    *   This endpoint should query the database for relevant entities (Users, Teams, Projects, Goals, Knowledge Assets) within the user's tenant.
+    *   Compute the relationships (edges) between these entities (e.g., User `MEMBER_OF` Team, Project `ALIGNED_TO` Goal, User `OWNS` KnowledgeAsset, etc.).
+    *   Define clear API response schemas (`MapData`, `MapNode`, `MapEdge` including `MapNodeTypeEnum`, `MapEdgeTypeEnum`) to structure the data for the frontend.
+*   **Frontend: Living Map Component:**
+    *   Integrate `react-flow` library (`@reactflow/core`).
+    *   Create the `LivingMap.tsx` component.
+    *   Fetch data from the `/map/data` backend endpoint.
+    *   Implement `transformApiNode` and `transformApiEdge` functions to convert the API response into `react-flow`'s `Node` and `Edge` formats.
+    *   Implement basic layouting using a library like `dagre`.
+    *   Create custom node components (`UserNode`, `TeamNode`, `ProjectNode`, `GoalNode`, `KnowledgeAssetNode`) matching the visual design concepts.
+    *   Implement edge styling based on the `MapEdgeTypeEnum` from the backend.
+    *   Connect `onNodeClick` events in the `LivingMap` to update the main panel (e.g., `BriefingPanel`) to show details of the selected entity.
+*   **Backend: CRUD APIs (Optional but Recommended):**
+    *   Implement basic CRUD API endpoints for `Project`, `Goal`, and `KnowledgeAsset` to allow for future data management (might not be strictly needed for initial map *viewing*).
+*   **Refinement:**
+    *   Address `datetime.utcnow()` deprecation warnings identified in the seed script logs.
+    *   Review and refine data model relationships as needed based on map visualization requirements.
+    *   Implement Google OAuth token refresh logic.
+    *   Add more robust authorization checks to backend endpoints.
+    *   Address any remaining `TODO` comments.
+
+## Session Summary - April 20th, 2025 (Continued)
+
+**Goal:** Resolve backend startup issues and achieve initial Living Map data loading.
+
+**Overall Progress:**
+
+*   **Systematic Refactoring & Debugging:**
+    *   Diagnosed and fixed a cascade of `ImportError`, `AttributeError`, and `ModuleNotFoundError` issues in the backend originating from inconsistent schema naming (`ProjectRead`, `GoalRead`, `TeamRead`, `UserRead` vs. `Project`, `Goal`, `Team`, `User`), inconsistent dependency import paths (`app.api.deps` vs. `app.core.security`/`app.db.session`), inconsistent CRUD class patterns (removal of `CRUDBase`), and incomplete feature removal (`TokenBlacklist`).
+    *   Performed a systematic consistency check across `schemas/`, `api/v1/endpoints/`, `api/routers/`, `crud/`, `models/`, and `main.py` to align schema names, imports, router structure, and CRUD patterns.
+*   **Added `Department` Model:**
+    *   Successfully created the `Department` model, schemas, CRUD file.
+    *   Added the `departments` relationship to the `Tenant` model.
+    *   Generated and applied Alembic migrations for the new table and foreign key (`Team.dept_id`).
+*   **Resolved SQLAlchemy Errors:**
+    *   Fixed `InvalidRequestError` (missing `departments` property on `Tenant` mapper) by adding the corresponding relationship.
+    *   Fixed `NoForeignKeysError` and `AmbiguousForeignKeysError` by adding the `dept_id` foreign key to `Team` and explicitly setting `foreign_keys` on the `Team.members` relationship.
+*   **Resolved Runtime Errors:**
+    *   Fixed `TypeError` in project creation (`crud_project.py`) caused by passing `owner_id` keyword argument when the model expected `owning_team_id`.
+    *   Fixed Pydantic `UserError` (`from_attributes=True` missing) for `ProjectRead` and `GoalRead` schemas by updating their base classes (`ProjectInDBBase`, `GoalInDBBase`) to use correct Pydantic V2 config.
+    *   Fixed `AttributeError` in `map.py` when calling `crud_team.get` by correcting the import and usage pattern.
+    *   Fixed `AttributeError` in `map.py` when querying `Project.owner_id` by changing the query to use the existing `Project.owning_team_id`.
+*   **Fixed Frontend Issues:**
+    *   Fixed logout redirect loop by navigating to `/map` instead of `/workspace` in `AuthCallbackPage.tsx`.
+    *   Fixed `ERR_CONNECTION_REFUSED` by correcting the `API_BASE_URL` port in `useApiClient.ts` to match the `docker-compose.yml` host port (`8001`).
+    *   Fixed map data loading error by correcting Axios response handling in `LivingMap.tsx` (`response.data` instead of `response`).
+*   **Current Status:** Backend starts successfully without import errors. Frontend logs in, fetches user data, and successfully fetches and processes initial data for the Living Map from `/api/v1/map/data` endpoint.
+
+**Challenges & Learnings:**
+
+*   Inconsistent refactoring is a major source of cascading errors. Systematic checks are crucial.
+*   SQLAlchemy relationship configuration (`back_populates`, `foreign_keys`) requires careful attention to avoid runtime errors.
+*   Pydantic V1 (`orm_mode`) vs V2 (`from_attributes`) configuration differences must be handled correctly.
+*   CORS errors in the frontend can often be symptoms of underlying backend errors (like 500s).
+*   Confirming frontend API URLs match Docker port mappings is essential.
+
+**Next Steps (Continue Living Map Implementation - Slice 2 MVP):**
+
+*   Investigate why newly created projects might not be immediately visible (potentially needs frontend state update or map refresh logic after creation).
+*   Implement frontend display/rendering for different node types (Project, Goal, etc.) on the map.
+*   Refine backend `/map/data` endpoint logic for fetching relevant nodes/edges.
+*   Implement Google OAuth token refresh logic.
+*   Add more robust authorization checks to backend endpoints.
+*   Address `TODO` comments. 

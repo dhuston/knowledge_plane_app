@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import DB session and user CRUD/model
 from app.db.session import get_db_session
-from app.crud.crud_user import user as crud_user
 from app.models.user import User as UserModel
 
 # Password hashing context (if using password auth later)
@@ -69,6 +68,8 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme)
 ) -> UserModel:
     """Dependency to verify JWT and return the current user."""
+    from app.crud.crud_user import user as crud_user
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

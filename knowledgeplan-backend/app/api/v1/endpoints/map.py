@@ -7,14 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload 
 
 from app import crud, models, schemas
-from app.api import deps
+# Removed: from app.api import deps
+# Import dependencies directly
+from app.db.session import get_db_session
+from app.core.security import get_current_user # Use get_current_user for now
 
 router = APIRouter()
 
 @router.get("/data", response_model=schemas.MapData)
 async def get_map_data(
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: models.User = Depends(deps.get_current_active_user),
+    db: AsyncSession = Depends(get_db_session), # Use get_db_session
+    # Use get_current_user for now, needs active check later
+    current_user: models.User = Depends(get_current_user), 
     types: Optional[str] = Query(None, description="Comma-separated list of node types to include (e.g., user,project,goal)"),
     # Add other filtering parameters later (e.g., center_node_id, depth)
 ) -> Any:

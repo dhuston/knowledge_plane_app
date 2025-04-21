@@ -1,45 +1,53 @@
-from typing import List, Dict, Any, Optional
-from enum import Enum as PyEnum
+from enum import Enum
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-# Define possible node types - can be extended
-class MapNodeTypeEnum(str, PyEnum):
-    USER = "user"
-    TEAM = "team"
-    PROJECT = "project"
-    GOAL = "goal"
-    KNOWLEDGE_ASSET = "knowledge_asset"
-    DEPARTMENT = "department" # Example future type
 
-# Define possible edge types - can be extended
-class MapEdgeTypeEnum(str, PyEnum):
-    REPORTS_TO = "reports_to"
-    MEMBER_OF = "member_of"
-    LEADS = "leads"
-    OWNS = "owns"
-    PARTICIPATES_IN = "participates_in"
-    ALIGNED_TO = "aligned_to"
-    DEPENDS_ON = "depends_on" # Example future type
-    LINKS_TO = "links_to"     # Example future type
+class MapNodeTypeEnum(str, Enum):
+    USER = "USER"
+    TEAM = "TEAM"
+    PROJECT = "PROJECT"
+    GOAL = "GOAL"
+    KNOWLEDGE_ASSET = "KNOWLEDGE_ASSET"
+    DEPARTMENT = "DEPARTMENT" # Added based on seed data
+
+
+class MapEdgeTypeEnum(str, Enum):
+    REPORTS_TO = "REPORTS_TO"  # User -> User (Manager)
+    MEMBER_OF = "MEMBER_OF"  # User -> Team, Team -> Department
+    LEADS = "LEADS" # User -> Team/Department
+    OWNS = "OWNS"  # User/Team -> Project, User -> KnowledgeAsset
+    PARTICIPATES_IN = "PARTICIPATES_IN" # User -> Project (Placeholder)
+    ALIGNED_TO = "ALIGNED_TO"  # Project -> Goal
+    PARENT_OF = "PARENT_OF" # Goal -> Goal
+    RELATED_TO = "RELATED_TO" # KnowledgeAsset -> Project/User etc.
+    # Add more as needed
+
 
 class MapNode(BaseModel):
-    id: str = Field(..., description="Unique ID for the node (string representation of UUID or composite key)")
-    type: MapNodeTypeEnum = Field(..., description="Type of the entity this node represents")
-    label: str = Field(..., description="Display name for the node")
-    data: Dict[str, Any] = Field(default_factory=dict, description="Payload containing additional properties for styling or context panels")
-    # Position hint - backend might not set this initially
-    position: Optional[Dict[str, float]] = Field(None, description="Optional position hint for frontend layout {x, y}")
+    id: str  # Using string ID for react-flow compatibility
+    type: MapNodeTypeEnum
+    label: str
+    # Store raw entity data for the briefing panel
+    data: Dict[str, Any] = {}
+    # Optional hint for initial positioning, backend might not set this initially
+    position: Optional[Dict[str, int]] = None
+
 
 class MapEdge(BaseModel):
-    id: str = Field(..., description="Unique ID for the edge (e.g., sourceId_type_targetId)")
-    source: str = Field(..., description="ID of the source MapNode")
-    target: str = Field(..., description="ID of the target MapNode")
-    type: MapEdgeTypeEnum = Field(..., description="Type of relationship this edge represents")
-    label: Optional[str] = Field(None, description="Optional display label for the edge")
-    data: Dict[str, Any] = Field(default_factory=dict, description="Payload containing additional properties for the edge")
+    id: str # e.g., f"{source_id}_{target_id}_{edge_type}"
+    source: str # Source node ID (string)
+    target: str # Target node ID (string)
+    type: MapEdgeTypeEnum
+    # Optional data like interaction strength, status, etc.
+    data: Optional[Dict[str, Any]] = None
+    # Optional styling hints
+    animated: Optional[bool] = None
+    label: Optional[str] = None
+
 
 class MapData(BaseModel):
-    nodes: List[MapNode] = Field(default_factory=list)
-    edges: List[MapEdge] = Field(default_factory=list) 
+    nodes: List[MapNode]
+    edges: List[MapEdge] 

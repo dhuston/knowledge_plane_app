@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.13-slim as builder
+FROM python:3.12-slim as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -25,7 +25,7 @@ RUN poetry config virtualenvs.in-project true
 RUN poetry install --only main --no-root --no-interaction --no-ansi
 
 # --- Final Stage ---
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -41,11 +41,13 @@ RUN apt-get update && apt-get install --no-install-recommends -y libpq-dev && rm
 # Copy virtual env from builder stage (from the project dir)
 COPY --from=builder /app/.venv $APP_HOME/.venv
 
-# Copy application code
-COPY ./app ./app
+# Copy application code AND Alembic config/scripts
+COPY ./alembic.ini $APP_HOME/alembic.ini
+COPY ./scripts $APP_HOME/scripts
+COPY ./app $APP_HOME/app
 
 # Expose port
 EXPOSE 8000
 
 # Run the application (uvicorn should now be in the PATH)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

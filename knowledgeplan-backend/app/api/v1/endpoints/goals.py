@@ -5,17 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, models, schemas
-from app.api import deps
+from app.db.session import get_db_session
+from app.core.security import get_current_user
 
 router = APIRouter()
 
 
-@router.post("/", response_model=schemas.Goal, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=schemas.GoalRead, status_code=status.HTTP_201_CREATED)
 async def create_goal(
     *, # Enforces keyword-only arguments after this
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     goal_in: schemas.GoalCreate,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Create new goal for the current user's tenant.
@@ -28,12 +29,12 @@ async def create_goal(
     return goal
 
 
-@router.get("/", response_model=List[schemas.Goal])
+@router.get("/", response_model=List[schemas.GoalRead])
 async def read_goals(
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Retrieve goals for the current user's tenant.
@@ -45,12 +46,12 @@ async def read_goals(
     return goals
 
 
-@router.get("/{goal_id}", response_model=schemas.Goal)
+@router.get("/{goal_id}", response_model=schemas.GoalRead)
 async def read_goal(
     *, # Enforces keyword-only arguments after this
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     goal_id: UUID,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Get goal by ID.
@@ -65,13 +66,13 @@ async def read_goal(
     return goal
 
 
-@router.put("/{goal_id}", response_model=schemas.Goal)
+@router.put("/{goal_id}", response_model=schemas.GoalRead)
 async def update_goal(
     *, # Enforces keyword-only arguments after this
-    db: AsyncSession = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db_session),
     goal_id: UUID,
     goal_in: schemas.GoalUpdate,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
     Update a goal.

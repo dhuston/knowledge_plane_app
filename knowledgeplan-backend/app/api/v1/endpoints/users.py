@@ -9,7 +9,7 @@ from app.db.session import get_db_session
 
 router = APIRouter()
 
-@router.get("/me", response_model=schemas.User)
+@router.get("/me", response_model=schemas.UserRead)
 async def read_users_me(
     current_user: models.User = Depends(security.get_current_user)
 ):
@@ -18,7 +18,7 @@ async def read_users_me(
     return current_user
 
 # Endpoint to get a specific user by ID
-@router.get("/{user_id}", response_model=schemas.User)
+@router.get("/{user_id}", response_model=schemas.UserRead)
 async def read_user(
     user_id: UUID, 
     db: AsyncSession = Depends(get_db_session),

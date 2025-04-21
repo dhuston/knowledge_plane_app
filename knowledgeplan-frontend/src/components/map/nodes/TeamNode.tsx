@@ -1,38 +1,40 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Box, Text, Icon, VStack } from '@chakra-ui/react';
+import { Box, Text, Icon, HStack } from '@chakra-ui/react';
 import { FaUsers } from 'react-icons/fa'; // Example icon
+import { TeamRead } from '../../types/team'; // Corrected path assumption
 
-// Define the expected structure of the data prop for a TeamNode
+// Assuming data structure includes label and TeamRead
 interface TeamNodeData {
-    label: string; // Team Name
-    // Add other relevant team data
+    label: string;
+    // Add other TeamRead fields if needed
+    originalApiNode?: { data: TeamRead };
 }
 
 const TeamNode: React.FC<NodeProps<TeamNodeData>> = ({ data }) => {
+    // const teamData = data.originalApiNode?.data;
+
     return (
         <Box
-            p={3} // Slightly larger padding
-            borderRadius="full" // Still circular, but larger overall
-            bg="green.100"
-            border="1px solid"
-            borderColor="green.300"
-            minW="120px" // Slightly wider
-            textAlign="center"
-            boxShadow="sm"
+            p={2}
+            borderWidth="1px"
+            borderRadius="md"
+            bg="gray.50"
+            borderColor="gray.300"
+            shadow="sm"
+            minWidth="150px"
         >
-            <Handle type="target" position={Position.Top} />
-            <Handle type="source" position={Position.Bottom} />
-            <Handle type="target" position={Position.Left} />
-            <Handle type="source" position={Position.Right} />
-            <VStack spacing={1} align="center">
-                <Icon as={FaUsers} boxSize={5} color="green.600" />
-                <Text fontSize="sm" fontWeight="bold" noOfLines={1}>
-                    {data.label}
-                </Text>
-            </VStack>
+            <HStack spacing={2}>
+                <Icon as={FaUsers} color="gray.500" />
+                <Text fontWeight="medium" fontSize="sm" noOfLines={1}>{data.label}</Text>
+            </HStack>
+            {/* Handles */}
+            <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+            <Handle type="target" position={Position.Left} style={{ background: '#555' }} />
+            <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+            <Handle type="source" position={Position.Right} style={{ background: '#555' }} />
         </Box>
     );
 };
 
-export default TeamNode; 
+export default memo(TeamNode); 

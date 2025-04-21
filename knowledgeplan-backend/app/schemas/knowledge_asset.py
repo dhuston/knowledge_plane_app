@@ -1,40 +1,86 @@
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from enum import Enum as PyEnum
+from uuid import UUID
 
 from pydantic import BaseModel, Field, UUID4
 
 # Enum for different types of knowledge assets
 # Starting simple, will expand significantly
 class KnowledgeAssetTypeEnum(str, PyEnum):
-    NOTE = "note"
-    DOCUMENT = "document" # Placeholder
-    MESSAGE = "message"   # Placeholder
-    MEETING = "meeting"   # Placeholder
+    NOTE = "NOTE"
+    DOCUMENT = "DOCUMENT"
+    MESSAGE = "MESSAGE"
+    MEETING = "MEETING"
+    REPORT = "REPORT"
+    SUBMISSION = "SUBMISSION"
+    PRESENTATION = "PRESENTATION"
+    # Add more types as needed
 
-# Shared properties
+# --- Schemas specific to NOTE type --- 
+
+class NoteBase(BaseModel):
+    content: str = Field(..., description="The main text content of the note.")
+    # Optional fields that might apply to notes
+    title: Optional[str] = Field(None, description="Optional title for the note.")
+    properties: Optional[Dict[str, Any]] = Field(None, description="Flexible key-value pairs for additional metadata.")
+
+class NoteCreate(NoteBase):
+    # Although derived from context/URL, make it explicit for clarity if needed
+    project_id: Optional[UUID] = None # Make optional if backend derives it
+    # owner_id will be derived from the current user
+    # type will likely be set automatically to NOTE
+    # Pass only content usually, let backend handle links?
+    pass # Keep inheriting for now, backend uses content + context
+
+class NoteRead(NoteBase):
+    id: UUID
+    tenant_id: UUID
+    project_id: UUID # Link back to the project
+    owner_id: UUID # Link back to the user who created it
+    type: KnowledgeAssetTypeEnum = KnowledgeAssetTypeEnum.NOTE # Explicitly show type
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+# --- Generic Knowledge Asset Schemas (Can be used if needed) --- 
+
+# Shared properties for any Knowledge Asset
 class KnowledgeAssetBase(BaseModel):
-    title: Optional[str] = Field(None, max_length=255)
-    type: KnowledgeAssetTypeEnum = Field(..., description="The type of knowledge asset")
-    source: Optional[str] = Field(None, max_length=100, description="Origin (e.g., native, slack, drive)")
-    link: Optional[str] = Field(None, description="External link if applicable")
-    content: Optional[str] = None # For native notes or summaries
-    project_id: Optional[UUID4] = Field(None, description="Link to the associated project")
-    # user_id: Optional[UUID4] = None # Link to the creating/owning user
-    properties: Optional[dict[str, Any]] = None
+    type: KnowledgeAssetTypeEnum
+    title: Optional[str] = None
+    source: Optional[str] = None # e.g., Drive, Slack, Native
+    link: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
 
-# Properties to receive via API on creation
+# Properties to receive on creation (Generic - might need specific ones like NoteCreate)
 class KnowledgeAssetCreate(KnowledgeAssetBase):
-    type: KnowledgeAssetTypeEnum = KnowledgeAssetTypeEnum.NOTE # Default to note for now
-    content: str # Require content for native notes
-    project_id: UUID4 # Require project link for notes
+    project_id: Optional[UUID] = None # Asset might be linked to a project
+    # Add other potential links like goal_id, user_id?
 
-# Properties to receive via API on update (e.g., updating a note)
+# Properties to receive on update
 class KnowledgeAssetUpdate(KnowledgeAssetBase):
-    title: Optional[str] = Field(None, max_length=255)
-    content: Optional[str] = None
-    type: Optional[KnowledgeAssetTypeEnum] = None # Should type be updatable?
+    type: Optional[KnowledgeAssetTypeEnum] = None # Usually type shouldn't change
+    title: Optional[str] = None
+    source: Optional[str] = None
+    link: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+    # Should not allow updating project_id or owner_id easily
+
+# Properties to return to client (Generic)
+class KnowledgeAssetRead(KnowledgeAssetBase):
+    id: UUID
+    tenant_id: UUID
+    project_id: Optional[UUID] = None
+    owner_id: UUID # Who created/owns this asset
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
 
 # Properties shared by models stored in DB
 class KnowledgeAssetInDBBase(KnowledgeAssetBase):
