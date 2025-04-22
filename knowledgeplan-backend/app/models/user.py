@@ -3,7 +3,12 @@ from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from typing import TYPE_CHECKING
 from app.db.base_class import Base
+from .project import project_participants # Assuming project.py is where it's defined
+
+if TYPE_CHECKING:
+    from .tenant import Tenant  # noqa: F401
 
 class User(Base):
     __tablename__ = "users"
@@ -37,6 +42,17 @@ class User(Base):
 
     # Define relationships (optional but useful)
     tenant = relationship("Tenant", back_populates="users")
-    manager = relationship("User", remote_side=[id], back_populates="reports")
-    reports = relationship("User", back_populates="manager")
+    manager = relationship("User", remote_side=[id], back_populates="direct_reports")
+    direct_reports = relationship("User", back_populates="manager")
     team = relationship("Team", back_populates="members", foreign_keys=[team_id])
+    
+    # Add relationship to projects via association table
+    projects = relationship(
+        "Project",
+        secondary=project_participants,
+        back_populates="participants"
+    )
+
+    def __repr__(self):
+        # Ensure correct indentation
+        return f"<User(id={self.id}, email='{self.email}')>" # Use existing repr content

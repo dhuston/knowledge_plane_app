@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -13,8 +13,15 @@ if TYPE_CHECKING:
     from .team import Team  # noqa: F401
     from .goal import Goal # noqa: F401 # Added Goal
     from .knowledge_asset import KnowledgeAsset # noqa: F401
-    # from .user import User # noqa: F401 # For participants/members relationship
+    from .user import User # noqa: F401 # Uncomment User import
 
+# Define Association Table for Project <-> User (Participants)
+project_participants = Table(
+    "project_participants",
+    Base.metadata,
+    Column("project_id", UUID(as_uuid=True), ForeignKey("projects.id"), primary_key=True),
+    Column("user_id", UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True),
+)
 
 class Project(Base):
     __tablename__ = "projects"
@@ -37,12 +44,12 @@ class Project(Base):
     goal = relationship("Goal", back_populates="projects") # Added goal relationship
     notes = relationship("KnowledgeAsset", back_populates="project", cascade="all, delete-orphan") # Relationship to notes
 
-    # participants = relationship(
-    #     "User",
-    #     secondary="project_participants", # Define association table later
-    #     back_populates="projects"
-    # )
-    # notes = relationship("KnowledgeAsset", back_populates="project", cascade="all, delete-orphan") # If notes are separate model
+    # Uncomment and define participants relationship
+    participants = relationship(
+        "User",
+        secondary=project_participants,
+        back_populates="projects"
+    )
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}', tenant_id={self.tenant_id})>"
@@ -53,7 +60,7 @@ class Project(Base):
 # Add back-population to Team model:
 # owned_projects = relationship("Project", back_populates="owner_team")
 
-# Define ProjectParticipants association table later if needed
+# Define ProjectParticipants association table later if needed - REMOVED OLD COMMENTED CLASS
 # class ProjectParticipants(Base):
 #     __tablename__ = 'project_participants'
 #     project_id = Column(UUID(as_uuid=True), ForeignKey('projects.id'), primary_key=True)

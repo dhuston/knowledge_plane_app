@@ -113,6 +113,23 @@ async def delete_project(db: AsyncSession, *, project_id: UUID, tenant_id: UUID)
         await db.commit()
     return db_project
 
+async def get_participants_for_project(
+    db: AsyncSession, *, project_id: UUID, tenant_id: UUID
+) -> List[User]:
+    """Fetches participants (User models) for a specific project."""
+    # Get the project first to access the relationship
+    project = await db.get(
+        ProjectModel, 
+        project_id, 
+        options=[selectinload(ProjectModel.participants)]
+    )
+    
+    # Check tenant and existence
+    if not project or project.tenant_id != tenant_id:
+        return []
+        
+    return project.participants
+
 # --- CRUD Class using Standalone Functions --- 
 
 # Removed inheritance from CRUDBase
@@ -130,6 +147,16 @@ class CRUDProject():
     ) -> List[ProjectModel]:
         # Call the standalone function
         return await get_multi_project_by_tenant(db=db, tenant_id=tenant_id, skip=skip, limit=limit)
+
+    # Add method to get projects by owning team
+    async def get_projects_by_team(
+        self, db: AsyncSession, *, team_id: UUID, tenant_id: UUID, skip: int = 0, limit: int = 100
+    ) -> List[ProjectModel]:
+        """Wrapper method to get projects owned by a specific team."""
+        # Call the standalone function
+        return await get_projects_by_team(
+            db=db, team_id=team_id, tenant_id=tenant_id, skip=skip, limit=limit
+        )
 
     # Add wrappers for standard CRUD operations using standalone functions
     async def get(self, db: AsyncSession, *, id: UUID, tenant_id: UUID) -> ProjectModel | None:
@@ -154,6 +181,12 @@ class CRUDProject():
     async def remove(self, db: AsyncSession, *, id: UUID, tenant_id: UUID) -> ProjectModel | None:
         # Pass tenant_id to underlying function
         return await delete_project(db=db, project_id=id, tenant_id=tenant_id)
+
+    # Add method to get participants
+    async def get_participants(
+        self, db: AsyncSession, *, project_id: UUID, tenant_id: UUID
+    ) -> List[User]:
+        return await get_participants_for_project(db=db, project_id=project_id, tenant_id=tenant_id)
 
 # Removed model from instantiation
 project = CRUDProject() 

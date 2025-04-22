@@ -4,7 +4,10 @@ from typing import Any, Optional, Dict
 from enum import Enum as PyEnum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, UUID4
+from pydantic import BaseModel, Field, UUID4, computed_field
+
+# Import a basic User schema for relationship
+from .user import UserReadBasic # Assuming you have a basic UserRead schema
 
 # Enum for different types of knowledge assets
 # Starting simple, will expand significantly
@@ -38,13 +41,23 @@ class NoteRead(NoteBase):
     id: UUID
     tenant_id: UUID
     project_id: UUID # Link back to the project
-    owner_id: UUID # Link back to the user who created it
+    # owner_id: UUID # Remove direct field, use computed field instead
     type: KnowledgeAssetTypeEnum = KnowledgeAssetTypeEnum.NOTE # Explicitly show type
     created_at: datetime
     updated_at: datetime
+    
+    # Add relationship field (needs to match model attribute name after loading)
+    # Assuming selectinload loads into 'created_by' attribute based on model
+    created_by: Optional[UserReadBasic] = None 
+
+    @computed_field
+    @property
+    def owner_id(self) -> Optional[UUID]:
+        return self.created_by.id if self.created_by else None
 
     class Config:
-        orm_mode = True
+        # Use from_attributes=True for Pydantic V2
+        from_attributes = True
 
 # --- Generic Knowledge Asset Schemas (Can be used if needed) --- 
 

@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, update
+from sqlalchemy.orm import selectinload
 
 from app.models.knowledge_asset import KnowledgeAsset as KnowledgeAssetModel, KnowledgeAssetTypeEnum
 from app.models.user import User
@@ -84,6 +85,7 @@ async def get_notes_by_project(
     """Get all notes associated with a specific project within a tenant."""
     result = await db.execute(
         select(KnowledgeAssetModel)
+        .options(selectinload(KnowledgeAssetModel.created_by))
         .where(
             KnowledgeAssetModel.project_id == project_id,
             KnowledgeAssetModel.tenant_id == tenant_id,
@@ -102,7 +104,7 @@ async def create_note(
     db_note = KnowledgeAssetModel(
         **note_in.dict(exclude_unset=True), # Use exclude_unset for optional fields
         tenant_id=owner.tenant_id,
-        owner_id=owner.id,
+        created_by_user_id=owner.id,
         project_id=project_id,
         type=KnowledgeAssetTypeEnum.NOTE # Explicitly set type
     )

@@ -60,6 +60,25 @@ class GoalInDBBase(GoalBase):
 class GoalRead(GoalInDBBase):
     pass # Inherits all needed fields
 
+# Minimal Goal details (e.g., for lists where properties are excluded)
+class GoalReadMinimal(BaseModel):
+    # Match the columns selected in the specific query
+    id: UUID
+    tenant_id: UUID
+    title: str
+    description: Optional[str] = None
+    type: GoalTypeEnum
+    parent_id: Optional[UUID] = None
+    status: Optional[str] = None
+    progress: Optional[int] = None
+    due_date: Optional[date] = None
+    # Exclude properties
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # Properties stored in DB
 class GoalInDB(GoalInDBBase):
     pass 

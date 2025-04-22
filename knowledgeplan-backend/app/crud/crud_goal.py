@@ -4,8 +4,10 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, update
+from sqlalchemy.engine import Row # Import Row for type hint
 
 from app.models.goal import Goal as GoalModel
+from app.models.project import Project as ProjectModel # Import ProjectModel
 from app.models.user import User # For potential owner assignment later
 from app.schemas.goal import GoalCreate, GoalUpdate
 
@@ -74,6 +76,36 @@ async def delete_goal(db: AsyncSession, *, goal_id: UUID, tenant_id: UUID) -> Op
         await db.commit()
     return db_goal
 
+async def get_goals_for_team(
+    db: AsyncSession, *, team_id: UUID, tenant_id: UUID, limit: int = 100
+) -> List[Row]:
+    """Fetches distinct goals linked to projects owned by a specific team."""
+    stmt = (
+        select(
+            GoalModel.id,
+            GoalModel.tenant_id,
+            GoalModel.title,
+            GoalModel.description,
+            GoalModel.type,
+            GoalModel.parent_id,
+            GoalModel.status,
+            GoalModel.progress,
+            GoalModel.due_date,
+            # Exclude GoalModel.properties
+            GoalModel.created_at,
+            GoalModel.updated_at
+        ).distinct()
+        .join(ProjectModel, GoalModel.id == ProjectModel.goal_id) 
+        .where(
+            ProjectModel.owning_team_id == team_id, 
+            ProjectModel.tenant_id == tenant_id, 
+        )
+        .limit(limit)
+        .order_by(GoalModel.title)
+    )
+    result = await db.execute(stmt)
+    return result.all() # Returns list of Row objects
+
 # --- CRUD Class using Standalone Functions --- 
 
 # Removed inheritance from CRUDBase
@@ -107,6 +139,13 @@ class CRUDGoal():
 
     async def remove(self, db: AsyncSession, *, id: UUID) -> GoalModel | None:
         return await delete_goal(db=db, goal_id=id)
+
+    # Add new method
+    async def get_multi_by_owning_team(
+        self, db: AsyncSession, *, team_id: UUID, tenant_id: UUID, skip: int = 0, limit: int = 100
+    ) -> List[Row]:
+        # Note: skip isn't used in the standalone function currently, added limit
+        return await get_goals_for_team(db=db, team_id=team_id, tenant_id=tenant_id, limit=limit)
 
 # Removed model from instantiation
 goal = CRUDGoal() 

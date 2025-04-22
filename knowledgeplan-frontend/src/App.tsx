@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -23,8 +24,9 @@ import ProfilePage from './pages/ProfilePage'; // Keep for now, might be removed
 // import ExplorePage from './pages/ExplorePage'; // Removed - Handled by Map/BriefingPanel
 import AuthCallbackPage from './pages/AuthCallbackPage';
 
-// Import Layout Component
+// Import Layout and ProtectedRoute Components
 import MainLayout from './components/layout/MainLayout';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from "./context/AuthContext";
 
 // --- Placeholder Page Components (REMOVED) --- 
@@ -43,25 +45,28 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Routes without the main layout */}
+          {/* Public routes */} 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-          {/* Main route rendering the Layout which contains the Map */}
-          <Route path="/map" element={<MainLayout />} />
+          {/* Protected Routes */} 
+          <Route path="/map" element={ <ProtectedRoute> <MainLayout /> </ProtectedRoute> } />
           
-          {/* Specific entity views - might be removed if BriefingPanel handles all */}
-          <Route path="/profile/:userId" element={<ProfilePage />} />
+          {/* Example of another protected route */}
+          <Route path="/profile/:userId" element={ <ProtectedRoute> <ProfilePage /> </ProtectedRoute>} />
+          
+          {/* Remove old direct routes handled by MainLayout/BriefingPanel */} 
           {/* <Route path="/hub/:hubId" element={<HubPage />} /> */} 
           {/* <Route path="/goals" element={<GoalsPage />} /> */} 
           {/* <Route path="/team/:teamId" element={<TeamPage />} /> */} 
           {/* <Route path="/department/:deptId" element={<DepartmentPage />} /> */}
           {/* <Route path="/explore" element={<ExplorePage />} /> */}
 
-          {/* Default route: Redirect to map view */}
+          {/* Default route: Redirect to login if not authenticated, 
+               ProtectedRoute on /map will handle redirecting logged-in users */} 
           <Route path="/" element={<Navigate to="/map" replace />} /> 
 
-          {/* Catch-all: Redirect unknown routes to map or login? For now, map */}
+          {/* Catch-all: Redirect unknown routes to map (which will redirect to login if needed) */}
           <Route path="*" element={<Navigate to="/map" replace />} /> 
         </Routes>
       </AuthProvider>

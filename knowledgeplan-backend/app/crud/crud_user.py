@@ -5,10 +5,15 @@ from uuid import UUID
 from sqlalchemy.future import select
 from typing import Any, Dict, Optional, Union, List
 from datetime import datetime
+from sqlalchemy.engine import Row
 
 from app.models.user import User as UserModel
 from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import create_access_token
+from app.models.project import Project as ProjectModel
+from app.schemas.project import ProjectRead
+from app.models.goal import Goal as GoalModel
+from app.schemas.goal import GoalRead
 
 async def get_user(db: AsyncSession, user_id: UUID) -> UserModel | None:
     result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
@@ -56,6 +61,58 @@ async def update_user(db: AsyncSession, *, db_obj: UserModel, obj_in: Union[User
     await db.commit()
     await db.refresh(db_obj)
     return db_obj
+
+async def get_projects_for_user(
+    db: AsyncSession, *, user_id: UUID, tenant_id: UUID, user_team_id: Optional[UUID], limit: int = 100
+) -> List[ProjectModel]:
+    """Fetches projects associated with a user (e.g., owned by their team)."""
+    if not user_team_id:
+        return []
+        
+    stmt = (
+        select(ProjectModel)
+        # Ensure this uses owning_team_id
+        .where(ProjectModel.owning_team_id == user_team_id, ProjectModel.tenant_id == tenant_id)
+        .limit(limit) 
+        .order_by(ProjectModel.name) # Add ordering for consistency
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_goals_for_user(
+    db: AsyncSession, *, user_id: UUID, tenant_id: UUID, user_team_id: Optional[UUID], limit: int = 100
+) -> List[Row]:
+    """Fetches goals associated with a user (e.g., linked to projects owned by their team)."""
+    if not user_team_id:
+        return []
+        
+    # Fetch distinct goals linked to projects owned by the user's team
+    # Select specific columns excluding JSON to allow DISTINCT
+    stmt = (
+        select(
+            GoalModel.id,
+            GoalModel.tenant_id,
+            GoalModel.title,
+            GoalModel.description,
+            GoalModel.type,
+            GoalModel.parent_id,
+            GoalModel.status,
+            GoalModel.progress,
+            GoalModel.due_date,
+            # Exclude GoalModel.properties
+            GoalModel.created_at,
+            GoalModel.updated_at
+        ).distinct()
+        .join(ProjectModel, GoalModel.id == ProjectModel.goal_id) 
+        .where(
+            ProjectModel.owning_team_id == user_team_id, 
+            ProjectModel.tenant_id == tenant_id, 
+        )
+        .limit(limit)
+        .order_by(GoalModel.title) # Add ordering
+    )
+    result = await db.execute(stmt)
+    return result.all() # Returns list of Row objects
 
 class CRUDUser():
     async def get(self, db: AsyncSession, id: UUID) -> UserModel | None:
@@ -114,6 +171,12 @@ class CRUDUser():
             print(f"Creating new user via auth: {obj_in.email}")
             # Pass tenant_id explicitly to create
             return await self.create(db, obj_in=obj_in, tenant_id=tenant_id)
+
+    async def get_projects(self, db: AsyncSession, *, user_id: UUID, tenant_id: UUID, user_team_id: Optional[UUID]) -> List[ProjectModel]:
+        return await get_projects_for_user(db=db, user_id=user_id, tenant_id=tenant_id, user_team_id=user_team_id)
+
+    async def get_goals(self, db: AsyncSession, *, user_id: UUID, tenant_id: UUID, user_team_id: Optional[UUID]) -> List[Row]:
+        return await get_goals_for_user(db=db, user_id=user_id, tenant_id=tenant_id, user_team_id=user_team_id)
 
     async def get_by_refresh_token(self, db: AsyncSession, *, refresh_token: str) -> Optional[UserModel]:
         """Finds a user by their stored Google refresh token."""

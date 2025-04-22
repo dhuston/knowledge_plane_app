@@ -4,12 +4,14 @@ import {
   Flex,
   useDisclosure,
   Spinner,
-  Center
+  Center,
+  Drawer, DrawerBody, DrawerOverlay, DrawerContent
 } from "@chakra-ui/react";
 import { useAuth } from '../../context/AuthContext';
 import CreateProjectModal from '../modals/CreateProjectModal';
 import LivingMapWrapper from '../map/LivingMap';
 import BriefingPanel from '../panels/BriefingPanel';
+import DailyBriefingPanel from '../panels/DailyBriefingPanel';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
 import Header from './Header';
 import { useApiClient } from '../../hooks/useApiClient';
@@ -21,6 +23,7 @@ export default function MainLayout() {
   // Only get used properties from useAuth
   const { isLoading, setToken } = useAuth(); 
   const { isOpen: isCreateProjectOpen, onOpen: onCreateProjectOpen, onClose: onCreateProjectClose } = useDisclosure();
+  const { isOpen: isBriefingOpen, onOpen: onBriefingOpen, onClose: onBriefingClose } = useDisclosure();
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
   const [isFetchingNodeDetails, setIsFetchingNodeDetails] = useState<boolean>(false);
   const apiClient = useApiClient();
@@ -91,18 +94,44 @@ export default function MainLayout() {
       <Header 
         onCreateProjectClick={handleCreateProjectClick}
         onLogout={handleLogout} 
+        onOpenBriefing={onBriefingOpen}
       />
       <Flex flex={1} position="relative" overflow="hidden">
-        <Box flex={1} h="full">
+        <Box flex={1} w="100%" h="100%" position="relative">
           <LivingMapWrapper onNodeClick={handleMapNodeClick} /> 
         </Box>
 
         {(selectedNode || isFetchingNodeDetails) && (
-          <BriefingPanel 
-            node={selectedNode}
-            onSelectNode={handleSelectNodeFromPanel}
-          />
+          <Box
+            position="absolute"
+            right="0"
+            top="0"
+            bottom="0"
+            width={{ base: "90%", md: "450px", lg: "500px" }}
+            bg="white"
+            borderLeftWidth="1px"
+            borderColor="gray.200"
+            boxShadow="lg"
+            zIndex={10}
+            display="flex"
+            flexDirection="column"
+            overflowY="auto"
+          >
+            <BriefingPanel 
+              node={selectedNode}
+              onSelectNode={handleSelectNodeFromPanel}
+            />
+          </Box>
         )}
+
+        <Drawer isOpen={isBriefingOpen} placement="left" onClose={onBriefingClose} size="md">
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerBody p={0}>
+              <DailyBriefingPanel isOpen={isBriefingOpen} onClose={onBriefingClose} />
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
       </Flex>
 
       <CreateProjectModal 

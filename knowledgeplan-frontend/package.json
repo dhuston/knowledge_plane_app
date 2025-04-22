@@ -20,6 +20,7 @@
     "@types/axios": "^0.9.36",
     "axios": "^1.8.4",
     "dagre": "^0.8.5",
+    "elkjs": "^0.10.0",
     "framer-motion": "^6.5.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

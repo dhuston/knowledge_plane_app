@@ -7,6 +7,7 @@ import { ProjectRead } from '../../types/project'; // Adjust path as needed
 // Assuming data structure includes label and ProjectRead
 interface ProjectNodeData {
     label: string;
+    title?: string; // Add title prop
     // Add other ProjectRead fields if needed (e.g., status)
     status?: string;
     originalApiNode?: { data: ProjectRead };
@@ -24,6 +25,13 @@ const ProjectNode: React.FC<NodeProps<ProjectNodeData>> = ({ data }) => {
 
     return (
         <Box
+            title={data.title || data.label} // Add title attribute
+            _hover={{ // Add hover styles
+                outline: '2px solid #805AD5', // Example purple outline for projects
+                outlineOffset: '2px',
+                shadow: 'md',
+                zIndex: 10,
+            }}
             p={2}
             borderWidth="1px"
             borderRadius="lg" // Slightly larger radius

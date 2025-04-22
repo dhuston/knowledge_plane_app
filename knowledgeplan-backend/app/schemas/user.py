@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, UUID4, Field
 from typing import Optional
 from datetime import datetime
+from uuid import UUID
 
 # Base properties shared by DB model and API schemas
 class UserBase(BaseModel):
@@ -67,6 +68,15 @@ class UserRead(UserInDBBase):
         }
     }
 
+# --- New Basic Schema --- 
+# Basic schema for representing a user minimally (e.g., in relationships)
+class UserReadBasic(BaseModel):
+    id: UUID
+
+    class Config:
+        from_attributes = True # Enable ORM mode
+
+
 # Properties stored in DB (including hashed password if we add it)
-# class UserInDB(UserInDBBase):
-#     hashed_password: str 
+class UserInDB(UserInDBBase):
+    hashed_password: str 

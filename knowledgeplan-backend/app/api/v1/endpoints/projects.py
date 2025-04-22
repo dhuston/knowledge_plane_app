@@ -103,6 +103,33 @@ async def update_project(
 # Add DELETE endpoint later if needed 
 
 
+# --- Participants Endpoint --- 
+
+@router.get("/{project_id}/participants", response_model=List[schemas.UserReadBasic])
+async def read_project_participants(
+    *, 
+    db: AsyncSession = Depends(get_db_session),
+    project_id: UUID,
+    current_user: models.User = Depends(get_current_user),
+) -> Any:
+    """Retrieve participants for a specific project."""
+    # Get project and verify tenant access first
+    # Pass tenant_id from current_user
+    project = await crud.project.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
+    if not project:
+        # This check implicitly handles tenant access because get requires tenant_id
+        raise HTTPException(status_code=404, detail="Project not found")
+    # Remove redundant tenant check (already handled by crud.project.get)
+    # if project.tenant_id != current_user.tenant_id:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions for this project")
+    
+    # TODO: Add check if current_user should be able to see participants?
+
+    # Fetch participants using the new CRUD method
+    participants = await crud.project.get_participants(db=db, project_id=project_id, tenant_id=current_user.tenant_id)
+    return participants # Pydantic will convert User models to UserReadBasic
+
+
 # --- Notes (Knowledge Asset) Endpoints within Project --- 
 
 @router.post("/{project_id}/notes", response_model=schemas.KnowledgeAsset, status_code=status.HTTP_201_CREATED)
@@ -117,18 +144,27 @@ async def create_note_for_project(
     Create a new note (KnowledgeAsset) associated with a project.
     """
     # Verify project exists and belongs to the user's tenant
-    project = await crud.project.get(db=db, id=project_id)
+    # Pass tenant_id to the get call
+    project = await crud.project.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=403, detail="Not enough permissions for this project")
+    # Remove redundant tenant check (already handled by crud.project.get)
+    # if project.tenant_id != current_user.tenant_id:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions for this project")
+    
     # TODO: Add check if user can add notes to this project (e.g., participant)
 
     # Ensure the note is created with the correct project_id and type='note'
-    note_create_data = note_in.copy(update={"project_id": project_id, "type": schemas.KnowledgeAssetTypeEnum.NOTE})
+    # Use model_dump() for Pydantic v2
+    note_create_data = note_in.model_dump(exclude_unset=True)
+    note_create_data["project_id"] = project_id
+    note_create_data["type"] = schemas.KnowledgeAssetTypeEnum.NOTE
+
+    # Re-create the Pydantic model to ensure validation after updates
+    validated_note_in = schemas.KnowledgeAssetCreate(**note_create_data)
 
     note = await crud.knowledge_asset.create_with_tenant_and_creator(
-        db=db, obj_in=note_create_data, tenant_id=current_user.tenant_id, creator_id=current_user.id
+        db=db, obj_in=validated_note_in, tenant_id=current_user.tenant_id, creator_id=current_user.id
     )
     return note
 
@@ -145,11 +181,14 @@ async def read_notes_for_project(
     Retrieve notes associated with a specific project.
     """
     # Verify project exists and belongs to the user's tenant
-    project = await crud.project.get(db=db, id=project_id)
+    # Pass tenant_id to the get call
+    project = await crud.project.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=403, detail="Not enough permissions for this project")
+    # Remove redundant tenant check
+    # if project.tenant_id != current_user.tenant_id:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions for this project")
+    
     # TODO: Add check if user can view notes for this project (e.g., participant)
 
     notes = await crud.knowledge_asset.get_multi_by_project(

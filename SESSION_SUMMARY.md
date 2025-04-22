@@ -228,4 +228,66 @@ This "Living Map" concept supersedes earlier, more fragmented workspace/overlay 
 *   Refine backend `/map/data` endpoint logic for fetching relevant nodes/edges.
 *   Implement Google OAuth token refresh logic.
 *   Add more robust authorization checks to backend endpoints.
-*   Address `TODO` comments. 
+*   Address `TODO` comments.
+
+---
+
+## Session Summary - April 21st, 2025
+
+**Goal:** Complete Slice 2 frontend tasks for the Living Map MVP, including map interactions, briefing panel population, and basic project creation/note taking.
+
+**Overall Progress:**
+
+*   **Living Map Component (`LivingMap.tsx`):**
+    *   Replaced initial `dagre` layout with `elkjs` for better layout options (experimented with `layered`, `force`, `mrtree`).
+    *   Implemented map interactions: Pan/Zoom (FE-TASK-044 via React Flow defaults), Hover effects with tooltips (FE-TASK-045), Click handling feeding `BriefingPanel` (FE-TASK-046), and visual node selection state.
+    *   Added `GoalNode.tsx` component and registered it.
+*   **Briefing Panel (`BriefingPanel.tsx`):**
+    *   Implemented logic to fetch and display details for selected User, Team, Project, and Goal nodes.
+    *   Added fetching and display for related items:
+        *   User -> Projects & Goals (FE-TASK-048).
+        *   Team -> Owned Projects & Associated Goals (FE-TASK-049).
+        *   Project -> Participants & Notes (FE-TASK-050).
+    *   Refactored panel display using Chakra UI `Card` components for better structure and visual appeal.
+    *   Implemented note submission UI and logic (FE-TASK-053).
+    *   Added visual placeholder for adding project participants (FE-TASK-054).
+*   **Backend Support:**
+    *   Added CRUD functions and API endpoints to support fetching related items for the Briefing Panel (`/users/{id}/projects`, `/users/{id}/goals`, `/teams/{id}/projects`, `/teams/{id}/goals`, `/projects/{id}/participants`).
+    *   Defined association table (`project_participants`) and updated model relationships (`Project`, `User`).
+    *   Generated and applied Alembic migration for the association table.
+*   **Authentication & Routing:**
+    *   Diagnosed frontend rendering issues (blank screen, missing user menu) caused by auth state/flow problems.
+    *   Implemented `ProtectedRoute` component to guard the `/map` route and correctly handle redirects to `/login` if not authenticated.
+    *   Resolved persistent `useAuth` import issues in `ProtectedRoute`.
+*   **Debugging & Fixes:**
+    *   Systematically diagnosed and fixed numerous backend 500 errors and frontend CORS errors related to:
+        *   Missing `tenant_id` arguments in CRUD calls (`CRUDProject.get`).
+        *   Incorrect function calls (`get_multi_by_project` vs `get_notes_by_project`).
+        *   Pydantic `ResponseValidationError` due to schema mismatches (`NoteRead` missing `owner_id`).
+        *   SQLAlchemy relationship loading (`selectinload`, `AttributeError: 'KnowledgeAsset' has no attribute 'owner'`).
+        *   Database query errors (`DISTINCT` on JSON columns).
+        *   Model attribute errors (`Project has no attribute 'owner_id'`).
+        *   Schema definition/export errors (`GoalReadMinimal`, `UserReadBasic` imports).
+    *   Fixed frontend type issues (`Goal` type inheritance, Avatar `src` prop).
+    *   Resolved `BriefingPanel` display issue ("Data structure mismatch") by improving type guards.
+*   **Cleanup:**
+    *   Removed outdated TODOs from `LivingMap.tsx` (GEN-TASK-001 started).
+    *   Fixed ESLint `exhaustive-deps` warning in `LivingMap.tsx` by separating selection styling effect from layout effect.
+
+**Challenges & Learnings:**
+
+*   Backend errors often manifest as CORS errors in the frontend, requiring careful log checking on both sides.
+*   Tenant isolation logic (`tenant_id` checks) needs to be consistently applied across CRUD operations and endpoints.
+*   SQLAlchemy relationship loading (`selectinload`) and Pydantic schema validation (`from_attributes`, `computed_field`) require careful coordination.
+*   Database-specific limitations (e.g., `DISTINCT` on JSON) can necessitate query adjustments (explicit column selection).
+*   Frontend state management for authentication (`AuthContext`) needs robust handling of initial loading, token validation (`/users/me`), and error states to prevent UI inconsistencies.
+*   Protected routing is essential for SPA applications to handle unauthenticated access correctly.
+*   Tooling issues (module resolution cache, automated edits) can slow down debugging; restarts and manual verification are sometimes needed.
+
+**Next Steps (Continue Slice 2):**
+
+*   Complete remaining cleanup tasks (GEN-TASK-001, GEN-TASK-002, GEN-TASK-003), including fixing the kebab-case warning and using env vars for API URL.
+*   Implement Daily Briefing feature (FE-TASK-051), requiring backend Google Calendar integration.
+*   Implement UI/logic for adding/removing project participants.
+*   Refine map data fetching and layout further.
+*   Add missing note metadata (author, timestamp). 

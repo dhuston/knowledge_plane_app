@@ -16,13 +16,13 @@ import {
     useToast,
 } from '@chakra-ui/react';
 
-import { apiClient } from '../../api/client'; // Correct path and named import
-import { Project, ProjectCreate } from '../../types/project'; // Uncomment real import
+import { useApiClient } from '../../hooks/useApiClient';
+import { Project, ProjectCreate } from '../../types/project';
 
 interface CreateProjectModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onProjectCreated?: (newProject: Project) => void; // Use imported Project type
+    onProjectCreated?: (newProject: Project) => void;
 }
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onProjectCreated }) => {
@@ -30,6 +30,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
     const [projectDescription, setProjectDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const toast = useToast();
+    const apiClient = useApiClient();
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -41,19 +42,17 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
         setIsLoading(true);
         const projectData: ProjectCreate = {
             name: projectName.trim(),
-            description: projectDescription.trim() || undefined, // Send undefined if empty
-            // Add other default fields if needed by backend schema (e.g., status)
+            description: projectDescription.trim() || undefined,
         };
 
         try {
-            // Use specific assertion workaround
-            const response = await apiClient.post('/projects', projectData);
-            onProjectCreated?.((response as { data: Project }).data);
+            const response = await apiClient.post<Project>('/projects/', projectData);
+            onProjectCreated?.(response.data);
+            toast({ title: "Project created!", status: "success", duration: 3000 });
             handleClose();
         } catch (error: unknown) {
             console.error("Failed to create project:", error);
             let errorMessage = "Could not create project.";
-            // Basic error checking
             if (typeof error === 'object' && error !== null && 'response' in error) {
                 const responseError = error as { response?: { data?: { detail?: string } } };
                 errorMessage = responseError.response?.data?.detail || errorMessage;

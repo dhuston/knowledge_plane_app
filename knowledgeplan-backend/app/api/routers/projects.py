@@ -10,6 +10,7 @@ from app.models.project import Project as ProjectModel
 from app.models.knowledge_asset import KnowledgeAsset as NoteModel
 from app.schemas.project import ProjectRead, ProjectCreate, ProjectUpdate
 from app.schemas.knowledge_asset import NoteRead, NoteCreate
+from app.schemas.user import UserReadBasic
 from app.crud import project as crud_project_instance
 from app.crud import crud_knowledge_asset
 
@@ -62,7 +63,7 @@ async def create_project_note(
     Create a new note associated with a specific project.
     """
     # First, verify the project exists and belongs to the user's tenant
-    project = await crud_project_instance.get(db=db, id=project_id)
+    project = await crud_project_instance.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -88,7 +89,7 @@ async def read_project_notes(
     Retrieve notes associated with a specific project.
     """
     # Verify the project exists and belongs to the user's tenant
-    project = await crud_project_instance.get(db=db, id=project_id)
+    project = await crud_project_instance.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -96,10 +97,37 @@ async def read_project_notes(
         )
     
     # Fetch the notes for this project
-    notes = await crud_knowledge_asset.get_multi_by_project(
+    notes = await crud_knowledge_asset.get_notes_by_project(
         db=db, project_id=project_id, tenant_id=current_user.tenant_id, skip=skip, limit=limit
     )
     return notes
+
+# Add endpoint for project participants
+@router.get("/{project_id}/participants", response_model=List[UserReadBasic]) # Assuming UserReadBasic is the correct schema
+async def read_project_participants(
+    *,
+    db: AsyncSession = Depends(get_db_session),
+    project_id: UUID,
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Retrieve participants (users) associated with a specific project.
+    """
+    # Verify the project exists and belongs to the user's tenant
+    project = await crud_project_instance.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found or not part of your tenant."
+        )
+
+    # TODO: Implement the actual fetching of participants
+    # This likely involves a join query or a specific CRUD function
+    # Example placeholder - replace with actual logic:
+    # participants = await crud_project_instance.get_participants(db=db, project_id=project_id, tenant_id=current_user.tenant_id)
+    # For now, returning an empty list to avoid breaking:
+    participants = [] 
+    return participants
 
 # Optional: Add listing endpoint later
 # @router.get("/", response_model=List[ProjectRead])

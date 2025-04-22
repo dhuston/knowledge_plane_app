@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
-    Box, Text, Spinner, Heading, VStack, /* CloseButton, */ Divider, Tag, Code,
-    /* List, ListItem, */ Textarea, Button, Avatar, HStack, /* Input, */ useToast // Cleaned up imports
+    Box, Text, Spinner, Heading, VStack, /* CloseButton, */ /*Divider,*/ Tag, Code,
+    Textarea, Button, Avatar, HStack, /* Input, */ useToast, Card, CardHeader, CardBody, SimpleGrid, Center, Flex
 } from '@chakra-ui/react';
 import { MdNote /* MdPersonAdd */ } from "react-icons/md"; // Cleaned up imports
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
@@ -10,10 +10,10 @@ import { MapNode, MapNodeTypeEnum } from '../../types/map';
 // import { useAuth } from '../../context/AuthContext'; // REMOVED unused import
 
 // Import specific entity types
-import { User } from '../../types/user'; // Use User
+import { User, UserReadBasic } from '../../types/user'; // Use User and UserReadBasic
 import { TeamRead } from '../../types/team'; // Use TeamRead
 import { ProjectRead } from '../../types/project'; // Use ProjectRead
-import { GoalRead } from '../../types/goal'; // Use GoalRead
+import { GoalRead, GoalReadMinimal } from '../../types/goal'; // Use GoalRead and GoalReadMinimal
 import { NoteCreate, Note } from '../../types/knowledge_asset';
 import { useApiClient } from '../../hooks/useApiClient'; // Corrected path relative to src/components/panels
 // import { Link as RouterLink } from 'react-router-dom'; // Removed unused
@@ -26,17 +26,45 @@ interface BriefingPanelProps {
     onSelectNode: (nodeId: string, nodeType: MapNodeTypeEnum) => void; // Add callback prop
 }
 
+// Helper component for Label-Value pairs
+const DetailItem: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <Box>
+        <Text fontSize="sm" fontWeight="medium" color="gray.600">{label}</Text>
+        <Text fontSize="sm" mt={1}>{children}</Text>
+    </Box>
+);
+
+// Helper component for Clickable Links
+const EntityLink: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
+     <DetailItem label={label}>
+         <Button variant="link" size="sm" colorScheme="blue" onClick={onClick} fontWeight="normal">
+            {children}
+         </Button>
+     </DetailItem>
+);
+
 const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => {
     // Use specific Read types matching API responses
     const [entityData, setEntityData] = useState<User | TeamRead | ProjectRead | GoalRead | null>(null);
     const [notes, setNotes] = useState<Note[]>([]); 
+    const [userProjects, setUserProjects] = useState<ProjectRead[]>([]);
+    const [userGoals, setUserGoals] = useState<GoalRead[]>([]);
+    // Add state for team's related items
+    const [teamProjects, setTeamProjects] = useState<ProjectRead[]>([]);
+    const [teamGoals, setTeamGoals] = useState<GoalReadMinimal[]>([]); // State uses GoalReadMinimal
+    // Loading states
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isNotesLoading, setIsNotesLoading] = useState<boolean>(false);
-    const [newNoteContent, setNewNoteContent] = useState<string>(''); 
     const [isSubmittingNote, setIsSubmittingNote] = useState<boolean>(false);
+    const [isFetchingRelated, setIsFetchingRelated] = useState<boolean>(false); 
+    // New note state
+    const [newNoteContent, setNewNoteContent] = useState<string>(''); 
     // const { user: currentUser } = useAuth(); // Removed as unused 
     const toast = useToast();
+
+    // Add state for project participants
+    const [projectParticipants, setProjectParticipants] = useState<UserReadBasic[]>([]);
 
     const nodeType = useMemo(() => node?.type, [node]);
     const nodeId = useMemo(() => node?.id, [node]);
@@ -60,11 +88,17 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
         }
     }, [apiClient, toast]); // Dependencies of the callback
 
-    // Fetch main entity details and related data (notes)
+    // Fetch main entity details and related data
     useEffect(() => {
         setEntityData(null); 
         setError(null);
         setNotes([]);
+        setUserProjects([]); 
+        setUserGoals([]);
+        setTeamProjects([]); // Reset team projects
+        setTeamGoals([]); // Reset team goals
+        setProjectParticipants([]); // Reset participants
+
         if (!nodeId || !nodeType) {
             setIsLoading(false);
             return;
@@ -73,6 +107,7 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
         let apiEndpoint = '';
         let fetchSuccess = true;
 
+        // Determine main endpoint
         switch (nodeType) {
             case MapNodeTypeEnum.USER: apiEndpoint = `/users/${nodeId}`; break;
             case MapNodeTypeEnum.TEAM: apiEndpoint = `/teams/${nodeId}`; break;
@@ -89,10 +124,11 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
         const fetchNodeDetails = async () => {
             console.log(`Fetching details for ${nodeType} ${nodeId} from ${apiEndpoint}`);
             setIsLoading(true);
+            setIsFetchingRelated(false); // Reset related fetching state
             let fetchedEntityData: User | TeamRead | ProjectRead | GoalRead | null = null;
 
             try {
-                // Fetch full response
+                // Fetch main entity details
                 if (nodeType === MapNodeTypeEnum.USER) {
                      const response = await apiClient.get<User>(apiEndpoint);
                      fetchedEntityData = response.data; // Access .data
@@ -104,11 +140,39 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
                 setEntityData(fetchedEntityData);
                 console.log("Fetched entity data:", fetchedEntityData);
 
-                // Fetch related data ONLY if main fetch succeeded
-                 if (nodeType === MapNodeTypeEnum.PROJECT && nodeId) {
-                    // Call the memoized fetchProjectNotes
-                    await fetchProjectNotes(nodeId);
-                 }
+                // ---- Fetch Related Data ----
+                if (fetchedEntityData) { // Only fetch related if main fetch succeeded
+                    setIsFetchingRelated(true);
+                    try {
+                        if (nodeType === MapNodeTypeEnum.PROJECT && nodeId) {
+                            await fetchProjectNotes(nodeId);
+                            // Fetch project participants
+                            const participantsResponse = await apiClient.get<UserReadBasic[]>(`/projects/${nodeId}/participants`);
+                            setProjectParticipants(participantsResponse.data || []);
+                        }
+                        if (nodeType === MapNodeTypeEnum.USER && nodeId) {
+                            const projectsResponse = await apiClient.get<ProjectRead[]>(`/users/${nodeId}/projects`);
+                            setUserProjects(projectsResponse.data || []);
+                            const goalsResponse = await apiClient.get<GoalRead[]>(`/users/${nodeId}/goals`);
+                            setUserGoals(goalsResponse.data || []);
+                        }
+                        // --- Add fetch for TEAM --- 
+                        if (nodeType === MapNodeTypeEnum.TEAM && nodeId) {
+                            // Fetch team's projects
+                            const teamProjectsResponse = await apiClient.get<ProjectRead[]>(`/teams/${nodeId}/projects`);
+                            setTeamProjects(teamProjectsResponse.data || []);
+                            // Fetch team's goals
+                            const teamGoalsResponse = await apiClient.get<GoalReadMinimal[]>(`/teams/${nodeId}/goals`);
+                            setTeamGoals(teamGoalsResponse.data || []);
+                        }
+                    } catch (relatedErr) {
+                        console.error("Error fetching related data:", relatedErr);
+                        toast({ title: "Error Loading Related Items", status: "warning", duration: 3000 });
+                        // Don't fail the whole panel, just show missing related data
+                    } finally {
+                        setIsFetchingRelated(false);
+                    }
+                }
                  // Removed calendar fetch logic
 
             } catch (err: unknown) { 
@@ -143,7 +207,7 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
              fetchNodeDetails();
         }
        
-    }, [nodeId, nodeType, apiClient, toast, fetchProjectNotes]); // Removed currentUser dependency
+    }, [nodeId, nodeType, apiClient, toast, fetchProjectNotes]); // Dependencies
 
     // Wrap handleNoteSubmit in useCallback
     const handleNoteSubmit = useCallback(async () => {
@@ -183,60 +247,138 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
     // Render functions for different entity types
     const renderUserContent = (data: User) => { 
         return (
-            <VStack align="start" spacing={3} w="full">
-                <HStack spacing={4}>
-                    <Avatar size="md" name={data.name || data.email} src={data.avatar_url || undefined} />
-                    <VStack align="start" spacing={0}>
-                        <Heading size="md">{data.name || node?.label || 'User Details'}</Heading>
-                        {data.title && <Text fontSize="md" color="gray.500">{data.title}</Text>}
-                    </VStack>
-                </HStack>
-                <Divider />
-                <Text fontSize="sm"><b>Email:</b> {data.email || 'N/A'}</Text>
-                {data.team_id && (
-                    <Text fontSize="sm"><b>Team:</b> 
-                        <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                            onClick={() => onSelectNode(data.team_id!, MapNodeTypeEnum.TEAM)}>
-                           <Code fontSize="xs">{data.team_id}</Code>
-                        </Button>
-                    </Text>
-                )}
-                {data.manager_id && (
-                     <Text fontSize="sm"><b>Manager:</b> 
-                        <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                            onClick={() => onSelectNode(data.manager_id!, MapNodeTypeEnum.USER)}>
-                           <Code fontSize="xs">{data.manager_id}</Code>
-                        </Button>
-                    </Text>
-                )}
-                <Tag size="sm" variant="outline">ID: {data.id}</Tag>
-            </VStack>
+            <VStack align="stretch" spacing={4} w="full">
+                <Card variant="outline" size="sm">
+                    <CardHeader pb={2}>
+                        <HStack spacing={3}>
+                            <Avatar size="md" name={data.name || data.email} src={data.avatar_url ? data.avatar_url : undefined} />
+                            <VStack align="start" spacing={0}>
+                                <Heading size="sm">{data.name || node?.label || 'User Details'}</Heading>
+                                {data.title && <Text fontSize="sm" color="gray.500">{data.title}</Text>}
+                            </VStack>
+                        </HStack>
+                    </CardHeader>
+                    <CardBody pt={2}>
+                        <VStack align="start" spacing={3} w="full">
+                            <DetailItem label="Email">{data.email || 'N/A'}</DetailItem>
+                            {data.team_id && (
+                                <EntityLink label="Team" onClick={() => onSelectNode(data.team_id!, MapNodeTypeEnum.TEAM)}>
+                                <Code fontSize="xs" px={1}>{data.team_id}</Code>
+                                </EntityLink>
+                            )}
+                            {data.manager_id && (
+                                <EntityLink label="Manager" onClick={() => onSelectNode(data.manager_id!, MapNodeTypeEnum.USER)}>
+                                <Code fontSize="xs" px={1}>{data.manager_id}</Code>
+                                </EntityLink>
+                            )}
+                            <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
+                        </VStack>
+                    </CardBody>
+                </Card>
+
+                 {/* Associated Projects Card */}
+                <Card variant="outline" size="sm">
+                    <CardHeader pb={1}><Heading size="xs">Associated Projects</Heading></CardHeader>
+                    <CardBody pt={1}>
+                        {isFetchingRelated ? <Spinner size="xs" /> : 
+                         userProjects.length > 0 ? (
+                            <VStack align="start" spacing={1}>
+                                {userProjects.map(proj => (
+                                    <EntityLink key={proj.id} label="" onClick={() => onSelectNode(proj.id, MapNodeTypeEnum.PROJECT)}>
+                                        {proj.name}
+                                    </EntityLink>
+                                ))}
+                             </VStack>
+                        ) : (
+                            <Text fontSize="sm" color="gray.500">No associated projects found.</Text>
+                        )}
+                    </CardBody>
+                </Card>
+
+                 {/* Associated Goals Card */}
+                 <Card variant="outline" size="sm">
+                    <CardHeader pb={1}><Heading size="xs">Associated Goals</Heading></CardHeader>
+                    <CardBody pt={1}>
+                        {isFetchingRelated ? <Spinner size="xs" /> : 
+                         userGoals.length > 0 ? (
+                            <VStack align="start" spacing={1}>
+                                {userGoals.map(goal => (
+                                     <EntityLink key={goal.id} label="" onClick={() => onSelectNode(goal.id, MapNodeTypeEnum.GOAL)}>
+                                        {goal.title} 
+                                     </EntityLink>
+                                ))}
+                             </VStack>
+                        ) : (
+                            <Text fontSize="sm" color="gray.500">No associated goals found.</Text>
+                        )}
+                     </CardBody>
+                 </Card>
+             </VStack>
         );
     }
 
     const renderTeamContent = (data: TeamRead) => (
-        <VStack align="start" spacing={3} w="full">
-            <Heading size="md">{data.name ?? 'Team Details'}</Heading>
-            <Divider />
-            <Text fontSize="sm"><b>Description:</b> {data.description || <Text as="i" color="gray.500">No description</Text>}</Text>
-            {data.lead_id && (
-                 <Text fontSize="sm"><b>Lead:</b> 
-                    <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                        onClick={() => onSelectNode(data.lead_id!, MapNodeTypeEnum.USER)}>
-                       <Code fontSize="xs">{data.lead_id}</Code>
-                    </Button>
-                 </Text>
-            )}
-            {data.dept_id && (
-                <Text fontSize="sm"><b>Department:</b> 
-                    <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                        onClick={() => onSelectNode(data.dept_id!, MapNodeTypeEnum.DEPARTMENT)}>
-                       <Code fontSize="xs">{data.dept_id}</Code>
-                    </Button>
-                </Text>
-            )}
-            <Tag size="sm" variant="outline">ID: {data.id}</Tag>
-        </VStack>
+        <VStack align="stretch" spacing={4} w="full">
+             <Card variant="outline" size="sm">
+                <CardHeader pb={2}>
+                    <Heading size="sm">{data.name ?? 'Team Details'}</Heading>
+                </CardHeader>
+                <CardBody pt={2}>
+                    <VStack align="start" spacing={3} w="full">
+                        <DetailItem label="Description">{data.description || <Text as="i" color="gray.400">No description</Text>}</DetailItem>
+                        {data.lead_id && (
+                            <EntityLink label="Lead" onClick={() => onSelectNode(data.lead_id!, MapNodeTypeEnum.USER)}>
+                            <Code fontSize="xs" px={1}>{data.lead_id}</Code>
+                            </EntityLink>
+                        )}
+                        {data.dept_id && (
+                            <EntityLink label="Department" onClick={() => onSelectNode(data.dept_id!, MapNodeTypeEnum.DEPARTMENT)}>
+                            <Code fontSize="xs" px={1}>{data.dept_id}</Code>
+                            </EntityLink>
+                        )}
+                        <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
+                    </VStack>
+                </CardBody>
+            </Card>
+
+            {/* Associated Projects Card */}
+            <Card variant="outline" size="sm">
+                <CardHeader pb={1}><Heading size="xs">Owned Projects</Heading></CardHeader>
+                <CardBody pt={1}>
+                    {isFetchingRelated ? <Spinner size="xs" /> : 
+                        teamProjects.length > 0 ? (
+                        <VStack align="start" spacing={1}>
+                            {teamProjects.map(proj => (
+                                <EntityLink key={proj.id} label="" onClick={() => onSelectNode(proj.id, MapNodeTypeEnum.PROJECT)}>
+                                    {proj.name}
+                                </EntityLink>
+                            ))}
+                            </VStack>
+                    ) : (
+                        <Text fontSize="sm" color="gray.500">No associated projects found.</Text>
+                    )}
+                </CardBody>
+            </Card>
+
+            {/* Associated Goals Card */}
+            <Card variant="outline" size="sm">
+                <CardHeader pb={1}><Heading size="xs">Associated Goals (via Projects)</Heading></CardHeader>
+                <CardBody pt={1}>
+                    {isFetchingRelated ? <Spinner size="xs" /> : 
+                        teamGoals.length > 0 ? (
+                        <VStack align="start" spacing={1}>
+                            {teamGoals.map(goal => (
+                                <EntityLink key={goal.id} label="" onClick={() => onSelectNode(goal.id, MapNodeTypeEnum.GOAL)}>
+                                    {goal.title} 
+                                </EntityLink>
+                            ))}
+                            </VStack>
+                    ) : (
+                        <Text fontSize="sm" color="gray.500">No associated goals found.</Text>
+                    )}
+                    </CardBody>
+            </Card>
+         </VStack>
     );
 
     const renderProjectContent = (data: ProjectRead) => {
@@ -249,125 +391,164 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
         if (lowerCaseStatus?.includes('completed') || lowerCaseStatus?.includes('done')) statusColorScheme = 'purple';
 
          return (
-             <VStack align="start" spacing={3} w="full">
-                <Heading size="md">{data.name ?? 'Project Details'}</Heading>
-                {data.status && <Tag size="sm" colorScheme={statusColorScheme} variant="subtle">{data.status}</Tag>} 
-                <Divider />
-                <Text fontSize="sm">
-                    <b>Description:</b> {data.description || <Text as="i" color="gray.500">No description</Text>}
-                </Text>
-                {data.owner_id && (
-                     <Text fontSize="sm"><b>Owner:</b> 
-                        <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                             onClick={() => onSelectNode(data.owner_id!, MapNodeTypeEnum.USER)}>
-                            <Code fontSize="xs">{data.owner_id}</Code>
-                        </Button>
-                     </Text>
-                )}
-                {data.owning_team_id && (
-                     <Text fontSize="sm"><b>Owning Team:</b> 
-                         <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                            onClick={() => onSelectNode(data.owning_team_id!, MapNodeTypeEnum.TEAM)}>
-                            <Code fontSize="xs">{data.owning_team_id}</Code>
-                         </Button>
-                     </Text>
-                )}
-                {data.goal_id && (
-                     <Text fontSize="sm"><b>Aligned Goal:</b> 
-                         <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                            onClick={() => onSelectNode(data.goal_id!, MapNodeTypeEnum.GOAL)}>
-                            <Code fontSize="xs">{data.goal_id}</Code>
-                         </Button>
-                     </Text>
-                )}
-                 <Tag size="sm" variant="outline">ID: {data.id}</Tag>
+             <VStack align="stretch" spacing={4} w="full">
+                 <Card variant="outline" size="sm">
+                    <CardHeader pb={2}>
+                        <HStack justifyContent="space-between">
+                            <Heading size="sm">{data.name ?? 'Project Details'}</Heading>
+                            {data.status && <Tag size="sm" colorScheme={statusColorScheme} variant="subtle">{data.status}</Tag>} 
+                        </HStack>
+                    </CardHeader>
+                    <CardBody pt={2}>
+                         <VStack align="start" spacing={3} w="full">
+                            <DetailItem label="Description">{data.description || <Text as="i" color="gray.400">No description</Text>}</DetailItem>
+                            <SimpleGrid columns={2} spacing={3} w="full">
+                                {data.owning_team_id && (
+                                    <EntityLink label="Owning Team" onClick={() => onSelectNode(data.owning_team_id!, MapNodeTypeEnum.TEAM)}>
+                                        <Code fontSize="xs" px={1}>{data.owning_team_id}</Code>
+                                    </EntityLink>
+                                )}
+                                {data.goal_id && (
+                                    <EntityLink label="Aligned Goal" onClick={() => onSelectNode(data.goal_id!, MapNodeTypeEnum.GOAL)}>
+                                        <Code fontSize="xs" px={1}>{data.goal_id}</Code>
+                                    </EntityLink>
+                                )}
+                            </SimpleGrid>
+                            <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
+                         </VStack>
+                     </CardBody>
+                 </Card>
                 
-                {/* Notes Section */}
-                <Box pt={4} w="full">
-                     <Heading size="xs" mb={2}>Notes</Heading>
-                    <Divider mb={2}/>
-                    <VStack align="stretch" spacing={2} mb={3} maxH="200px" overflowY="auto">
-                        {/* TODO: Add error display for notes fetching */}
-                        {isNotesLoading ? <Spinner size="sm"/> : 
-                         notes.length > 0 ? notes.map(note => (
-                             <Box key={note.id} p={2} bg="gray.50" borderRadius="md">
-                                <Text fontSize="sm">{note.content}</Text>
-                                {/* Optionally display note.created_at or owner later */}
-                             </Box>
-                        )) : <Text fontSize="sm" color="gray.500">No notes yet.</Text>}
-                     </VStack>
-                     <Textarea 
-                        placeholder="Add a new note..."
-                        value={newNoteContent}
-                        onChange={(e) => setNewNoteContent(e.target.value)}
-                        size="sm"
-                        mb={2}
-                     />
-                     <Button 
-                        size="sm" 
-                        colorScheme="blue"
-                        onClick={handleNoteSubmit}
-                        isLoading={isSubmittingNote}
-                        isDisabled={!newNoteContent.trim()}
-                        leftIcon={<MdNote />}
-                    >
-                        Add Note
-                    </Button>
-                </Box>
+                 {/* Participants Card */}
+                 <Card variant="outline" size="sm">
+                     <CardHeader pb={1}>
+                         <Flex justify="space-between" align="center">
+                             <Heading size="xs">Participants</Heading>
+                             <Button 
+                                size="xs" 
+                                variant="outline" 
+                                colorScheme="gray"
+                                onClick={() => console.log("TODO: Implement Add Participant UI/logic")}
+                             >
+                                 Add
+                             </Button>
+                         </Flex>
+                     </CardHeader>
+                     <CardBody pt={1}>
+                        {isFetchingRelated ? <Spinner size="xs" /> : 
+                         projectParticipants.length > 0 ? (
+                            <VStack align="start" spacing={1}>
+                                {projectParticipants.map(user => (
+                                    <EntityLink key={user.id} label="" onClick={() => onSelectNode(user.id, MapNodeTypeEnum.USER)}>
+                                        {user.name || user.id} {/* Display name if available, else ID */}
+                                    </EntityLink>
+                                ))}
+                             </VStack>
+                        ) : (
+                            <Text fontSize="sm" color="gray.500">No participants listed.</Text>
+                        )}
+                     </CardBody>
+                 </Card>
+
+                 {/* Notes Section - Improved Layout */}
+                <Card variant="outline" size="sm">
+                    <CardHeader pb={1}>
+                         <Heading size="xs">Notes</Heading>
+                    </CardHeader>
+                    <CardBody pt={1}>
+                        <VStack align="stretch" spacing={2} mb={3} maxH="250px" overflowY="auto" pr={2}>
+                            {isNotesLoading ? <Center><Spinner size="sm"/></Center> : 
+                             notes.length > 0 ? notes.map(note => (
+                                 <Box key={note.id} p={2} bg="blackAlpha.50" borderRadius="sm">
+                                    <Text fontSize="sm" whiteSpace="pre-wrap">{note.content}</Text>
+                                    {/* TODO: Add note metadata (author, timestamp) */}
+                                 </Box>
+                            )) : <Text fontSize="sm" color="gray.500" fontStyle="italic">No notes yet.</Text>}
+                         </VStack>
+                         <VStack align="stretch" spacing={2} mt={3}>
+                             <Textarea 
+                                placeholder="Add a new note..." 
+                                value={newNoteContent}
+                                onChange={(e) => setNewNoteContent(e.target.value)}
+                                size="sm"
+                             />
+                             <Button 
+                                size="sm" 
+                                colorScheme="blue"
+                                onClick={handleNoteSubmit}
+                                isLoading={isSubmittingNote}
+                                isDisabled={!newNoteContent.trim()}
+                                leftIcon={<MdNote />}
+                                alignSelf="flex-end"
+                            >
+                                Add Note
+                            </Button>
+                        </VStack>
+                    </CardBody>
+                 </Card>
              </VStack>
         );
     };
 
      const renderGoalContent = (data: GoalRead) => (
-        <VStack align="start" spacing={3} w="full">
-            {/* Assume Goal type in types/goal.ts has these fields */}
-            <Heading size="md">{data.title ?? 'Goal Details'}</Heading>
-            {data.status && <Tag size="sm" colorScheme="green">{data.status}</Tag>} 
-            <Divider />
-             <Text fontSize="sm"><b>Type:</b> {data.type ?? 'N/A'}</Text>
-             <Text fontSize="sm"><b>Progress:</b> {data.progress ?? 0}%</Text>
-             <Text fontSize="sm"><b>Due:</b> {data.dueDate ? new Date(data.dueDate).toLocaleDateString() : 'N/A'}</Text>
-             {data.parent_id && (
-                <Text fontSize="sm"><b>Parent Goal:</b> 
-                    <Button variant="link" size="sm" colorScheme="blue" ml={1}
-                         onClick={() => onSelectNode(data.parent_id!, MapNodeTypeEnum.GOAL)}>
-                       <Code fontSize="xs">{data.parent_id}</Code>
-                    </Button>
-                </Text>
-             )}
-             <Tag size="sm" variant="outline">ID: {data.id}</Tag>
-        </VStack>
+         <Card variant="outline" size="sm">
+            <CardHeader pb={2}>
+                 <HStack justifyContent="space-between">
+                    <Heading size="sm">{data.title ?? 'Goal Details'}</Heading>
+                    {data.status && <Tag size="sm" colorScheme="green" variant="subtle">{data.status}</Tag>} 
+                 </HStack>
+            </CardHeader>
+            <CardBody pt={2}>
+                 <VStack align="start" spacing={3} w="full">
+                     <SimpleGrid columns={2} spacing={3} w="full">
+                        <DetailItem label="Type">{data.type ?? 'N/A'}</DetailItem>
+                        <DetailItem label="Progress">{data.progress ?? 0}%</DetailItem>
+                        <DetailItem label="Due">{data.dueDate ? new Date(data.dueDate).toLocaleDateString() : 'N/A'}</DetailItem>
+                    </SimpleGrid>
+                     {data.parent_id && (
+                        <EntityLink label="Parent Goal" onClick={() => onSelectNode(data.parent_id!, MapNodeTypeEnum.GOAL)}>
+                           <Code fontSize="xs" px={1}>{data.parent_id}</Code>
+                        </EntityLink>
+                     )}
+                     <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
+                 </VStack>
+             </CardBody>
+         </Card>
      );
 
     // Main render logic decides which content function to call
     const renderContent = () => {
-        if (isLoading) return <Spinner />;
-        if (error) return <Text color="red.500">{error}</Text>; 
+        if (isLoading) return <Center><Spinner /></Center>; // Center spinner
+        if (error) return <Text color="red.500" p={4}>{error}</Text>; 
         if (!entityData) { 
-            if (node && !isLoading) return <Text color="gray.500">Loading details...</Text>; 
-             return <Text color="gray.500">Select a node to see details.</Text>;
+            // Show spinner if loading, otherwise prompt to select
+            return isLoading ? <Center><Spinner /></Center> : <Center h="100%"><Text color="gray.500">Select a node to see details.</Text></Center>;
         }
 
         // Use type guards for safer rendering
         switch (nodeType) { 
             case MapNodeTypeEnum.USER: 
-                // User type should match API response, assuming it's User for now
-                return renderUserContent(entityData as User);
+                 // Assuming the API call for USER returns User
+                 if ('email' in entityData) { // Check for a required User field
+                     return renderUserContent(entityData as User);
+                 }
+                 break; 
             case MapNodeTypeEnum.TEAM: 
-                // Assuming the API call for TEAM returns TeamRead
-                 if ('dept_id' in entityData || 'lead_id' in entityData) { // Check properties specific to TeamRead
+                 // Check for a required Team field like 'name' instead of optional relationships
+                 if ('name' in entityData && typeof entityData.name === 'string') { 
                     return renderTeamContent(entityData as TeamRead);
                  }
                  break; 
             case MapNodeTypeEnum.PROJECT: 
-                 // Assuming the API call for PROJECT returns ProjectRead
-                 if ('owner_id' in entityData || 'owning_team_id' in entityData) { 
+                 // Check for a required Project field like 'name'
+                 if ('name' in entityData && typeof entityData.name === 'string') { 
                     return renderProjectContent(entityData as ProjectRead);
                  }
                  break;
             case MapNodeTypeEnum.GOAL: 
-                 // Assuming the API call for GOAL returns GoalRead
-                 if ('title' in entityData || 'progress' in entityData) { 
+                 // Check for a required Goal field like 'title'
+                 // Use GoalRead here as the main entity fetch gets the full GoalRead
+                 if ('title' in entityData && typeof entityData.title === 'string') { 
                      return renderGoalContent(entityData as GoalRead);
                  }
                  break;
@@ -377,15 +558,16 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => 
                 return <Text>Details for type {node?.type} not implemented or data mismatch.</Text>;
         }
         // Fallback if type guard fails (should ideally not happen)
-        return <Text color="orange.500">Data structure mismatch for type {nodeType}.</Text>;
+        return <Text color="orange.500" p={4}>Data structure mismatch for type {nodeType}.</Text>;
     };
 
-    if (!node) {
+    if (!node && !isLoading) { // Don't render anything if no node selected and not loading initial node
         return null; 
     }
 
     return (
-        <Box width="100%" height="100%" p={1}> 
+        // Add padding to the main panel container
+        <Box width="100%" height="100%" p={4}> 
             {renderContent()}
         </Box>
     );

@@ -6,10 +6,11 @@ import { UserRead } from '../../../types/user'; // Adjust path as necessary
 // Assuming data structure passed from LivingMap includes label and UserRead object
 interface UserNodeData {
     label: string;
+    // Add title explicitly to the expected data
+    title?: string; 
     // Add other UserRead fields you want to display directly on the node
     email?: string;
     avatar_url?: string;
-    title?: string;
     // Include the original UserRead data if needed for interactions
     originalApiNode?: { data: UserRead }; 
 }
@@ -19,6 +20,18 @@ const UserNode: React.FC<NodeProps<UserNodeData>> = ({ data }) => {
 
     return (
         <Box
+            title={data.title || data.label} // Use title if available, fallback to label
+            _hover={{ 
+                // Revert to a more standard hover style
+                // Maybe a thicker border or different shadow?
+                // Let's try a slightly thicker border in the original blue
+                outline: '2px solid #3b82f6', // Match user node color theme
+                outlineOffset: '1px', 
+                shadow: 'md', // Keep or slightly enhance shadow
+                zIndex: 10,
+                // Remove the debugging background color
+                // backgroundColor: 'yellow.200', 
+            }}
             p={2}
             borderWidth="1px"
             borderRadius="md"

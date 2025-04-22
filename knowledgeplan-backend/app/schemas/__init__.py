@@ -1,11 +1,11 @@
 # Import Pydantic schemas
-from .user import UserRead, UserCreate, UserUpdate
+from .user import UserRead, UserCreate, UserUpdate, UserReadBasic
 from .tenant import TenantRead, TenantCreate, TenantUpdate
 from .team import TeamRead, TeamCreate, TeamUpdate
 from .department import DepartmentRead, DepartmentCreate, DepartmentUpdate
 from .token import Token, TokenPayload
 from .project import ProjectCreate, ProjectUpdate, ProjectRead
-from .goal import GoalRead, GoalCreate, GoalUpdate
+from .goal import GoalRead, GoalCreate, GoalUpdate, GoalReadMinimal
 from .knowledge_asset import (
     KnowledgeAsset, KnowledgeAssetCreate, KnowledgeAssetUpdate, KnowledgeAssetRead,
     NoteCreate, NoteRead
@@ -16,13 +16,13 @@ from .map import MapData, MapNode, MapEdge, MapNodeTypeEnum, MapEdgeTypeEnum
 # Import KnowledgeAsset schemas here later 
 
 __all__ = [
-    "UserRead", "UserCreate", "UserUpdate",
+    "UserRead", "UserCreate", "UserUpdate", "UserReadBasic",
     "TenantRead", "TenantCreate", "TenantUpdate",
     "TeamRead", "TeamCreate", "TeamUpdate",
     "DepartmentRead", "DepartmentCreate", "DepartmentUpdate",
     "Token", "TokenPayload",
     "ProjectCreate", "ProjectUpdate", "ProjectRead",
-    "GoalRead", "GoalCreate", "GoalUpdate",
+    "GoalRead", "GoalCreate", "GoalUpdate", "GoalReadMinimal",
     "KnowledgeAsset", "KnowledgeAssetCreate", "KnowledgeAssetUpdate", "KnowledgeAssetRead",
     "NoteCreate", "NoteRead",
     "MapData", "MapNode", "MapEdge", "MapNodeTypeEnum", "MapEdgeTypeEnum",

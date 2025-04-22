@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from typing import List
 
 from app import schemas, crud # Import top-level packages
 from app import models # Import models module
@@ -35,4 +36,53 @@ async def read_user(
     #     raise HTTPException(status_code=403, detail="Not authorized to access this user")
     return user
 
-# Add other user endpoints later (e.g., get user by ID, update user) 
+# --- New Endpoints for Related Items --- 
+
+@router.get("/{user_id}/projects", response_model=List[schemas.ProjectRead])
+async def read_user_projects(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: models.User = Depends(security.get_current_user),
+):
+    """Retrieve projects associated with a specific user (owned by their team)."""
+    # Verify the target user exists and is in the same tenant
+    target_user = await crud.user.get(db, id=user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this user's projects")
+
+    # Fetch projects using the CRUD method, passing the target user's team_id
+    projects = await crud.user.get_projects(
+        db=db, 
+        user_id=user_id, 
+        tenant_id=current_user.tenant_id, 
+        user_team_id=target_user.team_id # Pass user's team_id
+    )
+    return projects
+
+@router.get("/{user_id}/goals", response_model=List[schemas.GoalReadMinimal])
+async def read_user_goals(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: models.User = Depends(security.get_current_user),
+):
+    """Retrieve goals associated with a specific user (linked to projects owned by their team)."""
+    # Verify the target user exists and is in the same tenant
+    target_user = await crud.user.get(db, id=user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this user's goals")
+
+    # Fetch goals using the CRUD method (returns Rows matching GoalReadMinimal)
+    goals = await crud.user.get_goals(
+        db=db, 
+        user_id=user_id, 
+        tenant_id=current_user.tenant_id,
+        user_team_id=target_user.team_id 
+    )
+    return goals # Pydantic will validate the Row objects against GoalReadMinimal
+
+
+# Add other user endpoints later (e.g., update user) 
