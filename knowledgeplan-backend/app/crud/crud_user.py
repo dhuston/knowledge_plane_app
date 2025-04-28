@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from typing import Any, Dict, Optional, Union, List
 from datetime import datetime
 from sqlalchemy.engine import Row
+from sqlalchemy.orm import selectinload, joinedload, Query
 
 from app.models.user import User as UserModel
 from app.schemas.user import UserCreate, UserUpdate
@@ -115,10 +116,16 @@ async def get_goals_for_user(
     return result.all() # Returns list of Row objects
 
 class CRUDUser():
-    async def get(self, db: AsyncSession, id: UUID) -> UserModel | None:
-        return await get_user(db, user_id=id)
+    async def get(self, db: AsyncSession, id: UUID, *, options: Optional[List] = None) -> UserModel | None:
+        """Gets a single user by ID, optionally loading relationships."""
+        stmt = select(UserModel).where(UserModel.id == id)
+        if options:
+            stmt = stmt.options(*options)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[UserModel]:
+        # TODO: Add relationship loading option?
         return await get_user_by_email(db, email=email)
 
     async def get_by_auth_id(self, db: AsyncSession, auth_provider: str, auth_provider_id: str) -> UserModel | None:
@@ -182,9 +189,22 @@ class CRUDUser():
         """Finds a user by their stored Google refresh token."""
         # TODO: Add index on google_refresh_token column for performance
         # TODO: Ensure refresh tokens are stored securely (encryption)
+        # TODO: Add relationship loading option?
         result = await db.execute(
             select(UserModel).where(UserModel.google_refresh_token == refresh_token)
         )
         return result.scalar_one_or_none()
+
+    async def get_participating_project_ids(self, db: AsyncSession, *, user_id: UUID) -> List[UUID]:
+        """Returns a list of project IDs the user is participating in."""
+        # Import the association table where it's used
+        from app.models.project import project_participants
+        
+        stmt = (
+            select(project_participants.c.project_id)
+            .where(project_participants.c.user_id == user_id)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
 
 user = CRUDUser() 

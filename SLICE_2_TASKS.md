@@ -29,13 +29,13 @@
 
 *   [x] **BE-TASK-029: Refine Map Data Structure:** Define a clear Pydantic schema for nodes and edges returned by the map API (e.g., `MapNode`, `MapEdge` including `id`, `type`, `label`, `data`, `position` hints, `source`, `target`).
 *   [x] **BE-TASK-030: Enhance `/map/data` Endpoint:** Update the map data endpoint to include Project and Goal nodes relevant to the user or current view context.
-*   [ ] **BE-TASK-031: Implement Map Data Filtering (Basic):** Add basic query parameters to `/map/data` to allow filtering by node type or relationship (e.g., `?types=user,project`). _(Note: This is the first step towards addressing map scalability)_
+*   [x] **BE-TASK-031: Implement Map Data Filtering (Basic):** Add basic query parameters to `/map/data` to allow filtering by node type or relationship (e.g., `?types=user,project`). _(Note: This is the first step towards addressing map scalability)_
 *   [x] **BE-TASK-032: Implement Relationship Logic:** Ensure backend logic correctly identifies and includes relevant relationships (edges) in the `/map/data` response (e.g., user->project participation, project->goal alignment).
 
 ### Epic: Backend - Authentication & Core (Slice 2)
 
-*   [ ] **BE-TASK-033: Implement Token Refresh Logic:** Add mechanism (e.g., refresh tokens, backend checks) to handle JWT expiration and refresh.
-*   [ ] **BE-TASK-034: Enhance Authorization:** Implement more granular authorization checks on API endpoints based on user roles or relationship to data (e.g., can user view/edit this project?).
+*   [x] **BE-TASK-033: Implement Token Refresh Logic:** Add mechanism (e.g., refresh tokens, backend checks) to handle JWT expiration and refresh.
+*   [x] **BE-TASK-034: Enhance Authorization:** Implement more granular authorization checks on API endpoints based on user roles or relationship to data (e.g., can user view/edit this project?).
 
 ### Epic: Frontend - Map Visualization (Slice 2)
 
@@ -60,13 +60,14 @@
 *   [x] **FE-TASK-048: Populate `BriefingPanel` (User):** When a User node is selected, fetch detailed data from `/users/{id}` and display profile information in the panel (e.g., name, title, email, team, manager, *key projects/goals they are involved in* - context relevant to most personas).
 *   [x] **FE-TASK-049: Populate `BriefingPanel` (Team):** When a Team node is selected, fetch detailed data from `/teams/{id}` and display team info (name, lead, members, *active projects, linked goals* - context relevant to PI, Director).
 *   [x] **FE-TASK-050: Populate `BriefingPanel` (Project):** When a Project node is selected, fetch detailed data from `/projects/{id}` and display project info (name, status, description, owner, team, members/participants, *aligned goal, recent notes/assets* - context relevant to Scientist, PI, Director).
-*   [ ] **FE-TASK-051: Integrate Daily Briefing:** Create a dedicated panel/component (`/src/components/panels/DailyBriefingPanel.tsx`) to display the AI briefing, potentially triggered from a main layout element or linked from the user's node. Ensure it uses real calendar data (`/integrations/google/calendar/events`) and highlights entities relevant to the user's context (initial step for Scientist persona).
+*   [x] **FE-TASK-051: Integrate Daily Briefing:** Create a dedicated panel/component (`/src/components/panels/DailyBriefingPanel.tsx`) to display the AI briefing, potentially triggered from a main layout element or linked from the user's node. Ensure it uses real calendar data (`/integrations/google/calendar/events`) and highlights entities relevant to the user's context (initial step for Scientist persona).
 *   [x] **FE-TASK-052: Implement Project Hub Creation (Basic):** Add UI (e.g., button in main layout or context menu) to trigger creation of a new Project. Connect to backend `/projects` endpoint. New project should appear as a node on the map.
 *   [x] **FE-TASK-053: Implement Note Taking in Hub:** Add simple input/display for notes within the Project `BriefingPanel`. Connect to backend note endpoints (initial Knowledge Asset interaction).
 *   [x] **FE-TASK-054: Implement User Invitation to Hub (Visual):** Add UI element to invite users (e.g., search/add button in Project `BriefingPanel`). Initially, this might just update frontend state or link visually on the map without full backend logic.
 
 ### General / Cleanup (Slice 2)
 
-*   [ ] **GEN-TASK-001: Address Core TODOs:** Resolve outstanding TODO comments from Slice 1 & 2.
-*   [ ] **GEN-TASK-002: Refactor Existing UI:** Adapt existing components (e.g., `MainLayout`, `ProfilePage`) to fit the new map-centric paradigm. Remove redundant old `WorkspacePage` components/mock data.
-*   [ ] **GEN-TASK-003: Basic Monitoring/Logging Setup:** Implement initial monitoring and logging configurations for backend/frontend. 
+*   [x] **GEN-TASK-001: Address Core TODOs:** Resolve outstanding TODO comments from Slice 1 & 2.
+*   [x] **GEN-TASK-002: Refactor Existing UI:** Adapt existing components (e.g., `MainLayout`, `ProfilePage`) to fit the new map-centric paradigm. Remove redundant old `WorkspacePage` components/mock data.
+*   [x] **GEN-TASK-003: Basic Monitoring/Logging Setup:** Implement initial monitoring and logging configurations for backend/frontend.
+*   [x] **GEN-TASK-004: Align `UserReadBasic` Schema:** Backend currently returns only `id`, whereas frontend expects `{ id, name? }`. Decide whether to add `name` to backend `UserReadBasic` or adjust UI to rely solely on `id` (with fallback). Also confirm if other hidden fields (e.g., `google_*` tokens) need explicit exclusion in UI typings. 

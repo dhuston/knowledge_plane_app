@@ -31,6 +31,7 @@ async def get_multi_knowledge_asset_by_project(
     """Retrieves knowledge assets associated with a specific project."""
     result = await db.execute(
         select(KnowledgeAssetModel)
+        .options(selectinload(KnowledgeAssetModel.created_by))
         .where(KnowledgeAssetModel.tenant_id == tenant_id, KnowledgeAssetModel.project_id == project_id)
         .order_by(KnowledgeAssetModel.created_at.desc()) # Show newest first
         .offset(skip)
@@ -111,6 +112,25 @@ async def create_note(
     db.add(db_note)
     await db.commit()
     await db.refresh(db_note)
+
+    # Import moved here to avoid circular dependency
+    from app.crud.crud_activity_log import activity_log
+    from app.schemas.activity_log import ActivityLogCreate
+
+    # --- Add Activity Log Entry --- 
+    await activity_log.create(
+        db=db,
+        obj_in=ActivityLogCreate(
+            tenant_id=owner.tenant_id,
+            user_id=owner.id,
+            action="CREATE_NOTE",
+            target_entity_type="KnowledgeAsset", # Logged as the base type
+            target_entity_id=str(db_note.id),
+            details={"project_id": str(project_id)} # Add project context
+        )
+    )
+    # -----------------------------
+
     return db_note
 
 # --- CRUD Class using Standalone Functions --- 

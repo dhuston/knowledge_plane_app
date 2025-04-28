@@ -33,13 +33,15 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "a_very_secret_key_change_this"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8 # 8 days for example
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Google OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
 
-    # Use .env file for environment variables
-    model_config = SettingsConfigDict(env_file=".env", extra='ignore')
+    # OpenAI
+    OPENAI_API_KEY: str
+
 
 
 settings = Settings() 

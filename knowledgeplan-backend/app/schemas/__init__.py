@@ -5,12 +5,16 @@ from .team import TeamRead, TeamCreate, TeamUpdate
 from .department import DepartmentRead, DepartmentCreate, DepartmentUpdate
 from .token import Token, TokenPayload
 from .project import ProjectCreate, ProjectUpdate, ProjectRead
-from .goal import GoalRead, GoalCreate, GoalUpdate, GoalReadMinimal
+from .goal import GoalRead, GoalCreate, GoalUpdate, GoalReadMinimal, GoalTypeEnum
 from .knowledge_asset import (
     KnowledgeAsset, KnowledgeAssetCreate, KnowledgeAssetUpdate, KnowledgeAssetRead,
     NoteCreate, NoteRead
 )
 from .map import MapData, MapNode, MapEdge, MapNodeTypeEnum, MapEdgeTypeEnum
+from .activity_log import ActivityLogCreate, ActivityLogRead
+from .briefing import BriefingResponse
+from .insight import ProjectOverlapResponse
+from .note import NoteBase, NoteCreate, NoteUpdate, NoteRead, NoteReadRecent, NoteInDB
 # from .token import Token, TokenData # Placeholder for token schemas 
 # Import Goal schemas here later
 # Import KnowledgeAsset schemas here later 
@@ -26,4 +30,13 @@ __all__ = [
     "KnowledgeAsset", "KnowledgeAssetCreate", "KnowledgeAssetUpdate", "KnowledgeAssetRead",
     "NoteCreate", "NoteRead",
     "MapData", "MapNode", "MapEdge", "MapNodeTypeEnum", "MapEdgeTypeEnum",
+    "ActivityLogCreate", "ActivityLogRead",
+    "BriefingResponse",
+    "ProjectOverlapResponse",
+    "NoteBase",
+    "NoteCreate",
+    "NoteUpdate",
+    "NoteRead",
+    "NoteReadRecent",
+    "NoteInDB",
 ] 

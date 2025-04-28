@@ -6,12 +6,13 @@ from pydantic import BaseModel
 
 
 class MapNodeTypeEnum(str, Enum):
-    USER = "USER"
-    TEAM = "TEAM"
-    PROJECT = "PROJECT"
-    GOAL = "GOAL"
-    KNOWLEDGE_ASSET = "KNOWLEDGE_ASSET"
-    DEPARTMENT = "DEPARTMENT" # Added based on seed data
+    USER = "user"
+    TEAM = "team"
+    PROJECT = "project"
+    GOAL = "goal"
+    DEPARTMENT = "department" # Assuming Department might be a node type
+    KNOWLEDGE_ASSET = "knowledge_asset" # Generic asset type
+    TEAM_CLUSTER = "team_cluster" # For clustered teams
 
 
 class MapEdgeTypeEnum(str, Enum):

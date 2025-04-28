@@ -42,7 +42,7 @@ class Project(Base):
     tenant = relationship("Tenant", back_populates="projects")
     owner_team = relationship("Team", back_populates="owned_projects")
     goal = relationship("Goal", back_populates="projects") # Added goal relationship
-    notes = relationship("KnowledgeAsset", back_populates="project", cascade="all, delete-orphan") # Relationship to notes
+    notes = relationship("KnowledgeAsset", back_populates="project", cascade="all, delete-orphan")
 
     # Uncomment and define participants relationship
     participants = relationship(

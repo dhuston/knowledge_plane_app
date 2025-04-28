@@ -21,6 +21,13 @@ from app.models.user import User as UserModel
 # Configure Authlib OAuth client
 oauth = OAuth()
 
+# Reusable HTTPException for credential errors
+CREDENTIALS_EXCEPTION = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
 # Register Google OAuth client
 # Ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set in your .env
 oauth.register(
@@ -70,11 +77,7 @@ async def get_current_user(
     """Dependency to verify JWT and return the current user."""
     from app.crud.crud_user import user as crud_user
 
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    credentials_exception = CREDENTIALS_EXCEPTION
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]

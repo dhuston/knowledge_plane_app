@@ -1,4 +1,4 @@
-import React from 'react';
+// React import no longer needed with React 17+ JSX transform
 import {
   BrowserRouter as Router,
   Routes,

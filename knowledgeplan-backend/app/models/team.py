@@ -24,7 +24,7 @@ class Team(Base):
     name = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
     lead_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
-    dept_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True, index=True) # Uncommented
+    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id"), nullable=True, index=True) # Changed from dept_id
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

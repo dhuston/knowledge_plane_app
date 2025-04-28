@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Box, Text, Avatar, HStack, VStack } from '@chakra-ui/react';
-import { UserRead } from '../../../types/user'; // Adjust path as necessary
 
 // Assuming data structure passed from LivingMap includes label and UserRead object
 interface UserNodeData {
@@ -12,31 +11,30 @@ interface UserNodeData {
     email?: string;
     avatar_url?: string;
     // Include the original UserRead data if needed for interactions
-    originalApiNode?: { data: UserRead }; 
+    originalApiNode?: { data: Record<string, unknown> }; 
 }
 
 const UserNode: React.FC<NodeProps<UserNodeData>> = ({ data }) => {
-    const userData = data.originalApiNode?.data;
+    // Ensure userData access is safe and avatar_url is treated as string | undefined
+    const userData = data.originalApiNode?.data as Record<string, unknown> | undefined;
+    const avatarUrl = typeof userData?.avatar_url === 'string' ? userData.avatar_url : undefined;
 
     return (
         <Box
             title={data.title || data.label} // Use title if available, fallback to label
             _hover={{ 
-                // Revert to a more standard hover style
-                // Maybe a thicker border or different shadow?
-                // Let's try a slightly thicker border in the original blue
                 outline: '2px solid #3b82f6', // Match user node color theme
                 outlineOffset: '1px', 
-                shadow: 'md', // Keep or slightly enhance shadow
+                shadow: 'md', 
                 zIndex: 10,
-                // Remove the debugging background color
-                // backgroundColor: 'yellow.200', 
+                transform: 'scale(1.03)', // Add slight scale on hover
             }}
+            transition="transform 0.1s ease-in-out" // Smooth the transition
             p={2}
             borderWidth="1px"
             borderRadius="md"
             bg="white"
-            borderColor="gray.300"
+            borderColor="blue.300"
             shadow="sm"
             minWidth="150px" // Ensure minimum width
         >
@@ -44,11 +42,13 @@ const UserNode: React.FC<NodeProps<UserNodeData>> = ({ data }) => {
                 <Avatar 
                     size="sm" 
                     name={data.label} 
-                    src={userData?.avatar_url || undefined} 
+                    src={avatarUrl} // Use corrected variable
                 />
                 <VStack align="start" spacing={0}>
                     <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{data.label}</Text>
-                    {userData?.title && <Text fontSize="xs" color="gray.500" noOfLines={1}>{userData.title}</Text>}
+                    {/* Ensure title access is also safe */} 
+                    {typeof userData?.title === 'string' && userData.title && 
+                        <Text fontSize="xs" color="gray.500" noOfLines={1}>{userData.title}</Text>}
                 </VStack>
             </HStack>
             {/* Handles allow connecting edges */}

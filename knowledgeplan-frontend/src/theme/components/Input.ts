@@ -1,8 +1,10 @@
 // KnowledgePlane AI Input Component
+// Modern, professional input styles with brand identity
+
 import { defineStyleConfig } from '@chakra-ui/react';
 
 const Input = defineStyleConfig({
-  // Base style for all inputs
+  // Base styles applied to all inputs
   baseStyle: {
     field: {
       width: '100%',
@@ -11,130 +13,124 @@ const Input = defineStyleConfig({
       position: 'relative',
       appearance: 'none',
       transition: 'all 0.2s',
+      fontFamily: 'body',
+    },
+    element: {
+      height: 'input-height',
+      borderRadius: 'input',
+      px: 'input-padding-x',
+      py: 'input-padding-y',
+      fontSize: 'md',
+      bg: 'white',
+      border: '1px solid',
+      borderColor: 'neutral.300',
+      _hover: {
+        borderColor: 'neutral.400',
+      },
+      _focus: {
+        borderColor: 'brand.500',
+        boxShadow: 'focus',
+      },
+      _disabled: {
+        opacity: 0.6,
+        cursor: 'not-allowed',
+        bg: 'neutral.50',
+      },
+      _invalid: {
+        borderColor: 'error.500',
+        boxShadow: 'focus-error',
+      },
+      _placeholder: {
+        color: 'neutral.400',
+      },
+    },
+    addon: {
+      height: 'input-height',
+      fontSize: 'md',
+      px: 'input-padding-x',
+      borderRadius: 'input',
     },
   },
-  
-  // Input variants
+
+  // Variations
   variants: {
-    // Outlined input with border
+    // Default outline style
     outline: {
       field: {
+        bg: 'white',
         border: '1px solid',
         borderColor: 'neutral.300',
-        bg: 'white',
         _hover: {
           borderColor: 'neutral.400',
         },
-        _readOnly: {
-          boxShadow: 'none !important',
-          userSelect: 'all',
-        },
-        _disabled: {
-          opacity: 0.4,
-          cursor: 'not-allowed',
-        },
-        _invalid: {
-          borderColor: 'accent.500',
-          boxShadow: `0 0 0 1px var(--chakra-colors-accent-500)`,
-        },
         _focus: {
-          zIndex: 1,
           borderColor: 'brand.500',
-          boxShadow: `0 0 0 1px var(--chakra-colors-brand-500)`,
+          boxShadow: 'focus',
         },
       },
     },
-    
-    // Filled input with background
+
+    // Filled style
     filled: {
       field: {
+        bg: 'neutral.50',
         border: '2px solid',
         borderColor: 'transparent',
-        bg: 'neutral.100',
         _hover: {
-          bg: 'neutral.200',
-        },
-        _readOnly: {
-          boxShadow: 'none !important',
-          userSelect: 'all',
-        },
-        _disabled: {
-          opacity: 0.4,
-          cursor: 'not-allowed',
-        },
-        _invalid: {
-          borderColor: 'accent.500',
+          bg: 'neutral.100',
         },
         _focus: {
-          bg: 'transparent',
+          bg: 'white',
           borderColor: 'brand.500',
+          boxShadow: 'focus',
         },
       },
     },
-    
-    // Flushed input with only bottom border
+
+    // Flushed style (borderless with bottom border)
     flushed: {
       field: {
-        borderBottom: '1px solid',
-        borderColor: 'neutral.300',
+        bg: 'transparent',
         borderRadius: 0,
         px: 0,
-        bg: 'transparent',
+        borderBottom: '1px solid',
+        borderColor: 'neutral.300',
         _hover: {
           borderColor: 'neutral.400',
         },
-        _readOnly: {
-          boxShadow: 'none !important',
-          userSelect: 'all',
-        },
-        _disabled: {
-          opacity: 0.4,
-          cursor: 'not-allowed',
-        },
-        _invalid: {
-          borderColor: 'accent.500',
-          boxShadow: `0px 1px 0px 0px var(--chakra-colors-accent-500)`,
-        },
         _focus: {
           borderColor: 'brand.500',
-          boxShadow: `0px 1px 0px 0px var(--chakra-colors-brand-500)`,
+          boxShadow: 'none',
+          borderBottom: '2px solid',
         },
       },
     },
-    
-    // Unstyled input without styling
+
+    // Unstyled
     unstyled: {
       field: {
         bg: 'transparent',
         px: 0,
         height: 'auto',
       },
-    },
-    
-    // Search input with icon and rounded styling
-    search: {
-      field: {
-        border: '1px solid',
-        borderColor: 'neutral.200',
-        bg: 'white',
-        borderRadius: 'full',
-        pl: 10, // Space for search icon
-        pr: 4,
-        _hover: {
-          borderColor: 'neutral.300',
-        },
-        _focus: {
-          borderColor: 'brand.500',
-          boxShadow: `0 0 0 1px var(--chakra-colors-brand-500)`,
-        },
+      addon: {
+        bg: 'transparent',
+        px: 0,
+        height: 'auto',
       },
     },
   },
-  
-  // Input sizes
+
+  // Sizes
   sizes: {
     xs: {
       field: {
+        fontSize: 'xs',
+        px: 2,
+        h: 6,
+        borderRadius: 'sm',
+      },
+      addon: {
         fontSize: 'xs',
         px: 2,
         h: 6,
@@ -148,9 +144,21 @@ const Input = defineStyleConfig({
         h: 8,
         borderRadius: 'sm',
       },
+      addon: {
+        fontSize: 'sm',
+        px: 3,
+        h: 8,
+        borderRadius: 'sm',
+      },
     },
     md: {
       field: {
+        fontSize: 'md',
+        px: 4,
+        h: 10,
+        borderRadius: 'md',
+      },
+      addon: {
         fontSize: 'md',
         px: 4,
         h: 10,
@@ -160,13 +168,19 @@ const Input = defineStyleConfig({
     lg: {
       field: {
         fontSize: 'lg',
-        px: 4,
+        px: 6,
         h: 12,
-        borderRadius: 'md',
+        borderRadius: 'lg',
+      },
+      addon: {
+        fontSize: 'lg',
+        px: 6,
+        h: 12,
+        borderRadius: 'lg',
       },
     },
   },
-  
+
   // Default values
   defaultProps: {
     size: 'md',

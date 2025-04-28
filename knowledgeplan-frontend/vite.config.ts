@@ -13,4 +13,14 @@ export default defineConfig({
     setupFiles: './src/setupTests.ts', // Optional setup file
     css: true, // if you have css imports in components
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
+    },
+  },
 })

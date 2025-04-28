@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional, Tuple
 from datetime import timedelta, timezone, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
@@ -9,15 +9,19 @@ from authlib.integrations.starlette_client import OAuthError
 from uuid import UUID
 import logging
 from pydantic import BaseModel # Import BaseModel from pydantic
+from jose import jwt
 
-from app import crud, models, schemas
+from app.crud.crud_user import user as crud_user
+from app.crud.crud_tenant import tenant as crud_tenant
+from app import models, schemas
 from app.core import security
 from app.core.config import settings
-from app.core.security import oauth # Import oauth client
-from app.core.security import create_access_token, get_current_user
+from app.core.security import create_access_token # Use only create_access_token
+from app.core.security import oauth, CREDENTIALS_EXCEPTION # Import oauth directly
+from app.core.security import get_current_user
 from app.db.session import get_db_session
 from app.schemas import UserCreate, UserUpdate, TenantCreate
-from app.crud import user as crud_user, tenant as crud_tenant
+from app.services.google_calendar import refresh_google_access_token, GoogleTokenRefreshError
 
 # Define Pydantic model for refresh token request body
 class RefreshTokenRequest(BaseModel): # Inherit from pydantic.BaseModel
@@ -120,13 +124,23 @@ async def callback_google(request: Request, db: AsyncSession = Depends(get_db_se
         logger.info(f"User upsert successful. User ID: {db_user.id}")
         
         # --- JWT Generation --- 
-        logger.debug(f"Generating JWT for user ID: {db_user.id}")
-        jwt_token = create_access_token(subject=db_user.id)
-        logger.info("JWT generated successfully.")
+        logger.debug(f"Generating JWT access token for user ID: {db_user.id}")
+        access_token = security.create_access_token(subject=db_user.id) # Use security directly
+        logger.info("JWT access token generated successfully.")
+
+        logger.debug(f"Generating JWT refresh token for user ID: {db_user.id}")
+        # Use a much longer expiry for refresh tokens
+        refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS) 
+        refresh_token = security.create_access_token( # Reuse create_access_token
+            subject=db_user.id, 
+            expires_delta=refresh_token_expires
+        )
+        logger.info("JWT refresh token generated successfully.")
         # ---------------------
         
-        frontend_redirect_url = f"http://localhost:5173/auth/callback?token={jwt_token}"
-        logger.info(f"Redirecting user to frontend: {frontend_redirect_url.split('?')[0]}?token=..." ) # Avoid logging token in URL
+        # Pass both tokens to the frontend
+        frontend_redirect_url = f"http://localhost:5173/auth/callback?token={access_token}&refreshToken={refresh_token}"
+        logger.info(f"Redirecting user to frontend: {frontend_redirect_url.split('?')[0]}?token=...&refreshToken=..." ) # Avoid logging tokens
         return RedirectResponse(url=frontend_redirect_url)
     
     except Exception as e:
@@ -140,54 +154,67 @@ async def callback_google(request: Request, db: AsyncSession = Depends(get_db_se
 async def refresh_token(
     *, # Enforce keyword-only arguments after this
     db: AsyncSession = Depends(get_db_session),
-    refresh_request: RefreshTokenRequest, # Receive refresh token in body
-    # Alternatively, could try extracting from HttpOnly cookie if implemented
+    refresh_request: RefreshTokenRequest, # Receive refresh token JWT in body
 ) -> Any:
     """
     OAuth2 refresh token flow.
-    Uses the provided refresh token to issue a new access token.
+    Uses the provided refresh token JWT to issue a new access token.
     """
-    logger.info("Received request for /refresh-token") # Add log
+    logger.info("Received request for /refresh-token")
     
     refresh_token = refresh_request.refresh_token
     if not refresh_token:
-        logger.error("Refresh token not provided in request body.")
+        logger.error("Refresh token JWT not provided in request body.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Refresh token not provided",
         )
 
-    # 1. Find user by refresh token
-    logger.debug(f"Looking up user by refresh token: ...{refresh_token[-6:]}") # Log partial token
-    user = await crud_user.get_by_refresh_token(db, refresh_token=refresh_token)
-    if not user:
-        logger.warning(f"Invalid refresh token provided: ...{refresh_token[-6:]}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    logger.info(f"Found user {user.email} for refresh token.")
-
-    # 2. TODO: Use the refresh token to get a NEW access token from Google
-    if not user.google_refresh_token: # Basic check if refresh token exists in DB
-         logger.error(f"User {user.email} found, but no Google refresh token stored in DB.")
-         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="No valid refresh token found for user",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     
-    # --- Placeholder --- 
-    logger.warning("Google token refresh logic not implemented yet.")
-    # --- End Placeholder --- 
+    # 1. Validate the refresh token JWT itself
+    try:
+        payload = jwt.decode(
+            refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        user_id_str: Optional[str] = payload.get("sub")
+        if user_id_str is None:
+            logger.warning("Refresh token JWT missing 'sub' claim.")
+            raise credentials_exception
+        try:
+            user_id = UUID(user_id_str)
+        except ValueError:
+            logger.warning("Refresh token JWT 'sub' claim is not a valid UUID.")
+            raise credentials_exception
+        token_data = security.TokenData(sub=user_id) # Use TokenData from security
+        logger.info(f"Refresh token JWT validated successfully for user ID: {user_id}")
 
-    # 3. Generate NEW JWT access token for our API
-    logger.debug(f"Generating new JWT access token for user {user.id}")
+    except jwt.ExpiredSignatureError:
+        logger.warning("Refresh token JWT has expired.")
+        raise credentials_exception
+    except jwt.JWTError as e:
+        logger.error(f"Error decoding refresh token JWT: {e}")
+        raise credentials_exception
+        
+    # 2. Find user by ID from the validated refresh token
+    user = await crud_user.get(db, id=token_data.sub)
+    if not user:
+        logger.error(f"User ID {token_data.sub} from valid refresh token not found in DB.")
+        raise credentials_exception 
+    
+    logger.info(f"Found user {user.email} from refresh token JWT.")
+
+    # Optional: Add token blacklist check here if implemented later
+
+    # 3. Generate NEW access token for our API
+    logger.debug(f"Generating new access token for user {user.id}")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    new_access_token = create_access_token(
+    new_access_token = security.create_access_token(
         subject=user.id, 
-        # tenant_id=user.tenant_id, # Re-add tenant_id if needed in your JWT payload
         expires_delta=access_token_expires
     )
     logger.info(f"Generated new access token for user {user.email}")
@@ -195,4 +222,22 @@ async def refresh_token(
     return {
         "access_token": new_access_token,
         "token_type": "bearer",
-    } 
+    }
+
+
+# TODO: Add endpoint to logout (potentially blacklist tokens)
+
+@router.post("/logout")
+async def logout(
+    # Optional: Could take the token to blacklist it if needed
+    # response: Response # If needing to clear HttpOnly cookies
+) -> Any:
+    """
+    Endpoint for client to signal logout.
+    Currently does nothing on the backend, but could be extended
+    to invalidate refresh tokens (e.g., add to a blacklist).
+    """
+    logger.info("Received request for /logout")
+    # No action needed on backend for simple JWT invalidation (client deletes)
+    # If using server-side refresh token invalidation, implement logic here.
+    return {"message": "Logout endpoint called"} 

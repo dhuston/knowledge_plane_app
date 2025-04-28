@@ -122,7 +122,7 @@ export default function ProfilePage() {
   }
   
   if (!profileUser) {
-      return <Navigate to="/workspace" replace />;
+      return <Navigate to="/map" replace />;
   }
 
   return (

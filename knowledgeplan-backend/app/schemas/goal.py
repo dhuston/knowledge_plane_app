@@ -16,18 +16,21 @@ class GoalTypeEnum(str, PyEnum):
 class GoalBase(BaseModel):
     title: str
     description: Optional[str] = None
-    type: Optional[str] = None # Consider Enum later: Enterprise/Dept/Team
+    type: Optional[GoalTypeEnum] = None # CHANGE: Use Enum
     status: Optional[str] = None
     progress: Optional[int] = Field(None, ge=0, le=100)
     dueDate: Optional[date] = Field(None, alias='dueDate') # Match frontend if needed
     parent_id: Optional[UUID] = None
     # properties: Optional[dict] = {} # Replaced with JSON type below
 
-    class Config:
-        allow_population_by_field_name = True # Allow using dueDate alias
+    # Pydantic V2 configuration
+    model_config = {
+        "validate_by_name": True,
+    }
 
 # Properties to receive via API on creation
 class GoalCreate(GoalBase):
+    type: GoalTypeEnum # Make type required on creation
     pass # Inherits all from GoalBase for now
 
 # Properties to receive via API on update
@@ -35,7 +38,7 @@ class GoalUpdate(GoalBase):
     # Make all fields optional for update
     title: Optional[str] = None
     description: Optional[str] = None
-    type: Optional[str] = None
+    type: Optional[GoalTypeEnum] = None # CHANGE: Use Enum
     status: Optional[str] = None
     progress: Optional[int] = Field(None, ge=0, le=100)
     dueDate: Optional[date] = Field(None, alias='dueDate')
@@ -50,14 +53,15 @@ class GoalInDBBase(GoalBase):
     updated_at: datetime
     # properties: Optional[Any] = None # Use JSON type from SQLAlchemy
 
-    # Use Pydantic V2 config
+    # Pydantic V2 configuration
     model_config = {
         "from_attributes": True,
-        "populate_by_name": True, # Replaces allow_population_by_field_name
+        "validate_by_name": True,
     }
 
 # Properties to return to client
 class GoalRead(GoalInDBBase):
+    type: GoalTypeEnum # Ensure type is returned as Enum
     pass # Inherits all needed fields
 
 # Minimal Goal details (e.g., for lists where properties are excluded)

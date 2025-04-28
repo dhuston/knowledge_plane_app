@@ -1,575 +1,524 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Box, Text, Spinner, Heading, VStack, /* CloseButton, */ /*Divider,*/ Tag, Code,
-    Textarea, Button, Avatar, HStack, /* Input, */ useToast, Card, CardHeader, CardBody, SimpleGrid, Center, Flex
+    Box, Text, Spinner, Heading, VStack, Button, Avatar, HStack,
+    useToast, Card, CardHeader, CardBody, Center, Icon,
+    UnorderedList, ListItem, Alert, AlertIcon, CloseButton,
+    useDisclosure,
+    Badge,
+    Input,
+    InputGroup,
+    InputRightElement,
+    IconButton
 } from '@chakra-ui/react';
-import { MdNote /* MdPersonAdd */ } from "react-icons/md"; // Cleaned up imports
+import {
+    MdNote,
+    MdOutlinePerson,
+    MdOutlineGroup,
+    MdOutlineFolder,
+    MdOutlineFlag
+} from "react-icons/md"; // Icons for types
+import { FaExclamationTriangle } from 'react-icons/fa'; // Icon for overlap
+
+// Core Types
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
+import type { ProjectRead } from '../../types/project';
+import type { TeamRead } from '../../types/team';
+import type { User as UserReadSchema } from '../../types/user';
+import { NoteCreate } from '../../types/knowledge_asset';
+import { GoalRead } from '../../types/goal'; // For full goal info
+import { NoteRead, NoteReadRecent } from '../../types/knowledge_asset'; // Use correct path
 
-// import { apiClient } from '../../api/client'; // Removed unused
-// import { useAuth } from '../../context/AuthContext'; // REMOVED unused import
+// Hooks & Components
+import { useApiClient } from '../../hooks/useApiClient';
+import { NoteInput } from '../notes/NoteInput'; // Assuming path is correct
+import GoalSelectorModal from '../modals/GoalSelectorModal'; // Correct default import
 
-// Import specific entity types
-import { User, UserReadBasic } from '../../types/user'; // Use User and UserReadBasic
-import { TeamRead } from '../../types/team'; // Use TeamRead
-import { ProjectRead } from '../../types/project'; // Use ProjectRead
-import { GoalRead, GoalReadMinimal } from '../../types/goal'; // Use GoalRead and GoalReadMinimal
-import { NoteCreate, Note } from '../../types/knowledge_asset';
-import { useApiClient } from '../../hooks/useApiClient'; // Corrected path relative to src/components/panels
-// import { Link as RouterLink } from 'react-router-dom'; // Removed unused
-
-// Define a type for Google Calendar events (Removed - not used here)
-// interface CalendarEvent { ... }
 
 interface BriefingPanelProps {
-    node: MapNode | null; // The selected node data from the map
-    onSelectNode: (nodeId: string, nodeType: MapNodeTypeEnum) => void; // Add callback prop
+    selectedNode: MapNode | null;
+    onClose: () => void;
+    projectOverlaps: Record<string, string[]>; // Overlap data passed down
+    // Callback to get project name from already fetched map data if possible
+    getProjectNameById: (id: string) => string | undefined;
 }
 
-// Helper component for Label-Value pairs
-const DetailItem: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-    <Box>
-        <Text fontSize="sm" fontWeight="medium" color="gray.600">{label}</Text>
-        <Text fontSize="sm" mt={1}>{children}</Text>
-    </Box>
-);
+// Type guard for entity data
+function isProjectRead(data: unknown): data is ProjectRead {
+    return typeof data === 'object' && data !== null && 'owning_team_id' in data;
+}
 
-// Helper component for Clickable Links
-const EntityLink: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
-     <DetailItem label={label}>
-         <Button variant="link" size="sm" colorScheme="blue" onClick={onClick} fontWeight="normal">
-            {children}
-         </Button>
-     </DetailItem>
-);
+function isTeamRead(data: unknown): data is TeamRead {
+    return typeof data === 'object' && data !== null && 'lead_id' in data;
+}
 
-const BriefingPanel: React.FC<BriefingPanelProps> = ({ node, onSelectNode }) => {
-    // Use specific Read types matching API responses
-    const [entityData, setEntityData] = useState<User | TeamRead | ProjectRead | GoalRead | null>(null);
-    const [notes, setNotes] = useState<Note[]>([]); 
-    const [userProjects, setUserProjects] = useState<ProjectRead[]>([]);
-    const [userGoals, setUserGoals] = useState<GoalRead[]>([]);
-    // Add state for team's related items
-    const [teamProjects, setTeamProjects] = useState<ProjectRead[]>([]);
-    const [teamGoals, setTeamGoals] = useState<GoalReadMinimal[]>([]); // State uses GoalReadMinimal
-    // Loading states
+function isUserRead(data: unknown): data is UserReadSchema {
+    return typeof data === 'object' && data !== null && 'email' in data;
+}
+
+
+const BriefingPanel: React.FC<BriefingPanelProps> = ({ 
+    selectedNode,
+    onClose,
+    projectOverlaps,
+    getProjectNameById
+}) => {
+    // State for fetched data
+    const [entityData, setEntityData] = useState<UserReadSchema | TeamRead | ProjectRead | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [recentNotes, setRecentNotes] = useState<NoteReadRecent[]>([]);
     const [isNotesLoading, setIsNotesLoading] = useState<boolean>(false);
-    const [isSubmittingNote, setIsSubmittingNote] = useState<boolean>(false);
-    const [isFetchingRelated, setIsFetchingRelated] = useState<boolean>(false); 
-    // New note state
-    const [newNoteContent, setNewNoteContent] = useState<string>(''); 
-    // const { user: currentUser } = useAuth(); // Removed as unused 
-    const toast = useToast();
+    const [notesError, setNotesError] = useState<string | null>(null);
+    const [linkedGoal, setLinkedGoal] = useState<GoalRead | null>(null);
+    const [isGoalLoading, setIsGoalLoading] = useState<boolean>(false);
+    
+    // State for asset linking placeholder
+    const [assetLinkUrl, setAssetLinkUrl] = useState<string>('');
+    const [isLinkingAsset, setIsLinkingAsset] = useState<boolean>(false);
 
-    // Add state for project participants
-    const [projectParticipants, setProjectParticipants] = useState<UserReadBasic[]>([]);
+    const { 
+        isOpen: isGoalModalOpen, 
+        onOpen: onGoalModalOpen, 
+        onClose: onGoalModalClose 
+    } = useDisclosure();
 
-    const nodeType = useMemo(() => node?.type, [node]);
-    const nodeId = useMemo(() => node?.id, [node]);
+    const nodeType = useMemo(() => selectedNode?.type, [selectedNode]);
+    const nodeId = useMemo(() => selectedNode?.id, [selectedNode]);
 
     const apiClient = useApiClient();
+    const toast = useToast();
 
-    // --- Callback Definitions --- 
-    // Wrap fetchProjectNotes in useCallback
-    const fetchProjectNotes = useCallback(async (projectId: string) => {
-        console.log(`Fetching notes for project ${projectId}...`);
-        setIsNotesLoading(true);
-        try {
-            const response = await apiClient.get<Note[]>(`/projects/${projectId}/notes`);
-            setNotes(response.data || []); 
-        } catch (err) {
-            console.error("Error fetching notes:", err);
-            toast({ title: "Error Loading Notes", status: "error", duration: 3000 });
-            setNotes([]); 
-        } finally {
-            setIsNotesLoading(false);
-        }
-    }, [apiClient, toast]); // Dependencies of the callback
-
-    // Fetch main entity details and related data
+    // --- Data Fetching Effect ---
     useEffect(() => {
-        setEntityData(null); 
-        setError(null);
-        setNotes([]);
-        setUserProjects([]); 
-        setUserGoals([]);
-        setTeamProjects([]); // Reset team projects
-        setTeamGoals([]); // Reset team goals
-        setProjectParticipants([]); // Reset participants
-
         if (!nodeId || !nodeType) {
-            setIsLoading(false);
+            setEntityData(null);
+            setError(null);
+            setRecentNotes([]);
+            setLinkedGoal(null);
             return;
         }
 
-        let apiEndpoint = '';
-        let fetchSuccess = true;
-
-        // Determine main endpoint
-        switch (nodeType) {
-            case MapNodeTypeEnum.USER: apiEndpoint = `/users/${nodeId}`; break;
-            case MapNodeTypeEnum.TEAM: apiEndpoint = `/teams/${nodeId}`; break;
-            case MapNodeTypeEnum.PROJECT: apiEndpoint = `/projects/${nodeId}`; break;
-            case MapNodeTypeEnum.GOAL: apiEndpoint = `/goals/${nodeId}`; break; 
-            case MapNodeTypeEnum.DEPARTMENT: apiEndpoint = `/departments/${nodeId}`; break;
-            default: 
-                setError(`Unsupported node type for detail fetching: ${nodeType}`);
-                setIsLoading(false);
-                fetchSuccess = false;
-                return;
-        }
-
-        const fetchNodeDetails = async () => {
-            console.log(`Fetching details for ${nodeType} ${nodeId} from ${apiEndpoint}`);
+        const fetchDetails = async () => {
             setIsLoading(true);
-            setIsFetchingRelated(false); // Reset related fetching state
-            let fetchedEntityData: User | TeamRead | ProjectRead | GoalRead | null = null;
+            setError(null);
+            setEntityData(null); 
+            setRecentNotes([]);
+            setLinkedGoal(null);
+            setNotesError(null);
+
+            let apiUrl = '';
 
             try {
-                // Fetch main entity details
-                if (nodeType === MapNodeTypeEnum.USER) {
-                     const response = await apiClient.get<User>(apiEndpoint);
-                     fetchedEntityData = response.data; // Access .data
-                } else { 
-                     const response = await apiClient.get<TeamRead | ProjectRead | GoalRead>(apiEndpoint);
-                     fetchedEntityData = response.data; // Access .data
-                }
-               
-                setEntityData(fetchedEntityData);
-                console.log("Fetched entity data:", fetchedEntityData);
+                switch (nodeType) {
+                    case MapNodeTypeEnum.USER:
+                        apiUrl = `/users/${nodeId}`;
+                        {
+                            const response = await apiClient.get<UserReadSchema>(apiUrl);
+                            setEntityData(response.data);
+                        }
+                        break;
+                    case MapNodeTypeEnum.TEAM:
+                        apiUrl = `/teams/${nodeId}`;
+                        {
+                            const response = await apiClient.get<TeamRead>(apiUrl);
+                            setEntityData(response.data);
+                        }
+                        break;
+                    case MapNodeTypeEnum.PROJECT:
+                        apiUrl = `/projects/${nodeId}`;
+                        {
+                            const response = await apiClient.get<ProjectRead>(apiUrl);
+                            setEntityData(response.data);
 
-                // ---- Fetch Related Data ----
-                if (fetchedEntityData) { // Only fetch related if main fetch succeeded
-                    setIsFetchingRelated(true);
-                    try {
-                        if (nodeType === MapNodeTypeEnum.PROJECT && nodeId) {
-                            await fetchProjectNotes(nodeId);
-                            // Fetch project participants
-                            const participantsResponse = await apiClient.get<UserReadBasic[]>(`/projects/${nodeId}/participants`);
-                            setProjectParticipants(participantsResponse.data || []);
+                            // Fetch related notes & goal info
+                            if (response.data) {
+                                fetchRecentNotes(nodeId);
+                                if (response.data.goal_id) {
+                                    fetchLinkedGoal(response.data.goal_id);
+                                }
+                            }
                         }
-                        if (nodeType === MapNodeTypeEnum.USER && nodeId) {
-                            const projectsResponse = await apiClient.get<ProjectRead[]>(`/users/${nodeId}/projects`);
-                            setUserProjects(projectsResponse.data || []);
-                            const goalsResponse = await apiClient.get<GoalRead[]>(`/users/${nodeId}/goals`);
-                            setUserGoals(goalsResponse.data || []);
-                        }
-                        // --- Add fetch for TEAM --- 
-                        if (nodeType === MapNodeTypeEnum.TEAM && nodeId) {
-                            // Fetch team's projects
-                            const teamProjectsResponse = await apiClient.get<ProjectRead[]>(`/teams/${nodeId}/projects`);
-                            setTeamProjects(teamProjectsResponse.data || []);
-                            // Fetch team's goals
-                            const teamGoalsResponse = await apiClient.get<GoalReadMinimal[]>(`/teams/${nodeId}/goals`);
-                            setTeamGoals(teamGoalsResponse.data || []);
-                        }
-                    } catch (relatedErr) {
-                        console.error("Error fetching related data:", relatedErr);
-                        toast({ title: "Error Loading Related Items", status: "warning", duration: 3000 });
-                        // Don't fail the whole panel, just show missing related data
-                    } finally {
-                        setIsFetchingRelated(false);
-                    }
+                        break;
+                    default:
+                        console.warn('No API endpoint for type:', nodeType);
+                        setError(`Details view not implemented for type: ${nodeType}`);
+                        return;
                 }
-                 // Removed calendar fetch logic
-
-            } catch (err: unknown) { 
-                console.error("Error fetching node details:", err);
-                 let detail = "Unknown error";
-                 // Safer error handling: Check instanceof Error first
-                 if (err instanceof Error) { 
-                     detail = err.message;
-                     // Check if it might be an axios-like error object
-                     if ('response' in err && typeof err.response === 'object' && err.response !== null && 'data' in err.response) {
-                         const responseError = err.response as { data?: { detail?: string } };
-                         detail = responseError.data?.detail || detail;
-                     }
-                 } else if (typeof err === 'object' && err !== null) {
-                     // Handle potential non-Error objects with response structure
-                      if ('response' in err && typeof err.response === 'object' && err.response !== null && 'data' in err.response) {
-                         const responseError = err.response as { data?: { detail?: string } };
-                         detail = responseError.data?.detail || detail;
-                      } else {
-                         detail = String(err); // Fallback to string conversion
-                      }
-                 }
-                 setError(`Failed to load details: ${detail}`);
-                 toast({ title: "Error Loading Details", description: detail, status: "error", duration: 5000, isClosable: true });
-                 fetchSuccess = false;
+            } catch (err) {
+                console.error(`Error fetching details for ${nodeType} ${nodeId}:`, err);
+                setError(`Failed to load details for ${selectedNode?.label || nodeId}.`);
             } finally {
-                 setIsLoading(false);
+                setIsLoading(false);
             }
         };
-        
-        if(fetchSuccess) {
-             fetchNodeDetails();
-        }
-       
-    }, [nodeId, nodeType, apiClient, toast, fetchProjectNotes]); // Dependencies
 
-    // Wrap handleNoteSubmit in useCallback
-    const handleNoteSubmit = useCallback(async () => {
-        if (!newNoteContent.trim() || !nodeId || nodeType !== MapNodeTypeEnum.PROJECT) return;
-        setIsSubmittingNote(true);
-        const noteData: NoteCreate = { 
-            content: newNoteContent.trim(),
-        };
+        fetchDetails();
+
+    }, [nodeId, nodeType, apiClient]); // Re-fetch when node changes
+
+    // --- Fetch Recent Notes --- 
+    const fetchRecentNotes = async (projectId: string) => {
+        setIsNotesLoading(true);
+        setNotesError(null);
         try {
-            const response = await apiClient.post<Note>(`/projects/${nodeId}/notes`, noteData);
-            setNotes(prevNotes => [response.data, ...prevNotes]);
-            setNewNoteContent('');
-            toast({ title: "Note Added", status: "success", duration: 2000 });
-        } catch (err: unknown) {
-            console.error("Error submitting note:", err);
-            let detail = "Could not add note.";
-             if (err instanceof Error) { 
-                 detail = err.message;
-                 if ('response' in err && typeof err.response === 'object' && err.response !== null && 'data' in err.response) {
-                     const responseError = err.response as { data?: { detail?: string } };
-                     detail = responseError.data?.detail || detail;
-                 }
-             } else if (typeof err === 'object' && err !== null) {
-                  if ('response' in err && typeof err.response === 'object' && err.response !== null && 'data' in err.response) {
-                     const responseError = err.response as { data?: { detail?: string } };
-                     detail = responseError.data?.detail || detail;
-                  } else {
-                     detail = String(err);
-                  }
-             }
-            toast({ title: "Error Adding Note", description: detail, status: "error", duration: 3000 });
+            const response = await apiClient.get<NoteReadRecent[]>(`/notes/project/${projectId}/recent?limit=5`);
+            setRecentNotes(response.data || []);
+        } catch (err) {
+            console.error(`Error fetching notes for project ${projectId}:`, err);
+            setNotesError("Failed to load recent notes.");
         } finally {
-            setIsSubmittingNote(false);
+            setIsNotesLoading(false);
         }
-    }, [newNoteContent, nodeId, nodeType, apiClient, toast, setNotes]); 
+    };
 
-    // Render functions for different entity types
-    const renderUserContent = (data: User) => { 
-        return (
-            <VStack align="stretch" spacing={4} w="full">
-                <Card variant="outline" size="sm">
-                    <CardHeader pb={2}>
-                        <HStack spacing={3}>
-                            <Avatar size="md" name={data.name || data.email} src={data.avatar_url ? data.avatar_url : undefined} />
-                            <VStack align="start" spacing={0}>
-                                <Heading size="sm">{data.name || node?.label || 'User Details'}</Heading>
-                                {data.title && <Text fontSize="sm" color="gray.500">{data.title}</Text>}
-                            </VStack>
-                        </HStack>
-                    </CardHeader>
-                    <CardBody pt={2}>
-                        <VStack align="start" spacing={3} w="full">
-                            <DetailItem label="Email">{data.email || 'N/A'}</DetailItem>
-                            {data.team_id && (
-                                <EntityLink label="Team" onClick={() => onSelectNode(data.team_id!, MapNodeTypeEnum.TEAM)}>
-                                <Code fontSize="xs" px={1}>{data.team_id}</Code>
-                                </EntityLink>
-                            )}
-                            {data.manager_id && (
-                                <EntityLink label="Manager" onClick={() => onSelectNode(data.manager_id!, MapNodeTypeEnum.USER)}>
-                                <Code fontSize="xs" px={1}>{data.manager_id}</Code>
-                                </EntityLink>
-                            )}
-                            <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
-                        </VStack>
-                    </CardBody>
-                </Card>
+    // --- Fetch Linked Goal --- 
+    const fetchLinkedGoal = async (goalId: string | null) => {
+        if (!goalId) {
+            setLinkedGoal(null);
+            return;
+        }
+        setIsGoalLoading(true);
+        try {
+            const response = await apiClient.get<GoalRead>(`/goals/${goalId}`);
+            setLinkedGoal(response.data);
+        } catch (err) {
+            console.error(`Error fetching title for goal ${goalId}:`, err);
+            setLinkedGoal(null);
+            toast({ title: "Error fetching linked goal details", status: "error", duration: 4000 });
+        } finally {
+            setIsGoalLoading(false);
+        }
+    };
 
-                 {/* Associated Projects Card */}
-                <Card variant="outline" size="sm">
-                    <CardHeader pb={1}><Heading size="xs">Associated Projects</Heading></CardHeader>
-                    <CardBody pt={1}>
-                        {isFetchingRelated ? <Spinner size="xs" /> : 
-                         userProjects.length > 0 ? (
-                            <VStack align="start" spacing={1}>
-                                {userProjects.map(proj => (
-                                    <EntityLink key={proj.id} label="" onClick={() => onSelectNode(proj.id, MapNodeTypeEnum.PROJECT)}>
-                                        {proj.name}
-                                    </EntityLink>
-                                ))}
-                             </VStack>
-                        ) : (
-                            <Text fontSize="sm" color="gray.500">No associated projects found.</Text>
-                        )}
-                    </CardBody>
-                </Card>
+    // --- Handlers --- 
+    const handleAddNote = async (content: string) => {
+        if (!nodeId || nodeType !== MapNodeTypeEnum.PROJECT) return;
+        const payload: NoteCreate = { content };
+        try {
+            const response = await apiClient.post<NoteRead>(`/notes`, payload); 
+            const newRecentNote: NoteReadRecent = {
+                id: response.data.id,
+                title: response.data.title,
+                created_at: response.data.created_at
+            };
+            setRecentNotes(prev => [newRecentNote, ...prev].slice(0, 5));
+            toast({ title: "Note added", status: "success", duration: 3000, isClosable: true });
+        } catch (err) {
+            console.error("Error adding note:", err);
+            toast({ title: "Error adding note", status: "error", duration: 5000, isClosable: true });
+        }
+    };
+    
+    const handleGoalSelect = async (projectId: string, goalId: string | null) => {
+        if (!entityData || !isProjectRead(entityData)) return;
 
-                 {/* Associated Goals Card */}
-                 <Card variant="outline" size="sm">
-                    <CardHeader pb={1}><Heading size="xs">Associated Goals</Heading></CardHeader>
-                    <CardBody pt={1}>
-                        {isFetchingRelated ? <Spinner size="xs" /> : 
-                         userGoals.length > 0 ? (
-                            <VStack align="start" spacing={1}>
-                                {userGoals.map(goal => (
-                                     <EntityLink key={goal.id} label="" onClick={() => onSelectNode(goal.id, MapNodeTypeEnum.GOAL)}>
-                                        {goal.title} 
-                                     </EntityLink>
-                                ))}
-                             </VStack>
-                        ) : (
-                            <Text fontSize="sm" color="gray.500">No associated goals found.</Text>
-                        )}
-                     </CardBody>
-                 </Card>
-             </VStack>
-        );
-    }
+        const originalGoalId = entityData.goal_id;
+        const originalLinkedGoal = linkedGoal;
 
-    const renderTeamContent = (data: TeamRead) => (
-        <VStack align="stretch" spacing={4} w="full">
-             <Card variant="outline" size="sm">
-                <CardHeader pb={2}>
-                    <Heading size="sm">{data.name ?? 'Team Details'}</Heading>
-                </CardHeader>
-                <CardBody pt={2}>
-                    <VStack align="start" spacing={3} w="full">
-                        <DetailItem label="Description">{data.description || <Text as="i" color="gray.400">No description</Text>}</DetailItem>
-                        {data.lead_id && (
-                            <EntityLink label="Lead" onClick={() => onSelectNode(data.lead_id!, MapNodeTypeEnum.USER)}>
-                            <Code fontSize="xs" px={1}>{data.lead_id}</Code>
-                            </EntityLink>
-                        )}
-                        {data.dept_id && (
-                            <EntityLink label="Department" onClick={() => onSelectNode(data.dept_id!, MapNodeTypeEnum.DEPARTMENT)}>
-                            <Code fontSize="xs" px={1}>{data.dept_id}</Code>
-                            </EntityLink>
-                        )}
-                        <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
-                    </VStack>
-                </CardBody>
-            </Card>
+        // Optimistic update
+        setLinkedGoal(null);
+        setEntityData(prev => ({ ...(prev as ProjectRead), goal_id: goalId }));
 
-            {/* Associated Projects Card */}
-            <Card variant="outline" size="sm">
-                <CardHeader pb={1}><Heading size="xs">Owned Projects</Heading></CardHeader>
-                <CardBody pt={1}>
-                    {isFetchingRelated ? <Spinner size="xs" /> : 
-                        teamProjects.length > 0 ? (
-                        <VStack align="start" spacing={1}>
-                            {teamProjects.map(proj => (
-                                <EntityLink key={proj.id} label="" onClick={() => onSelectNode(proj.id, MapNodeTypeEnum.PROJECT)}>
-                                    {proj.name}
-                                </EntityLink>
-                            ))}
-                            </VStack>
-                    ) : (
-                        <Text fontSize="sm" color="gray.500">No associated projects found.</Text>
-                    )}
-                </CardBody>
-            </Card>
+        try {
+            await apiClient.put(`/projects/${projectId}`, { goal_id: goalId });
 
-            {/* Associated Goals Card */}
-            <Card variant="outline" size="sm">
-                <CardHeader pb={1}><Heading size="xs">Associated Goals (via Projects)</Heading></CardHeader>
-                <CardBody pt={1}>
-                    {isFetchingRelated ? <Spinner size="xs" /> : 
-                        teamGoals.length > 0 ? (
-                        <VStack align="start" spacing={1}>
-                            {teamGoals.map(goal => (
-                                <EntityLink key={goal.id} label="" onClick={() => onSelectNode(goal.id, MapNodeTypeEnum.GOAL)}>
-                                    {goal.title} 
-                                </EntityLink>
-                            ))}
-                            </VStack>
-                    ) : (
-                        <Text fontSize="sm" color="gray.500">No associated goals found.</Text>
-                    )}
-                    </CardBody>
-            </Card>
-         </VStack>
+            if (goalId) {
+                fetchLinkedGoal(goalId);
+            } else {
+                setLinkedGoal(null);
+            }
+
+            toast({ title: 'Goal link updated', status: 'success', duration: 3000, isClosable: true });
+        } catch (err) {
+            console.error('Error updating project goal link:', err);
+            toast({ title: 'Error updating goal link', status: 'error', duration: 5000, isClosable: true });
+
+            // Revert
+            setLinkedGoal(originalLinkedGoal);
+            setEntityData(prev => ({ ...(prev as ProjectRead), goal_id: originalGoalId }));
+        }
+    };
+
+    // --- Asset Linking Placeholder Handler ---
+    const handleLinkAsset = async () => {
+        if (!assetLinkUrl || !entityData || !isProjectRead(entityData)) return;
+
+        const currentLinks = (entityData.properties?.linkedAssets as string[] || []);
+        if (currentLinks.includes(assetLinkUrl)) {
+            toast({ title: "Link already exists", status: "info", duration: 3000 });
+            return;
+        }
+
+        const updatedLinks = [...currentLinks, assetLinkUrl];
+        const updatedProperties = { ...(entityData.properties || {}), linkedAssets: updatedLinks };
+
+        // Optimistic update
+        const originalProperties = entityData.properties;
+        setEntityData(prev => ({ ...(prev as ProjectRead), properties: updatedProperties }));
+        setAssetLinkUrl(''); // Clear input
+        setIsLinkingAsset(true);
+
+        try {
+            await apiClient.put(`/projects/${entityData.id}`, { properties: updatedProperties });
+            toast({ title: "Asset linked (placeholder)", status: "success", duration: 3000 });
+        } catch (err) {
+            console.error("Error linking asset:", err);
+            toast({ title: "Error linking asset", status: "error" });
+            // Revert optimistic update
+            setEntityData(prev => ({ ...(prev as ProjectRead), properties: originalProperties }));
+        } finally {
+            setIsLinkingAsset(false);
+        }
+    };
+
+    const handleRemoveAssetLink = async (linkToRemove: string) => {
+        if (!entityData || !isProjectRead(entityData)) return;
+
+        const currentLinks = (entityData.properties?.linkedAssets as string[] || []);
+        const updatedLinks = currentLinks.filter(link => link !== linkToRemove);
+        const updatedProperties = { ...(entityData.properties || {}), linkedAssets: updatedLinks };
+
+        // Optimistic update
+        const originalProperties = entityData.properties;
+        setEntityData(prev => ({ ...(prev as ProjectRead), properties: updatedProperties }));
+        setIsLinkingAsset(true); // Reuse loading state maybe?
+
+        try {
+            await apiClient.put(`/projects/${entityData.id}`, { properties: updatedProperties });
+            toast({ title: "Asset link removed", status: "success", duration: 3000 });
+        } catch (err) {
+            console.error("Error removing asset link:", err);
+            toast({ title: "Error removing link", status: "error" });
+            // Revert optimistic update
+            setEntityData(prev => ({ ...(prev as ProjectRead), properties: originalProperties }));
+        } finally {
+            setIsLinkingAsset(false);
+        }
+    };
+
+    // --- Render Functions --- 
+
+    const renderUserDetails = (data: UserReadSchema) => (
+        <VStack align="stretch" spacing={1}>
+            <HStack spacing={3} mb={2}>
+                <Avatar size="md" name={data.name || data.email || 'U'} src={data.avatar_url || undefined} />
+                <VStack align="start" spacing={0}>
+                    <Heading size="sm">{data.name || selectedNode?.label || 'User'}</Heading>
+                    {data.title && <Text fontSize="sm" color="gray.500">{data.title}</Text>}
+                </VStack>
+            </HStack>
+            <Text fontSize="sm">Email: {data.email}</Text>
+            {/* TODO: Display Team/Manager Links */} 
+        </VStack>
     );
 
-    const renderProjectContent = (data: ProjectRead) => {
-         // Define badge color based on status (example)
+    const renderTeamDetails = (data: TeamRead) => (
+        <VStack align="stretch" spacing={1}>
+            <Heading size="sm">{data.name || selectedNode?.label || 'Team'}</Heading>
+            {/* TODO: Display Lead, Members, Projects */} 
+        </VStack>
+    );
+
+    const renderProjectDetails = (data: ProjectRead) => {
+        const overlaps = projectOverlaps[data.id] || [];
         let statusColorScheme = 'gray';
-        const lowerCaseStatus = data.status?.toLowerCase();
-        if (lowerCaseStatus?.includes('active') || lowerCaseStatus?.includes('on track')) statusColorScheme = 'green';
-        if (lowerCaseStatus?.includes('planning') || lowerCaseStatus?.includes('pending')) statusColorScheme = 'blue';
-        if (lowerCaseStatus?.includes('paused') || lowerCaseStatus?.includes('blocked') || lowerCaseStatus?.includes('at risk')) statusColorScheme = 'orange';
-        if (lowerCaseStatus?.includes('completed') || lowerCaseStatus?.includes('done')) statusColorScheme = 'purple';
+        const statusLower = data.status?.toLowerCase() || '';
+        if (statusLower.includes('active') || statusLower.includes('track')) statusColorScheme = 'green';
+        else if (statusLower.includes('planning')) statusColorScheme = 'blue';
+        else if (statusLower.includes('paused') || statusLower.includes('blocked')) statusColorScheme = 'orange';
+        else if (statusLower.includes('completed')) statusColorScheme = 'purple';
 
-         return (
-             <VStack align="stretch" spacing={4} w="full">
-                 <Card variant="outline" size="sm">
-                    <CardHeader pb={2}>
-                        <HStack justifyContent="space-between">
-                            <Heading size="sm">{data.name ?? 'Project Details'}</Heading>
-                            {data.status && <Tag size="sm" colorScheme={statusColorScheme} variant="subtle">{data.status}</Tag>} 
-                        </HStack>
-                    </CardHeader>
-                    <CardBody pt={2}>
-                         <VStack align="start" spacing={3} w="full">
-                            <DetailItem label="Description">{data.description || <Text as="i" color="gray.400">No description</Text>}</DetailItem>
-                            <SimpleGrid columns={2} spacing={3} w="full">
-                                {data.owning_team_id && (
-                                    <EntityLink label="Owning Team" onClick={() => onSelectNode(data.owning_team_id!, MapNodeTypeEnum.TEAM)}>
-                                        <Code fontSize="xs" px={1}>{data.owning_team_id}</Code>
-                                    </EntityLink>
-                                )}
-                                {data.goal_id && (
-                                    <EntityLink label="Aligned Goal" onClick={() => onSelectNode(data.goal_id!, MapNodeTypeEnum.GOAL)}>
-                                        <Code fontSize="xs" px={1}>{data.goal_id}</Code>
-                                    </EntityLink>
-                                )}
-                            </SimpleGrid>
-                            <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
-                         </VStack>
-                     </CardBody>
-                 </Card>
-                
-                 {/* Participants Card */}
-                 <Card variant="outline" size="sm">
-                     <CardHeader pb={1}>
-                         <Flex justify="space-between" align="center">
-                             <Heading size="xs">Participants</Heading>
-                             <Button 
-                                size="xs" 
-                                variant="outline" 
-                                colorScheme="gray"
-                                onClick={() => console.log("TODO: Implement Add Participant UI/logic")}
-                             >
-                                 Add
-                             </Button>
-                         </Flex>
-                     </CardHeader>
-                     <CardBody pt={1}>
-                        {isFetchingRelated ? <Spinner size="xs" /> : 
-                         projectParticipants.length > 0 ? (
-                            <VStack align="start" spacing={1}>
-                                {projectParticipants.map(user => (
-                                    <EntityLink key={user.id} label="" onClick={() => onSelectNode(user.id, MapNodeTypeEnum.USER)}>
-                                        {user.name || user.id} {/* Display name if available, else ID */}
-                                    </EntityLink>
-                                ))}
-                             </VStack>
-                        ) : (
-                            <Text fontSize="sm" color="gray.500">No participants listed.</Text>
+        return (
+            <VStack align="stretch" spacing={4}>
+                <Heading size="sm">{data.name || selectedNode?.label || 'Project'}</Heading>
+                <HStack spacing={2} alignItems="center">
+                    <Badge colorScheme={statusColorScheme} size="sm" variant="subtle">{data.status || 'N/A'}</Badge>
+                    <HStack flex={1} minWidth={0} alignItems="center">
+                        <Text fontSize="xs" fontWeight="medium" whiteSpace="nowrap">Aligns To:</Text>
+                        {isGoalLoading && <Spinner size="xs" ml={1} />}
+                        {!isGoalLoading && linkedGoal && (
+                            <HStack>
+                                <Badge 
+                                    variant="outline" 
+                                    colorScheme={linkedGoal.status?.toLowerCase().includes('risk') ? 'red' : 'green'}
+                                    fontSize="xs"
+                                    mr={1}
+                                    noOfLines={1}
+                                    maxWidth="150px"
+                                    title={`${linkedGoal.title} (${linkedGoal.status || 'N/A'})`}
+                                >
+                                    {linkedGoal.title || 'Untitled Goal'}
+                                </Badge>
+                                <Button size="xs" variant="ghost" colorScheme="blue" onClick={onGoalModalOpen} aria-label="Change Goal">Change</Button>
+                            </HStack>
                         )}
-                     </CardBody>
-                 </Card>
+                        {!isGoalLoading && !linkedGoal && data.goal_id && (
+                            <HStack>
+                                <Text fontSize="xs" color="red.500">Error loading goal.</Text>
+                                <Button size="xs" variant="ghost" colorScheme="blue" onClick={onGoalModalOpen} aria-label="Retry/Change Goal">Retry</Button>
+                            </HStack>
+                        )}
+                    </HStack>
+                </HStack>
+                {data.description && <Text fontSize="sm" whiteSpace="pre-wrap">{data.description}</Text>}
+                
+                {/* Overlaps Section */} 
+                {overlaps.length > 0 && (
+                    <Box mt={1} p={3} borderWidth="1px" borderRadius="md" borderColor="orange.200" bg="orange.50">
+                        <HStack mb={1} spacing={2}>
+                            <Icon as={FaExclamationTriangle} color="orange.400" />
+                            <Heading size="xs" color="orange.800">Potential Overlaps Found</Heading>
+                        </HStack>
+                        <UnorderedList spacing={1} pl={5} >
+                            {overlaps.map(overlapId => (
+                                <ListItem key={overlapId} fontSize="sm">
+                                    {getProjectNameById(overlapId) ?? `Project: ${overlapId.substring(0, 8)}...`}
+                                    {/* TODO: Link to focus map on overlapId */} 
+                                </ListItem>
+                            ))}
+                        </UnorderedList>
+                    </Box>
+                )}
 
-                 {/* Notes Section - Improved Layout */}
+                {/* Notes Section */} 
                 <Card variant="outline" size="sm">
-                    <CardHeader pb={1}>
-                         <Heading size="xs">Notes</Heading>
-                    </CardHeader>
+                    <CardHeader pb={1}><Heading size="xs">Recent Activity / Notes</Heading></CardHeader>
                     <CardBody pt={1}>
-                        <VStack align="stretch" spacing={2} mb={3} maxH="250px" overflowY="auto" pr={2}>
-                            {isNotesLoading ? <Center><Spinner size="sm"/></Center> : 
-                             notes.length > 0 ? notes.map(note => (
-                                 <Box key={note.id} p={2} bg="blackAlpha.50" borderRadius="sm">
-                                    <Text fontSize="sm" whiteSpace="pre-wrap">{note.content}</Text>
-                                    {/* TODO: Add note metadata (author, timestamp) */}
-                                 </Box>
-                            )) : <Text fontSize="sm" color="gray.500" fontStyle="italic">No notes yet.</Text>}
-                         </VStack>
-                         <VStack align="stretch" spacing={2} mt={3}>
-                             <Textarea 
-                                placeholder="Add a new note..." 
-                                value={newNoteContent}
-                                onChange={(e) => setNewNoteContent(e.target.value)}
-                                size="sm"
-                             />
-                             <Button 
-                                size="sm" 
-                                colorScheme="blue"
-                                onClick={handleNoteSubmit}
-                                isLoading={isSubmittingNote}
-                                isDisabled={!newNoteContent.trim()}
-                                leftIcon={<MdNote />}
-                                alignSelf="flex-end"
-                            >
-                                Add Note
-                            </Button>
-                        </VStack>
+                        <NoteInput onSubmit={handleAddNote} />
+                        {isNotesLoading && <Center><Spinner size="sm" /></Center>}
+                        {notesError && <Text color="red.500" fontSize="sm">{notesError}</Text>}
+                        {!isNotesLoading && !notesError && recentNotes.length === 0 && (
+                            <Text color="gray.500" fontSize="sm">No recent notes.</Text>
+                        )}
+                        {!isNotesLoading && !notesError && recentNotes.length > 0 && (
+                            <UnorderedList spacing={1} styleType="none" ml={0}>
+                                {recentNotes.map(note => (
+                                    <ListItem key={note.id} fontSize="sm">
+                                        <HStack justifyContent="space-between">
+                                            <Text noOfLines={1} title={note.title || 'Note'}>{note.title || 'Untitled Note'}</Text>
+                                            <Text fontSize="xs" color="gray.400">{new Date(note.created_at).toLocaleDateString()}</Text>
+                                        </HStack>
+                                        {/* TODO: Maybe make these clickable to view full note? */}
+                                    </ListItem>
+                                ))}
+                            </UnorderedList>
+                        )}
                     </CardBody>
-                 </Card>
-             </VStack>
+                </Card>
+
+                {/* Asset Linking Placeholder Section */}
+                <Card variant="outline" size="sm">
+                    <CardHeader pb={1}><Heading size="xs">Linked Assets (Placeholder)</Heading></CardHeader>
+                    <CardBody pt={1}>
+                        <InputGroup size="sm" mb={2}>
+                            <Input 
+                                placeholder="Paste document URL (e.g., GDrive, SharePoint)"
+                                value={assetLinkUrl}
+                                onChange={(e) => setAssetLinkUrl(e.target.value)}
+                                isDisabled={isLinkingAsset}
+                            />
+                            <InputRightElement width="4.5rem">
+                                <Button 
+                                    h="1.75rem" 
+                                    size="sm" 
+                                    onClick={handleLinkAsset}
+                                    isLoading={isLinkingAsset}
+                                    isDisabled={!assetLinkUrl}
+                                > Link </Button>
+                            </InputRightElement>
+                        </InputGroup>
+                        
+                        {(entityData.properties?.linkedAssets as string[] || []).length === 0 && (
+                             <Text fontSize="sm" color="gray.500">No assets linked yet.</Text>
+                        )}
+                        {(entityData.properties?.linkedAssets as string[] || []).length > 0 && (
+                            <UnorderedList spacing={1} styleType="none" ml={0}>
+                                {(entityData.properties?.linkedAssets as string[]).map((link, index) => (
+                                    <ListItem key={index} fontSize="sm">
+                                        <HStack justifyContent="space-between">
+                                            <Text as="a" href={link} isExternal noOfLines={1} color="blue.600" title={link}>{link}</Text>
+                                            <IconButton 
+                                                 aria-label="Remove link"
+                                                 icon={<CloseButton size="sm" />} 
+                                                 size="xs"
+                                                 variant="ghost"
+                                                 onClick={() => handleRemoveAssetLink(link)}
+                                                 isDisabled={isLinkingAsset}
+                                            />
+                                        </HStack>
+                                    </ListItem>
+                                ))}
+                            </UnorderedList>
+                        )}
+                    </CardBody>
+                </Card>
+            </VStack>
         );
     };
 
-     const renderGoalContent = (data: GoalRead) => (
-         <Card variant="outline" size="sm">
-            <CardHeader pb={2}>
-                 <HStack justifyContent="space-between">
-                    <Heading size="sm">{data.title ?? 'Goal Details'}</Heading>
-                    {data.status && <Tag size="sm" colorScheme="green" variant="subtle">{data.status}</Tag>} 
-                 </HStack>
-            </CardHeader>
-            <CardBody pt={2}>
-                 <VStack align="start" spacing={3} w="full">
-                     <SimpleGrid columns={2} spacing={3} w="full">
-                        <DetailItem label="Type">{data.type ?? 'N/A'}</DetailItem>
-                        <DetailItem label="Progress">{data.progress ?? 0}%</DetailItem>
-                        <DetailItem label="Due">{data.dueDate ? new Date(data.dueDate).toLocaleDateString() : 'N/A'}</DetailItem>
-                    </SimpleGrid>
-                     {data.parent_id && (
-                        <EntityLink label="Parent Goal" onClick={() => onSelectNode(data.parent_id!, MapNodeTypeEnum.GOAL)}>
-                           <Code fontSize="xs" px={1}>{data.parent_id}</Code>
-                        </EntityLink>
-                     )}
-                     <Tag size="sm" variant="subtle" mt={2}>ID: {data.id}</Tag>
-                 </VStack>
-             </CardBody>
-         </Card>
-     );
+    const renderMainContent = () => {
+        if (isLoading) return <Center h="100%"><Spinner /></Center>;
+        if (error) return <Alert status="error" variant="subtle"><AlertIcon />{error}</Alert>;
+        if (!entityData) return <Center h="100%"><Text color="gray.500">Select a node.</Text></Center>;
 
-    // Main render logic decides which content function to call
-    const renderContent = () => {
-        if (isLoading) return <Center><Spinner /></Center>; // Center spinner
-        if (error) return <Text color="red.500" p={4}>{error}</Text>; 
-        if (!entityData) { 
-            // Show spinner if loading, otherwise prompt to select
-            return isLoading ? <Center><Spinner /></Center> : <Center h="100%"><Text color="gray.500">Select a node to see details.</Text></Center>;
-        }
-
-        // Use type guards for safer rendering
-        switch (nodeType) { 
-            case MapNodeTypeEnum.USER: 
-                 // Assuming the API call for USER returns User
-                 if ('email' in entityData) { // Check for a required User field
-                     return renderUserContent(entityData as User);
-                 }
-                 break; 
-            case MapNodeTypeEnum.TEAM: 
-                 // Check for a required Team field like 'name' instead of optional relationships
-                 if ('name' in entityData && typeof entityData.name === 'string') { 
-                    return renderTeamContent(entityData as TeamRead);
-                 }
-                 break; 
-            case MapNodeTypeEnum.PROJECT: 
-                 // Check for a required Project field like 'name'
-                 if ('name' in entityData && typeof entityData.name === 'string') { 
-                    return renderProjectContent(entityData as ProjectRead);
-                 }
-                 break;
-            case MapNodeTypeEnum.GOAL: 
-                 // Check for a required Goal field like 'title'
-                 // Use GoalRead here as the main entity fetch gets the full GoalRead
-                 if ('title' in entityData && typeof entityData.title === 'string') { 
-                     return renderGoalContent(entityData as GoalRead);
-                 }
-                 break;
-            // case MapNodeTypeEnum.DEPARTMENT: ... 
-            default:
-                console.warn("Unhandled node type or type mismatch in renderContent:", nodeType, entityData);
-                return <Text>Details for type {node?.type} not implemented or data mismatch.</Text>;
-        }
-        // Fallback if type guard fails (should ideally not happen)
-        return <Text color="orange.500" p={4}>Data structure mismatch for type {nodeType}.</Text>;
+        if (isUserRead(entityData)) return renderUserDetails(entityData);
+        if (isTeamRead(entityData)) return renderTeamDetails(entityData);
+        if (isProjectRead(entityData)) return renderProjectDetails(entityData);
+        // Add Goal or other types here
+        
+        return <Alert status="warning" variant="subtle"><AlertIcon />Cannot render details for this entity type.</Alert>;
     };
 
-    if (!node && !isLoading) { // Don't render anything if no node selected and not loading initial node
-        return null; 
-    }
+    // --- Panel Header Logic --- 
+    const getNodeIcon = (type: MapNodeTypeEnum | undefined) => {
+        switch (type) {
+            case MapNodeTypeEnum.USER: return MdOutlinePerson;
+            case MapNodeTypeEnum.TEAM: return MdOutlineGroup;
+            case MapNodeTypeEnum.PROJECT: return MdOutlineFolder;
+            case MapNodeTypeEnum.GOAL: return MdOutlineFlag;
+            default: return MdNote;
+        }
+    };
+    const panelTitle: string = selectedNode?.label ?? selectedNode?.type ?? 'Details';
+    const panelSubTitle: string = nodeType ? nodeType.charAt(0).toUpperCase() + nodeType.slice(1) : '';
+
+    // --- Final Render --- 
+    
+    // Return null if nothing is selected (avoids rendering empty panel initially)
+    if (!selectedNode && !isLoading) return null; 
 
     return (
-        // Add padding to the main panel container
-        <Box width="100%" height="100%" p={4}> 
-            {renderContent()}
-        </Box>
+        <> 
+            <Box width="100%" height="100%" p={4} overflowY="auto" display="flex" flexDirection="column">
+                {/* Header */} 
+                <HStack justifyContent="space-between" mb={4} alignItems="center" flexShrink={0}>
+                    <HStack spacing={2} minWidth={0}>
+                        <Icon as={getNodeIcon(nodeType)} boxSize={5} color="gray.500" />
+                        <VStack align="start" spacing={0} flex={1} minWidth={0}>
+                            <Heading size="sm" noOfLines={1} title={panelTitle}>{panelTitle}</Heading>
+                            {panelSubTitle && <Text fontSize="xs" color="gray.500">{panelSubTitle}</Text>}
+                        </VStack>
+                    </HStack>
+                    <CloseButton size="sm" onClick={onClose} />
+                </HStack>
+                
+                {/* Body */} 
+                <Box flex={1} overflowY="auto" pl={1} pr={1}> {/* Add slight padding for scrollbar */} 
+                    {renderMainContent()}
+                </Box>
+            </Box>
+
+            {/* Goal Modal (Rendered outside main flow) */}
+            {nodeType === MapNodeTypeEnum.PROJECT && entityData && isProjectRead(entityData) && (
+                <GoalSelectorModal
+                    isOpen={isGoalModalOpen}
+                    onClose={onGoalModalClose}
+                    projectId={entityData.id}
+                    onGoalSelect={handleGoalSelect}
+                    currentGoalId={entityData.goal_id || undefined}
+                />
+            )}
+        </>
     );
 };
 

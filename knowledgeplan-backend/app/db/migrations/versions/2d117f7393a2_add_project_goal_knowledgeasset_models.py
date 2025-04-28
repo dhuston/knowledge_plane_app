@@ -152,3 +152,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_goals_parent_id'), table_name='goals')
     op.drop_table('goals')
     # ### end Alembic commands ###
+    # Manually drop enum types
+    op.execute("DROP TYPE IF EXISTS goaltypeenum;")
+    op.execute("DROP TYPE IF EXISTS knowledgeassettypeenum;")

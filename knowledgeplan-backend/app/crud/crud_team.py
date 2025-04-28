@@ -1,10 +1,11 @@
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.models.team import Team
+from app.models.user import User
 from app.schemas.team import TeamCreate, TeamUpdate # Use TeamUpdate if needed later
 
 class CRUDTeam():
@@ -27,5 +28,11 @@ class CRUDTeam():
         return db_obj
 
     # Add update, delete, get_multi etc. as needed
+
+    async def get_member_ids(self, db: AsyncSession, *, team_id: uuid.UUID) -> List[uuid.UUID]:
+        """Returns a list of user IDs for members of the specified team."""
+        stmt = select(User.id).where(User.team_id == team_id)
+        result = await db.execute(stmt)
+        return result.scalars().all()
 
 team = CRUDTeam()

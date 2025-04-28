@@ -11,7 +11,7 @@ from app.models.knowledge_asset import KnowledgeAsset as NoteModel
 from app.schemas.project import ProjectRead, ProjectCreate, ProjectUpdate
 from app.schemas.knowledge_asset import NoteRead, NoteCreate
 from app.schemas.user import UserReadBasic
-from app.crud import project as crud_project_instance
+from app.crud.crud_project import project as crud_project_instance
 from app.crud import crud_knowledge_asset
 
 router = APIRouter()
@@ -142,6 +142,50 @@ async def read_project_participants(
 #     """Update a project."""
 #     # Check permissions first
 #     pass
+
+# --- Add the PUT endpoint --- 
+@router.put("/{project_id}", response_model=ProjectRead)
+async def update_existing_project(
+    *, # Enforces keyword-only arguments after this
+    db: AsyncSession = Depends(get_db_session),
+    project_id: UUID,
+    project_in: ProjectUpdate,
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Update a project."""
+    # Fetch the existing project
+    project = await crud_project_instance.get(db=db, id=project_id, tenant_id=current_user.tenant_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Project not found or not part of your tenant."
+        )
+
+    # TODO: Add permissions check (e.g., user_can_edit_project)
+    # from app.core.permissions import user_can_edit_project
+    # if not user_can_edit_project(current_user, project):
+    #     raise HTTPException(status_code=403, detail="User does not have permission to update this project")
+
+    # Update the project
+    project_in_dict = project_in.model_dump(exclude_unset=True)
+    updated_project = await crud_project_instance.update(db=db, db_obj=project, obj_in=project_in_dict)
+    
+    # Log activity (consider moving logging into CRUD or a decorator)
+    try:
+        log_entry = schemas.ActivityLogCreate(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            action="UPDATE_PROJECT",
+            target_entity_type="Project",
+            target_entity_id=str(updated_project.id),
+            details={"updated_fields": list(project_in_dict.keys())}
+        )
+        from app.crud.crud_activity_log import activity_log as crud_activity_log
+        await crud_activity_log.create(db=db, obj_in=log_entry)
+    except Exception as log_err:
+        print(f"Error logging activity for UPDATE_PROJECT: {log_err}")
+
+    return updated_project
 
 # Optional: Add delete endpoint later
 # @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

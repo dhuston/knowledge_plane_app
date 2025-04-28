@@ -60,22 +60,19 @@ class UserInDBBase(UserBase):
 
 # Schema for returning user data to the client (API response model)
 class UserRead(UserInDBBase):
-    model_config = {
-        "fields": {
-            'google_access_token': {'exclude': True},
-            'google_refresh_token': {'exclude': True},
-            'google_token_expiry': {'exclude': True}
-        }
-    }
+    google_access_token: Optional[str] = Field(None, exclude=True)
+    google_refresh_token: Optional[str] = Field(None, exclude=True)
+    google_token_expiry: Optional[datetime] = Field(None, exclude=True)
 
 # --- New Basic Schema --- 
 # Basic schema for representing a user minimally (e.g., in relationships)
 class UserReadBasic(BaseModel):
     id: UUID
+    name: Optional[str] = None
 
-    class Config:
-        from_attributes = True # Enable ORM mode
-
+    model_config = {
+        "from_attributes": True,
+    }
 
 # Properties stored in DB (including hashed password if we add it)
 class UserInDB(UserInDBBase):

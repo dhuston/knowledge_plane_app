@@ -18,6 +18,8 @@ from app.db.session import SessionLocal # Assuming SessionLocal is defined for s
 from app.models import User, Tenant, Team, Project, Goal, KnowledgeAsset # Added Project, Goal, KnowledgeAsset
 from app.models.knowledge_asset import KnowledgeAssetTypeEnum
 from app.models.goal import GoalTypeEnum
+from app.models.project import project_participants # Ensure import
+from sqlalchemy import insert, exists
 
 # --- Configuration (Adjust as needed) ---
 TARGET_TENANT_DOMAIN = "gmail.com"
@@ -171,6 +173,51 @@ async def seed():
                                      defaults={"name":"Mike MSL", "title":"Medical Science Liaison", "manager_id": dr_khan.id, "tenant_id":tenant_id, "team_id": team_med_affairs.id})
         # -------------- #
 
+        # --- NEW SECTION: Assign Team Leads --- #
+        print("\n--- Assigning Team Leads ---")
+        if team_virology and dr_reed:
+            if team_virology.lead_id != dr_reed.id:
+                team_virology.lead_id = dr_reed.id
+                db.add(team_virology)
+                print(f"Assigned {dr_reed.name} as lead for {team_virology.name}")
+        if team_clinical_ops and sarah_stats:
+            if team_clinical_ops.lead_id != sarah_stats.id:
+                team_clinical_ops.lead_id = sarah_stats.id
+                db.add(team_clinical_ops)
+                print(f"Assigned {sarah_stats.name} as lead for {team_clinical_ops.name}")
+        if team_oncology_mkt and mark_market:
+            if team_oncology_mkt.lead_id != mark_market.id:
+                team_oncology_mkt.lead_id = mark_market.id
+                db.add(team_oncology_mkt)
+                print(f"Assigned {mark_market.name} as lead for {team_oncology_mkt.name}")
+        if team_discovery_bio and dr_lee:
+            if team_discovery_bio.lead_id != dr_lee.id:
+                team_discovery_bio.lead_id = dr_lee.id
+                db.add(team_discovery_bio)
+                print(f"Assigned {dr_lee.name} as lead for {team_discovery_bio.name}")
+        if team_preclinical and dr_chen:
+            if team_preclinical.lead_id != dr_chen.id:
+                team_preclinical.lead_id = dr_chen.id
+                db.add(team_preclinical)
+                print(f"Assigned {dr_chen.name} as lead for {team_preclinical.name}")
+        if team_regulatory and robert_reg:
+            if team_regulatory.lead_id != robert_reg.id:
+                team_regulatory.lead_id = robert_reg.id
+                db.add(team_regulatory)
+                print(f"Assigned {robert_reg.name} as lead for {team_regulatory.name}")
+        if team_cmc and dr_patel:
+            if team_cmc.lead_id != dr_patel.id:
+                team_cmc.lead_id = dr_patel.id
+                db.add(team_cmc)
+                print(f"Assigned {dr_patel.name} as lead for {team_cmc.name}")
+        if team_med_affairs and dr_khan:
+            if team_med_affairs.lead_id != dr_khan.id:
+                team_med_affairs.lead_id = dr_khan.id
+                db.add(team_med_affairs)
+                print(f"Assigned {dr_khan.name} as lead for {team_med_affairs.name}")
+        await db.flush() # Flush lead assignments
+        # ------------------------------------- #
+        
         # --- 4. Projects --- #
         print("\n--- Seeding Projects ---")
         # Existing
@@ -258,27 +305,31 @@ async def seed():
 
         # New Goals
         goal_ind_kp101 = await get_or_create(db, Goal, title="[Preclinical] File IND for KP-101 by Q3 2025",
-                                          defaults={
+                                          defaults={ # Link to broader goal if applicable?
                                               "description": "Submit Investigational New Drug application for KP-101.",
                                               "type": GoalTypeEnum.DEPARTMENT,
+                                              "parent_id": goal_onco_market_share.id, # Example: Preclinical goal supports overall Onco goal
                                               "tenant_id": tenant_id
                                           })
         goal_discovery_pipeline = await get_or_create(db, Goal, title="[Discovery] Advance 3 Novel Targets to Preclinical",
                                             defaults={
                                                 "description": "Identify and validate 3 new drug targets for pipeline entry.",
                                                 "type": GoalTypeEnum.DEPARTMENT,
+                                                # "parent_id": None, # Top-level department goal
                                                 "tenant_id": tenant_id
                                             })
         goal_cmc_scale = await get_or_create(db, Goal, title="[CMC] Establish Scalable Process for AV-123",
                                           defaults={
                                               "description": "Ensure robust and scalable manufacturing for Phase III and commercial.",
                                               "type": GoalTypeEnum.TEAM,
+                                              "parent_id": goal_phase2_complete.id, # Example: CMC goal supports Phase II completion goal
                                               "tenant_id": tenant_id
                                           })
         goal_reg_approval_oc456 = await get_or_create(db, Goal, title="[Regulatory] Achieve FDA Approval for OC-456",
                                             defaults={
                                                 "description": "Gain marketing authorization for OncoDrug OC-456 in the US.",
                                                 "type": GoalTypeEnum.ENTERPRISE,
+                                                "parent_id": goal_onco_market_share.id, # Example: Reg approval supports market share goal
                                                 "tenant_id": tenant_id
                                             })
         # ------------------ #
@@ -326,10 +377,47 @@ async def seed():
         await db.flush() # Flush project updates before creating KAs
         # ------------------------------ #
 
+        # --- NEW SECTION: Assign Project Participants --- #
+        print("\n--- Assigning Project Participants ---")
+        async def assign_participant(project: Project, user: User):
+            if not project or not user: return
+            # Check if association already exists
+            exists_stmt = select(exists().where(
+                project_participants.c.project_id == project.id,
+                project_participants.c.user_id == user.id
+            ))
+            association_exists = (await db.execute(exists_stmt)).scalar()
+
+            if not association_exists:
+                insert_stmt = insert(project_participants).values(project_id=project.id, user_id=user.id)
+                await db.execute(insert_stmt)
+                print(f"Assigned {user.name} to project {project.name}")
+            # else: # Optional log
+            #    print(f"{user.name} already assigned to project {project.name}")
+
+        # Example Assignments (add more as needed)
+        await assign_participant(proj_antidote_ph2, charles_bio) # Scientist on Virology project
+        await assign_participant(proj_antidote_ph2, chris_study) # Study Manager on Virology project
+        await assign_participant(proj_antidote_ph2, jane_cra)    # CRA on Virology project
+        await assign_participant(proj_mrna_platform, dr_reed)     # Director overseeing platform
+        await assign_participant(proj_mrna_platform, charles_bio) # Scientist working on platform
+        await assign_participant(proj_onco_launch_prep, susan_brand) # Brand Manager on launch
+        await assign_participant(proj_kp101_preclin, ben_tox)      # Toxicology lead on preclinical
+        await assign_participant(proj_kp101_preclin, alice_target) # Discovery scientist (collaboration?)
+        await assign_participant(proj_kp205_discovery, alice_target) # Discovery scientist
+        await assign_participant(proj_av123_cmc, olivia_process) # CMC engineer
+        await assign_participant(proj_oc456_reg_submission, linda_label) # Reg manager
+        await assign_participant(proj_av123_med_affairs, mike_msl) # MSL 
+        # Assign logged-in user to a project
+        login_user = await get_or_create(db, User, email=YOUR_LOGIN_EMAIL, defaults={"tenant_id": tenant_id})
+        await assign_participant(proj_kp101_preclin, login_user)
+        
+        await db.flush() # Flush participant assignments
+        # ------------------------------------------ #
+
         # --- 7. Update Logged-in User --- #
         print("\n--- Updating Logged-in User ---")
         # Assigning to a potentially relevant role/manager
-        login_user = await get_or_create(db, User, email=YOUR_LOGIN_EMAIL, defaults={"tenant_id": tenant_id})
         if login_user:
             manager_to_assign = dr_chen # Example: Assign to Preclinical Director
             team_to_assign = team_preclinical

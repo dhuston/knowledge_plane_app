@@ -40,3 +40,9 @@ body {
 
 /* Remove default color scheme media query - let Chakra handle it */
 /* @media (prefers-color-scheme: light) { ... } */
+
+/* --- React Flow Customizations --- */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px theme('colors.blue.500', '#3182ce'), 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* Add a prominent blue outline and slightly stronger shadow */
+}

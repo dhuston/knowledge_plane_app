@@ -92,15 +92,42 @@ async def create_project(
     db.add(db_project)
     await db.commit()
     await db.refresh(db_project)
+
+    # Import moved here to avoid circular dependency
+    from app.crud.crud_activity_log import activity_log
+    from app.schemas.activity_log import ActivityLogCreate
+    
+    # --- Add Activity Log Entry --- 
+    await activity_log.create(
+        db=db,
+        obj_in=ActivityLogCreate(
+            tenant_id=tenant_id,
+            user_id=creator.id,
+            action="CREATE_PROJECT",
+            target_entity_type="Project",
+            target_entity_id=str(db_project.id),
+            details={"project_name": db_project.name}
+        )
+    )
+    # -----------------------------
+
     return db_project
 
 async def update_project(
-    db: AsyncSession, *, db_project: ProjectModel, project_in: ProjectUpdate
+    db: AsyncSession, *, db_project: ProjectModel, project_in: Union[ProjectUpdate, Dict[str, Any]]
 ) -> ProjectModel:
     """Update an existing project."""
-    project_data = project_in.dict(exclude_unset=True)
-    for field, value in project_data.items():
-        setattr(db_project, field, value)
+    if isinstance(project_in, dict):
+        update_data = project_in
+    else:
+        # Ensure model_dump is used for Pydantic v2
+        update_data = project_in.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        # Check if the target model attribute exists before setting
+        if hasattr(db_project, field):
+             setattr(db_project, field, value)
+
     await db.commit()
     await db.refresh(db_project)
     return db_project
@@ -176,7 +203,9 @@ class CRUDProject():
     async def update(
         self, db: AsyncSession, *, db_obj: ProjectModel, obj_in: Union[ProjectUpdate, Dict[str, Any]]
     ) -> ProjectModel:
-        return await update_project(db=db, db_obj=db_obj, obj_in=obj_in)
+        # Pass the db_obj argument using the correct keyword 'db_project'
+        # AND pass obj_in using the correct keyword 'project_in'
+        return await update_project(db=db, db_project=db_obj, project_in=obj_in)
 
     async def remove(self, db: AsyncSession, *, id: UUID, tenant_id: UUID) -> ProjectModel | None:
         # Pass tenant_id to underlying function
@@ -187,6 +216,30 @@ class CRUDProject():
         self, db: AsyncSession, *, project_id: UUID, tenant_id: UUID
     ) -> List[User]:
         return await get_participants_for_project(db=db, project_id=project_id, tenant_id=tenant_id)
+
+    # --- New methods for map data --- 
+    async def get_ids_by_owning_team(
+        self, db: AsyncSession, *, team_id: UUID
+    ) -> List[UUID]:
+        """Returns a list of project IDs owned by the specified team."""
+        stmt = select(ProjectModel.id).where(ProjectModel.owning_team_id == team_id)
+        result = await db.execute(stmt)
+        return result.scalars().all()
+        
+    async def get_goal_ids_for_projects(
+        self, db: AsyncSession, *, project_ids: List[UUID]
+    ) -> List[UUID]:
+        """Returns a distinct list of goal IDs linked to the given project IDs."""
+        if not project_ids:
+            return []
+            
+        stmt = (
+            select(ProjectModel.goal_id)
+            .where(ProjectModel.id.in_(project_ids), ProjectModel.goal_id.isnot(None))
+            .distinct()
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
 
 # Removed model from instantiation
 project = CRUDProject() 

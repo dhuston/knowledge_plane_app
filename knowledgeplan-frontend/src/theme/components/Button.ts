@@ -1,13 +1,21 @@
-// KnowledgePlane AI Button Component
+/**
+ * KnowledgePlane AI Button Component
+ * 
+ * This file defines the button component styles, variants, and sizes
+ * based on the design system.
+ */
+
 import { defineStyleConfig } from '@chakra-ui/react';
 
 const Button = defineStyleConfig({
-  // Base style applied to all variants
+  // Base style applied to all button variants
   baseStyle: {
     fontWeight: 'semibold',
     borderRadius: 'md',
+    lineHeight: 'button',
+    transition: 'all 0.2s',
     _focus: {
-      boxShadow: 'outline',
+      boxShadow: 'focus',
     },
     _disabled: {
       opacity: 0.6,
@@ -20,154 +28,151 @@ const Button = defineStyleConfig({
       },
     },
   },
-  
-  // Variants
-  variants: {
-    // Primary button - solid with brand color
-    primary: {
-      bg: 'brand.500',
-      color: 'white',
-      _hover: {
-        bg: 'brand.600',
-        _disabled: {
-          bg: 'brand.500',
-        },
-      },
-      _active: { bg: 'brand.700' },
-    },
-    
-    // Secondary button - lighter background
-    secondary: {
-      bg: 'neutral.100',
-      color: 'neutral.800',
-      _hover: {
-        bg: 'neutral.200',
-        _disabled: {
-          bg: 'neutral.100',
-        },
-      },
-      _active: { bg: 'neutral.300' },
-    },
-    
-    // Tertiary button - transparent with colored text
-    tertiary: {
-      bg: 'transparent',
-      color: 'brand.500',
-      _hover: {
-        bg: 'brand.50',
-        _disabled: {
-          bg: 'transparent',
-        },
-      },
-      _active: { bg: 'brand.100' },
-    },
-    
-    // Outline button - bordered
-    outline: {
-      bg: 'transparent',
-      color: 'brand.500',
-      borderWidth: '1px',
-      borderColor: 'brand.500',
-      _hover: {
-        bg: 'brand.50',
-        _disabled: {
-          bg: 'transparent',
-        },
-      },
-      _active: { bg: 'brand.100' },
-    },
-    
-    // Danger button - for destructive actions
-    danger: {
-      bg: 'accent.500',
-      color: 'white',
-      _hover: {
-        bg: 'accent.600',
-        _disabled: {
-          bg: 'accent.500',
-        },
-      },
-      _active: { bg: 'accent.700' },
-    },
-    
-    // Success button
-    success: {
-      bg: 'tertiary.500',
-      color: 'white',
-      _hover: {
-        bg: 'tertiary.600',
-        _disabled: {
-          bg: 'tertiary.500',
-        },
-      },
-      _active: { bg: 'tertiary.700' },
-    },
-    
-    // Ghost button - only shows on hover
-    ghost: {
-      bg: 'transparent',
-      color: 'neutral.700',
-      _hover: {
-        bg: 'neutral.100',
-        _disabled: {
-          bg: 'transparent',
-        },
-      },
-      _active: { bg: 'neutral.200' },
-    },
-    
-    // Map control button with shadow
-    mapControl: {
-      bg: 'white',
-      color: 'neutral.800',
-      boxShadow: 'md',
-      borderRadius: 'lg',
-      fontSize: 'sm',
-      _hover: {
-        bg: 'neutral.50',
-      },
-      _active: { bg: 'neutral.100' },
-    },
-  },
-  
+
   // Sizes
   sizes: {
     xs: {
-      h: 8,
-      minW: 8,
       fontSize: 'xs',
-      px: 3,
+      px: 2,
+      py: 1,
+      h: 6,
+      minW: 6,
     },
     sm: {
-      h: 9,
-      minW: 9,
       fontSize: 'sm',
-      px: 4,
+      px: 3,
+      py: 1,
+      h: 8,
+      minW: 8,
     },
     md: {
+      fontSize: 'sm',
+      px: 4,
+      py: 2,
       h: 10,
       minW: 10,
-      fontSize: 'md',
-      px: 4,
     },
     lg: {
+      fontSize: 'md',
+      px: 5,
+      py: 2,
       h: 12,
       minW: 12,
-      fontSize: 'lg',
-      px: 6,
     },
     xl: {
+      fontSize: 'lg',
+      px: 6,
+      py: 3,
       h: 14,
       minW: 14,
-      fontSize: 'xl',
-      px: 6,
     },
   },
-  
+
+  // Variants
+  variants: {
+    // Primary button (solid with brand color)
+    primary: {
+      bg: 'primary.500',
+      color: 'white',
+      _hover: {
+        bg: 'primary.600',
+        _disabled: {
+          bg: 'primary.500',
+        },
+      },
+      _active: {
+        bg: 'primary.700',
+      },
+    },
+
+    // Secondary button (outlined with brand color)
+    secondary: {
+      bg: 'white',
+      color: 'primary.500',
+      border: '1px solid',
+      borderColor: 'primary.500',
+      _hover: {
+        bg: 'primary.50',
+      },
+      _active: {
+        bg: 'primary.100',
+      },
+    },
+
+    // Tertiary button (ghost style with brand color)
+    tertiary: {
+      bg: 'transparent',
+      color: 'primary.500',
+      _hover: {
+        bg: 'primary.50',
+      },
+      _active: {
+        bg: 'primary.100',
+      },
+    },
+
+    // Danger button (solid with error color)
+    danger: {
+      bg: 'error.500',
+      color: 'white',
+      _hover: {
+        bg: 'error.600',
+        _disabled: {
+          bg: 'error.500',
+        },
+      },
+      _active: {
+        bg: 'error.700',
+      },
+    },
+
+    // Success button (solid with success color)
+    success: {
+      bg: 'success.500',
+      color: 'white',
+      _hover: {
+        bg: 'success.600',
+        _disabled: {
+          bg: 'success.500',
+        },
+      },
+      _active: {
+        bg: 'success.700',
+      },
+    },
+
+    // Link style
+    link: {
+      padding: 0,
+      height: 'auto',
+      lineHeight: 'normal',
+      color: 'primary.500',
+      _hover: {
+        textDecoration: 'underline',
+        color: 'primary.600',
+      },
+      _active: {
+        color: 'primary.700',
+      },
+    },
+
+    // Subtle (low emphasis)
+    subtle: {
+      bg: 'primary.50',
+      color: 'primary.700',
+      _hover: {
+        bg: 'primary.100',
+      },
+      _active: {
+        bg: 'primary.200',
+      },
+    },
+  },
+
   // Default values
   defaultProps: {
-    variant: 'primary',
     size: 'md',
+    variant: 'primary',
   },
 });
 

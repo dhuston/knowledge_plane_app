@@ -1,16 +1,21 @@
 import React from 'react';
 import {
-    Box, Heading, Text, VStack, Spinner, Alert, AlertIcon, CloseButton, HStack 
+    Box,
+    Heading,
+    Text,
+    Spinner,
+    Alert,
+    AlertIcon,
+    CloseButton,
+    HStack,
     // Add Drawer or Modal components if needed for display
 } from '@chakra-ui/react';
 
-// TODO: Define interface for Calendar Event data
-interface CalendarEvent {
-    id: string;
+import { useApiClient } from '../../hooks/useApiClient';
+
+// Define interface for the briefing response
+interface BriefingResponse {
     summary: string;
-    start: { dateTime?: string; date?: string };
-    end: { dateTime?: string; date?: string };
-    // Add other relevant fields like description, attendees, etc.
 }
 
 interface DailyBriefingPanelProps {
@@ -19,17 +24,18 @@ interface DailyBriefingPanelProps {
 }
 
 const DailyBriefingPanel: React.FC<DailyBriefingPanelProps> = ({ isOpen, onClose }) => {
-    const [events, setEvents] = React.useState<CalendarEvent[]>([]);
+    // State to hold the briefing summary string
+    const [briefingSummary, setBriefingSummary] = React.useState<string | null>(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     
-    // TODO: Add useEffect hook to fetch data from '/integrations/google/calendar/events'
-    // Need to handle authentication (useApiClient) and potential errors
+    // API client for authenticated calls
+    const apiClient = useApiClient();
 
     React.useEffect(() => {
         if (!isOpen) {
              // Optionally clear state when closed
-            // setEvents([]);
+            // setBriefingSummary(null);
             // setError(null);
             return; 
         }
@@ -37,16 +43,15 @@ const DailyBriefingPanel: React.FC<DailyBriefingPanelProps> = ({ isOpen, onClose
         const fetchBriefing = async () => {
             setIsLoading(true);
             setError(null);
-            // TODO: Implement API call using useApiClient
+            setBriefingSummary(null);
             try {
-                // const apiClient = useApiClient(); // Get client instance
-                // const response = await apiClient.get('/integrations/google/calendar/events');
-                // setEvents(response.data || []);
-                console.warn("Calendar fetching not implemented yet.");
-                setEvents([]); // Placeholder
+                // Fetch from the new briefing endpoint
+                const response = await apiClient.get<BriefingResponse>('/briefings/daily');
+                setBriefingSummary(response.data.summary || "No briefing summary available.");
             } catch (err) {
                 console.error("Error fetching daily briefing:", err);
                 setError("Failed to load briefing data.");
+                setBriefingSummary(null); // Clear summary on error
             } finally {
                 setIsLoading(false);
             }
@@ -54,7 +59,7 @@ const DailyBriefingPanel: React.FC<DailyBriefingPanelProps> = ({ isOpen, onClose
 
         fetchBriefing();
 
-    }, [isOpen]); // Re-fetch when isOpen changes to true
+    }, [isOpen, apiClient]); // Re-fetch when isOpen changes or apiClient changes
 
     // Basic rendering logic
     const renderContent = () => {
@@ -64,19 +69,15 @@ const DailyBriefingPanel: React.FC<DailyBriefingPanelProps> = ({ isOpen, onClose
         if (error) {
             return <Alert status="error"><AlertIcon />{error}</Alert>;
         }
-        if (events.length === 0) {
-            return <Text>No upcoming events found for today.</Text>;
+        if (!briefingSummary) {
+            return <Text>No briefing available.</Text>;
         }
         return (
-            <VStack align="stretch" spacing={3}>
-                {events.map(event => (
-                    <Box key={event.id} p={2} borderWidth="1px" borderRadius="md">
-                        <Heading size="xs">{event.summary}</Heading>
-                        {/* TODO: Format start/end times nicely */}
-                        <Text fontSize="sm">{event.start?.dateTime || event.start?.date}</Text>
-                    </Box>
-                ))}
-            </VStack>
+            // Display the summary text, potentially using Markdown or similar rendering later
+            // For now, just display the raw string, respecting whitespace
+            <Text whiteSpace="pre-wrap"> 
+                {briefingSummary}
+            </Text>
         );
     };
 

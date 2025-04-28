@@ -15,8 +15,8 @@ export interface User {
 }
 
 interface AuthContextType {
-  token: string | null;
-  setToken: (token: string | null) => void;
+  token: string | null; // Access token
+  setToken: (accessToken: string | null, refreshToken?: string | null) => void;
   isAuthenticated: boolean;
   user: User | null; // Add user state
   isLoading: boolean; // Add loading state
@@ -24,71 +24,76 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Define keys for localStorage
+const ACCESS_TOKEN_KEY = 'knowledge_plane_token';
+const REFRESH_TOKEN_KEY = 'knowledge_plane_refresh_token';
+
 export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   // const navigate = useNavigate(); // No longer needed here
   // const location = useLocation(); // No longer needed here
-  const [token, setTokenState] = useState<string | null>(() => {
-    const storedToken = localStorage.getItem('knowledge_plane_token');
-    console.log(`[AuthContext] Initializing token state from localStorage: ${storedToken ? storedToken.substring(0, 10)+'...' : 'null'}`);
+  const [accessToken, setAccessTokenState] = useState<string | null>(() => {
+    const storedToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    console.log(`[AuthContext] Initializing access token state: ${storedToken ? 'present' : 'null'}`);
     return storedToken;
   });
+  // No need to store refresh token in state, localStorage is enough
   const [user, setUser] = useState<User | null>(null);
-  // Start loading ONLY if a token exists initially
-  const [isLoading, setIsLoading] = useState<boolean>(!!token);
+  const [isLoading, setIsLoading] = useState<boolean>(!!accessToken);
 
   // Function to set token (called by AuthCallback or logout)
-  const setToken = (newToken: string | null) => {
-    // console.log(`[AuthContext] setToken called with: ${newToken ? newToken.substring(0, 10)+'...' : 'null'}`);
-    if (newToken) {
-      localStorage.setItem('knowledge_plane_token', newToken);
+  const setToken = (newAccessToken: string | null, newRefreshToken?: string | null) => {
+    console.log(`[AuthContext] setToken called with: ${newAccessToken ? 'accessToken' : 'null'}, ${newRefreshToken ? 'refreshToken' : 'null'}`);
+    if (newAccessToken) {
+      localStorage.setItem(ACCESS_TOKEN_KEY, newAccessToken);
+      // Store refresh token only if provided
+      if (newRefreshToken) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+      }
     } else {
-      localStorage.removeItem('knowledge_plane_token');
+      // Clear both tokens on logout
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
       setUser(null); // Clear user on logout
     }
-    setTokenState(newToken); // Update state
-    setIsLoading(!!newToken); // Start loading if token is set, stop if cleared
+    setAccessTokenState(newAccessToken); // Update access token state
+    setIsLoading(!!newAccessToken); 
   };
 
-  // Effect to fetch user when token state changes (and is not null)
+  // Effect to fetch user when access token state changes (and is not null)
   useEffect(() => {
     const fetchUser = async () => {
-      // console.log(`[AuthContext] User fetch effect. Token state: ${token ? token.substring(0, 10)+'...' : 'null'}`);
-      if (token) {
-        // Ensure loading is true when we start fetching
+      if (accessToken) {
         if (!isLoading) setIsLoading(true);
         try {
-          // console.log("[AuthContext] Fetching user data...");
           const userData = await apiClient.get<User>('/users/me');
           setUser(userData);
-          // console.log("[AuthContext] Fetched user data successfully.");
         } catch /* (error) */ {
-          // Error fetching user, likely invalid token
-          // console.error("[AuthContext] Failed to fetch user:", error); 
-          setToken(null); // Clear the invalid token
+          // If /users/me fails, the useApiClient interceptor should have already
+          // attempted a refresh if it was a 401. If it still fails after that,
+          // or fails for a different reason, we should clear the tokens.
+          console.warn("[AuthContext] /users/me failed after potential refresh attempt. Clearing tokens.");
+          setToken(null, null);
         } finally {
-          // Always set loading to false after attempt completes
-          // console.log("[AuthContext] User fetch attempt finished, setting isLoading false.");
           setIsLoading(false);
         }
       } else {
-        // If token is null, ensure user is null and loading is false
         if (user) setUser(null);
         if (isLoading) setIsLoading(false);
       }
     };
     fetchUser();
-  }, [token]); // Dependency: token state
+  }, [accessToken]); // Dependency: accessToken state
 
   // REMOVED Navigation effect - navigation is now handled by AuthCallbackPage
   // useEffect(() => {
   //   ...
   // }, [isLoading, user, navigate, location]); 
 
-  // Determine final isAuthenticated status AFTER loading is complete
   const isAuthenticated = !isLoading && !!user;
-  const contextValue = { token, setToken, isAuthenticated, user, isLoading };
+  // Expose only the access token as 'token' for compatibility with useApiClient
+  const contextValue = { token: accessToken, setToken, isAuthenticated, user, isLoading }; 
   
-  // console.log("[AuthContext] Providing context value:", { ...contextValue, token: token ? token.substring(0,10)+'...' : null });
+  console.log("[AuthContext] Providing context value:", { isAuthenticated, user: !!user, isLoading, token: accessToken ? 'present' : 'null' });
 
   return (
     <AuthContext.Provider value={contextValue}>

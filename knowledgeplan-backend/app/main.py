@@ -14,6 +14,10 @@ from app.api.routers import integrations as integrations_router # Assuming this 
 from app.api.routers import map as map_router # New map router
 from app.api.routers import projects as projects_router # Import the new projects router
 from app.api.routers import goals as goals_router # Import goals router
+from app.api.routers import briefings as briefings_router
+from app.api.routers import insights as insights_router
+from app.api.routers import notes as notes_router
+from app.api.routers import stream as stream_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -67,6 +71,10 @@ app.include_router(integrations_router.router, prefix=f"{api_prefix}/integration
 app.include_router(map_router.router, prefix=f"{api_prefix}/map", tags=["map"]) # Include the map router
 app.include_router(projects_router.router, prefix=f"{api_prefix}/projects", tags=["projects"]) # Register projects router
 app.include_router(goals_router.router, prefix=f"{api_prefix}/goals", tags=["goals"]) # Register goals router
+app.include_router(briefings_router.router, prefix=f"{api_prefix}/briefings", tags=["briefings"])
+app.include_router(insights_router.router, prefix=f"{api_prefix}/insights", tags=["insights"])
+app.include_router(notes_router.router, prefix=f"{api_prefix}/notes", tags=["notes"])
+app.include_router(stream_router.router, prefix=f"{api_prefix}", tags=["stream"])
 
 # Add root endpoint or additional setup if needed
 @app.get("/")

@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # Define the overall structure and main languages/frameworks
 # This helps Cursor understand the project context broadly.

@@ -13,7 +13,11 @@ from .department import Department
 from .project import Project
 from .goal import Goal
 from .knowledge_asset import KnowledgeAsset
+from .activity_log import ActivityLog
 # from .token_blacklist import TokenBlacklist # Removed missing import
+from .node import Node
+from .edge import Edge
+# from .note import Note # Remove import
 
 __all__ = [
     "User",
@@ -23,6 +27,10 @@ __all__ = [
     "Project",
     "Goal",
     "KnowledgeAsset",
+    "Node",
+    "Edge",
+    "ActivityLog",
+#    "Note", # Remove from __all__
     # "TokenBlacklist", # Removed from __all__
 ]
 

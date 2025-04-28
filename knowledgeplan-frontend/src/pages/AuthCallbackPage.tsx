@@ -11,22 +11,23 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     // console.log("[AuthCallbackPage] useEffect running...");
-    const token = searchParams.get('token');
+    const accessToken = searchParams.get('token');
+    const refreshToken = searchParams.get('refreshToken');
     const error = searchParams.get('error');
 
-    if (token) {
-      // console.log("[AuthCallbackPage] Received token:", token);
-      setToken(token);
+    if (accessToken) {
+      // console.log("[AuthCallbackPage] Received token:", accessToken);
+      setToken(accessToken, refreshToken);
       // console.log("[AuthCallbackPage] Called setToken via context.");
       navigate('/map', { replace: true });
       // console.log("[AuthCallbackPage] Navigated to /map.");
     } else if (error) {
       // console.error("[AuthCallbackPage] Authentication error received:", error);
-      setToken(null); 
+      setToken(null, null); 
       navigate('/login?error=callback_failed', { replace: true });
     } else {
       // console.error("[AuthCallbackPage] No token or error found in callback.");
-       setToken(null);
+       setToken(null, null);
        navigate('/login?error=invalid_callback', { replace: true });
     }
   }, [searchParams, navigate, setToken]);

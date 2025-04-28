@@ -18,13 +18,14 @@ class CalendarEvent(BaseModel):
 
 @router.get("/google/calendar/events", response_model=List[CalendarEvent])
 async def get_google_calendar_events_today(
+    db: AsyncSession = Depends(get_db_session),
     current_user: models.User = Depends(security.get_current_user)
 ):
     """Fetches today's Google Calendar events for the current user."""
     
     # Build the service client using stored credentials
     # Note: Google API calls might block, consider running in threadpool later
-    service = await google_calendar.get_google_calendar_service(current_user)
+    service = await google_calendar.get_google_calendar_service(current_user, db)
     
     if not service:
         # Could indicate no token or error building service

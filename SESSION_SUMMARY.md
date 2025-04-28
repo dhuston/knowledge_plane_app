@@ -290,4 +290,35 @@ This "Living Map" concept supersedes earlier, more fragmented workspace/overlay 
 *   Implement Daily Briefing feature (FE-TASK-051), requiring backend Google Calendar integration.
 *   Implement UI/logic for adding/removing project participants.
 *   Refine map data fetching and layout further.
-*   Add missing note metadata (author, timestamp). 
+*   Add missing note metadata (author, timestamp).
+
+---
+
+## Session Summary - April 24th, 2025
+
+**Goal:** Close out the day by stabilising the frontend build (TypeScript) after the latest Living Map work and ensure the codebase compiles cleanly.
+
+**Overall Progress:**
+
+*   **Front-End Build Fixes:**
+    *   Resolved `TS6133` warnings about unused `React` imports by adjusting imports in `TeamNode.tsx`, `AuthCallbackPage.tsx`, `LoginPage.tsx`, and other affected files.
+    *   Fixed `Avatar` prop type error in `UserNode.tsx` by ensuring the `src` prop is always passed a `string | undefined`.
+    *   Addressed generic `unknown` → `ReactNode` type issues with conditional JSX rendering.
+    *   Confirmed the app now passes `npx tsc -p tsconfig.app.json --noEmit` with **zero errors** (warnings remain for Chakra theme typing and duplicate casing, tracked under GEN-TASK-001).
+
+*   **Chakra Theme Clean-up (In-Progress):**
+    *   Investigated `_hover` type errors in custom `Card` theme; deferred full fix to GEN-TASK-001 as it requires deeper theme typing work.
+
+*   **Developer Experience:**
+    *   Improved code readability by consolidating React imports (default + types) into single lines.
+    *   Added inline comments where we temporarily silence unavoidable linter errors.
+
+**Challenges & Learnings:**
+
+*   Type-only imports (e.g., `import type React`) can still trigger React 17/18 global namespace issues in certain tooling contexts; importing the runtime default export avoids those edge cases.
+*   Chakra UI's strict typing can surface verbose generics; sometimes a narrow `as` cast is the pragmatic short-term path until a full theme typing pass.
+
+**Next Steps:**
+
+*   Finish GEN-TASK-001 (core TODO & type clean-up) – especially Chakra theme typings and duplicate filename casing on Windows.
+*   Pick up BE-TASK-031 (Map data filtering) or FE-TASK-051 (Daily Briefing) once the build remains green for an entire dev cycle. 

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, update
 from sqlalchemy.engine import Row # Import Row for type hint
+from sqlalchemy.orm import selectinload, joinedload, Query # Add Query for type hint
 
 from app.models.goal import Goal as GoalModel
 from app.models.project import Project as ProjectModel # Import ProjectModel
@@ -47,9 +48,16 @@ async def create_goal(
     db: AsyncSession, *, goal_in: GoalCreate, tenant_id: UUID # Use tenant_id from user
 ) -> GoalModel:
     """Create a new goal."""
+    # Convert input schema dict to model-compatible dict
+    goal_data = goal_in.model_dump() # Use model_dump() for Pydantic v2
+    
+    # Handle potential camelCase key from schema
+    if 'dueDate' in goal_data:
+        goal_data['due_date'] = goal_data.pop('dueDate')
+        
     # owner_id could be added later based on current_user
     db_goal = GoalModel(
-        **goal_in.dict(),
+        **goal_data,
         tenant_id=tenant_id 
     )
     db.add(db_goal)
@@ -121,8 +129,13 @@ class CRUDGoal():
         return await get_multi_goal_by_tenant(db=db, tenant_id=tenant_id, skip=skip, limit=limit)
 
     # Add wrappers for standard CRUD operations
-    async def get(self, db: AsyncSession, id: UUID) -> GoalModel | None:
-        return await get_goal(db, goal_id=id)
+    async def get(self, db: AsyncSession, id: UUID, *, options: Optional[List] = None) -> GoalModel | None:
+        """Gets a single goal by ID, optionally loading relationships."""
+        stmt = select(GoalModel).where(GoalModel.id == id)
+        if options:
+            stmt = stmt.options(*options)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
         
     async def get_multi(
         self, db: AsyncSession, *, skip: int = 0, limit: int = 100

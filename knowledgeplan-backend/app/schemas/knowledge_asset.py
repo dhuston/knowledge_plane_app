@@ -55,9 +55,10 @@ class NoteRead(NoteBase):
     def owner_id(self) -> Optional[UUID]:
         return self.created_by.id if self.created_by else None
 
-    class Config:
-        # Use from_attributes=True for Pydantic V2
-        from_attributes = True
+    # Pydantic V2 configuration
+    model_config = {
+        "from_attributes": True,
+    }
 
 # --- Generic Knowledge Asset Schemas (Can be used if needed) --- 
 
@@ -92,8 +93,10 @@ class KnowledgeAssetRead(KnowledgeAssetBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    # Pydantic V2 configuration
+    model_config = {
+        "from_attributes": True,
+    }
 
 # Properties shared by models stored in DB
 class KnowledgeAssetInDBBase(KnowledgeAssetBase):
@@ -103,8 +106,10 @@ class KnowledgeAssetInDBBase(KnowledgeAssetBase):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     created_by_user_id: Optional[UUID4] = None # Track creator
 
-    class Config:
-        orm_mode = True
+    # Pydantic V2 configuration
+    model_config = {
+        "from_attributes": True,
+    }
 
 # Properties to return to client
 class KnowledgeAsset(KnowledgeAssetInDBBase):

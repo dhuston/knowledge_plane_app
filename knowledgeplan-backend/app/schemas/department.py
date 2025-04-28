@@ -23,8 +23,10 @@ class DepartmentInDBBase(DepartmentBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    # Pydantic V2 configuration
+    model_config = {
+        "from_attributes": True,
+    }
 
 # Properties to return to client
 class DepartmentRead(DepartmentInDBBase):

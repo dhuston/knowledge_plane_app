@@ -1,375 +1,506 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import ReactFlow, {
-    ReactFlowProvider,
-    MiniMap,
-    Controls,
-    Background,
-    useNodesState,
-    useEdgesState,
-    addEdge,
-    Node,
-    Edge,
-    Connection,
-    BackgroundVariant,
-    NodeTypes,
-    Position,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-// import dagre from 'dagre'; // Remove dagre import
-import ELK from 'elkjs/lib/elk.bundled.js'; // Import ELK
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+// Remove react-force-graph import
+// import { ForceGraph2D } from 'react-force-graph'; 
 
-import { useAuth } from '../../context/AuthContext';
-// import { apiClient } from '../../api/client'; // Remove unused import
-import { MapData, MapNode, MapEdge, MapNodeTypeEnum, MapEdgeTypeEnum } from '../../types/map';
-import { Box, Spinner, Text, useToast } from '@chakra-ui/react';
-import { useApiClient } from '../../hooks/useApiClient'; // Trying corrected path
+// React-Sigma (v1 Wrapper) Imports
+// import { Sigma, RelativeSize, RandomizeNodePositions, SigmaEnableWebGL, ForceAtlas2 } from "react-sigma";
 
-// Import custom node components
-import UserNode from './nodes/UserNode';
-import TeamNode from './nodes/TeamNode';
-import ProjectNode from './nodes/ProjectNode';
-import GoalNode from './nodes/GoalNode'; // Import GoalNode
-// import BriefingPanel from '../panels/BriefingPanel'; // Removed - Handled by Layout
-// Import GoalNode etc. later
+// Keep necessary types and hooks
+import { MapData, MapNodeTypeEnum } from '../../types/map';
+import { Box, Spinner, Text, useToast, IconButton, useDisclosure, Input, HStack, List, ListItem } from '@chakra-ui/react';
+import { useApiClient } from '../../hooks/useApiClient';
+import { FaFilter } from 'react-icons/fa';
+import { FiSearch } from 'react-icons/fi';
+import { useDeltaStream } from '../../hooks/useDeltaStream';
+// import { throttle } from 'lodash';
 
-// Props for the LivingMap component
+// Custom node components are no longer needed for Sigma rendering directly
+// import UserNode from './nodes/UserNode';
+// ... other node imports removed ...
+
+// Props remain the same for now
 interface LivingMapProps {
-    onNodeClick: (node: MapNode | null) => void; // Use MapNode directly
-    // Add a prop to control the layout algorithm if desired later
-    // layoutAlgorithm?: string;
+    onNodeClick: (nodeId: string | null) => void;
+    isClustered?: boolean; // Will need to be applied differently
+    projectOverlaps: Record<string, string[]>;
+    onMapLoad?: () => void;
 }
 
-// Helper to transform backend nodes/edges to React Flow format
-const transformApiNode = (apiNode: MapNode): Node => {
-    let nodeType = 'default'; // Default type
-    switch (apiNode.type) {
-        case MapNodeTypeEnum.USER:
-            nodeType = 'userNode'; // Match the key in nodeTypes map
-            break;
-        case MapNodeTypeEnum.TEAM:
-            nodeType = 'teamNode';
-            break;
-        case MapNodeTypeEnum.PROJECT:
-            nodeType = 'projectNode';
-            break;
-        case MapNodeTypeEnum.GOAL: // Add case for GOAL
-            nodeType = 'goalNode';
-            break;
-        // Add cases for KNOWLEDGE_ASSET etc. later
-        // default: console.warn("Unknown node type:", apiNode.type); // Optional warning
-    }
+// Node/Edge transformation helpers are not needed for Sigma's internal structure
 
-    return {
-        id: apiNode.id,
-        type: nodeType, 
-        position: apiNode.position || { x: Math.random() * 400, y: Math.random() * 400 }, 
-        data: { 
-            label: apiNode.label, 
-            title: apiNode.label, // Keep title for tooltip
-            ...apiNode.data, 
-            originalApiNode: apiNode 
-        }, 
-    };
+// Constants for Filters remain
+// const ALL_NODE_TYPES = Object.values(MapNodeTypeEnum); // Commented out
+// const COMMON_STATUSES = ["Active", "Planning", "On Track", "Paused", "Blocked", "Completed", "At Risk", "Delayed"]; // Commented out
+
+// --- Delta types remain the same ---
+// Fix the any types in the DeltaData interface
+interface DeltaData {
+  nodes?: NodeData[];
+  edges?: EdgeData[];
+  addNodes?: NodeData[];
+  updateNodes?: NodeData[];
+  removeNodeIds?: string[];
+  addEdges?: EdgeData[];
+  updateEdges?: EdgeData[];
+  removeEdgeIds?: string[];
+  // Replace generic indexer with specific optional properties
+  version?: number;
+  timestamp?: string;
+}
+
+// Add these NodeData and EdgeData interfaces
+interface NodeData {
+  id: string;
+  type?: string;
+  position: { x: number; y: number };
+  data: {
+    label: string;
+    entityType: string;
+    entityId: string;
+    color?: string;
+    icon?: string;
+    // Replace generic indexer with specific optional properties
+    isExpanded?: boolean;
+    isVisible?: boolean;
+    metadata?: Record<string, unknown>;
+  };
+  // Replace generic indexer with specific optional properties
+  style?: React.CSSProperties;
+  className?: string;
+  selected?: boolean;
+  hidden?: boolean;
+}
+
+interface EdgeData {
+  id: string;
+  source: string;
+  target: string;
+  type?: string;
+  data?: {
+    label?: string;
+    relation?: string;
+    // Replace generic indexer with specific optional properties
+    metadata?: Record<string, unknown>;
+  };
+  // Replace generic indexer with specific optional properties
+  style?: React.CSSProperties;
+  className?: string;
+  animated?: boolean;
+  hidden?: boolean;
+}
+
+// Viewport calculation remains relevant but unused for now
+// interface ViewportBounds { /* ... */ }
+// const calculateViewportBounds = (/* ... */): ViewportBounds | null => { /* ... */ }; // Commented out
+
+// Type colors are still needed for Sigma nodes
+const typeColors = {
+    USER: '#3182bd',
+    TEAM: '#6baed6',
+    PROJECT: '#fd8d3c',
+    GOAL: '#74c476',
+    TEAM_CLUSTER: '#9e9ac8' // Keep cluster color
 };
 
-const transformApiEdge = (apiEdge: MapEdge): Edge => {
-    const edgeStyle: React.CSSProperties = {};
-    const isAnimated = false; // Use const for now
+// Define type for search results
+interface SearchResult {
+    id: string;
+    label: string;
+}
 
-    // Basic styling based on type
-    switch (apiEdge.type) {
-        case MapEdgeTypeEnum.REPORTS_TO:
-            edgeStyle.strokeDasharray = '5, 5'; // Dashed line
-            edgeStyle.stroke = '#888888'; // Gray color
-            break;
-        case MapEdgeTypeEnum.MEMBER_OF:
-            edgeStyle.stroke = '#cccccc'; // Lighter gray
-            edgeStyle.strokeWidth = 1;
-            break;
-        case MapEdgeTypeEnum.LEADS:
-            edgeStyle.stroke = '#4A5568'; // Darker gray/blue
-            edgeStyle.strokeWidth = 2;
-            break;
-        case MapEdgeTypeEnum.OWNS:
-            edgeStyle.stroke = '#805AD5'; // Purple (matching project node base)
-            edgeStyle.strokeWidth = 1.5;
-            break;
-        case MapEdgeTypeEnum.ALIGNED_TO:
-            edgeStyle.stroke = '#38A169'; // Green (like a goal/success color)
-            edgeStyle.strokeWidth = 1.5;
-            // isAnimated = true; // Re-enable later by changing const to let above
-            break;
-        // Add other types later
-        default:
-            edgeStyle.stroke = '#b1b1b7'; // Default React Flow color
-            break;
-    }
+// Define minimal types for internal usage before creating graphology graph
+interface SigmaNodeTemp {
+    id: string;
+    label?: string;
+    color?: string;
+    size?: number;
+    x?: number;
+    y?: number;
+    originalApiData?: unknown;
+}
+interface SigmaEdgeTemp {
+    id: string;
+    source: string;
+    target: string;
+    label?: string | null;
+    color?: string;
+    size?: number;
+    originalApiData?: unknown;
+}
+interface SigmaGraphTemp {
+    nodes: SigmaNodeTemp[];
+    edges: SigmaEdgeTemp[];
+}
 
-    return {
-        id: apiEdge.id,
-        source: apiEdge.source,
-        target: apiEdge.target,
-        label: apiEdge.label,
-        type: 'default', // Still using default edge renderer for now
-        style: edgeStyle, // Pass calculated style
-        animated: isAnimated, // Pass animated flag
-        data: apiEdge.data,
-    };
-};
-
-// --- ELK Setup ---
-const elk = new ELK();
-
-// Default ELK options - start with layered, similar to dagre TB
-// Experiment with 'stress', 'force', 'mrtree', 'radial'
-const elkOptions = {
-  'elk.algorithm': 'force', // Start with 'layered'
-  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-  'elk.spacing.nodeNode': '80',
-  // Add other algorithm-specific options here if needed
-  // e.g., for force: 'elk.force.iterations': '1000'
-};
-
-const nodeWidth = 172; // Keep using the defined dimensions
-const nodeHeight = 50; // Keep using the defined dimensions
-
-// Function to calculate layout using ELKjs
-const getLayoutedElements = async (nodes: Node[], edges: Edge[], options = elkOptions): Promise<{ nodes: Node[]; edges: Edge[] }> => {
-    // Create the graph structure expected by ELK
-    const elkGraph = {
-        id: 'root',
-        layoutOptions: options,
-        children: nodes.map(node => ({
-            id: node.id,
-            width: node.width || nodeWidth,
-            height: node.height || nodeHeight,
-            // Store original data needed for rendering React Flow nodes
-            _data: { ...node.data, type: node.type } // Ensure type is carried over
-        })),
-        edges: edges.map(edge => ({
-            id: edge.id,
-            sources: [edge.source],
-            targets: [edge.target],
-             _data: { ...edge.data, type: edge.type } // Ensure type is carried over
-        }))
-    };
-
-    try {
-        const layoutedGraph = await elk.layout(elkGraph);
-        console.log("[LivingMap] ELK layout result:", layoutedGraph); // Log ELK output
-
-        const layoutedNodes = layoutedGraph.children?.map((node: import('elkjs/lib/main').ElkNode) => ({
-            id: node.id,
-            // type: node._data.type, // Get type from stored _data
-             // Use the node type determined by transformApiNode
-             // which is stored in the input 'nodes' array
-            type: nodes.find(n => n.id === node.id)?.type || 'default',
-            position: { x: node.x ?? 0, y: node.y ?? 0 },
-             // Restore original data, ensuring originalApiNode is preserved
-            data: nodes.find(n => n.id === node.id)?.data || {},
-            // Set target/source handles based on layout direction if needed
-            // For layered TB, default Top/Bottom is often fine
-            targetPosition: Position.Top,
-            sourcePosition: Position.Bottom,
-            width: node.width, // Carry over width/height used by ELK
-            height: node.height,
-        })) ?? [];
-
-         // We don't typically need to modify edges much after ELK layout
-         // unless dealing with edge routing points (sections), which is more advanced.
-         // For now, just return the original edges passed in.
-        const layoutedEdges = edges;
-
-        return { nodes: layoutedNodes, edges: layoutedEdges };
-
-    } catch (error) {
-        console.error('ELK layout failed:', error);
-        // Fallback: return nodes without positions or with random positions
-        // Returning original nodes for now, React Flow will handle missing positions
-        return { nodes: nodes.map(n => ({ ...n, position: { x: Math.random() * 400, y: Math.random() * 400 } })), edges };
-    }
-};
-
-// Pass props to the component
-const LivingMap: React.FC<LivingMapProps> = ({ onNodeClick /*, layoutAlgorithm = 'layered' */ }) => {
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null); // State for selection
-    // const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null); // Keep commented out
-    const { token } = useAuth();
+const LivingMap: React.FC<LivingMapProps> = ({
+    onNodeClick,
+    onMapLoad,
+}) => {
     const toast = useToast();
     const apiClient = useApiClient();
+    const isMounted = useRef(true);
+    const lastDeltaUpdateRef = useRef<number>(0);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [rawApiData, setRawApiData] = useState<MapData | null>(null);
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [sigmaGraphData, setSigmaGraphData] = useState<SigmaGraphTemp | null>(null);
 
-    // Define the custom node types and memoize them
-    const nodeTypes: NodeTypes = useMemo(() => ({
-        userNode: UserNode,
-        teamNode: TeamNode,
-        projectNode: ProjectNode,
-        goalNode: GoalNode, // Register GoalNode
-        // Add assetNode etc. here later when implemented
-    }), []);
-
-    // Ref to store the raw API data to avoid re-fetching layout unless data changes
-    const rawMapDataRef = useRef<MapData | null>(null);
-
+    // Cleanup effect
     useEffect(() => {
-        const fetchAndLayoutData = async () => {
-            if (!token) {
-                setIsLoading(false);
-                return;
-            }
-            setIsLoading(true);
-            setError(null);
-
-            try {
-                // Fetch data only if we don't have it or maybe add refresh logic later
-                if (!rawMapDataRef.current) {
-                    console.log("[LivingMap] Fetching data...");
-                    const response = await apiClient.get<MapData>('/map/data');
-                    console.log("[LivingMap] API response received:", response);
-                    rawMapDataRef.current = response.data;
-                    console.log("[LivingMap] Map data stored:", rawMapDataRef.current);
-
-                    if (!rawMapDataRef.current || !rawMapDataRef.current.nodes || !rawMapDataRef.current.edges) {
-                        console.error("[LivingMap] Invalid map data structure:", rawMapDataRef.current);
-                        throw new Error("Received invalid map data structure from API.");
-                    }
-                }
-
-                const mapData = rawMapDataRef.current!;
-                // Use the transformer without selectedNodeId
-                const initialNodes = mapData.nodes.map(transformApiNode);
-                const initialEdges = mapData.edges.map(transformApiEdge);
-                console.log("[LivingMap] Initial nodes/edges (pre-layout):"); 
-
-                // Calculate layout using ELK
-                const { nodes: layoutedNodes, edges: layoutedEdges } = await getLayoutedElements(
-                    initialNodes,
-                    initialEdges
-                );
-                console.log("[LivingMap] Layouted nodes/edges:"); 
-
-                setNodes(layoutedNodes);
-                setEdges(layoutedEdges);
-
-            } catch (err: unknown) {
-                 console.error("[LivingMap] Error during fetch/layout:", err);
-                 // Keep existing error handling
-                 let errorMessage = "Failed to load map data.";
-                 if (err instanceof Error) {
-                     const errorResponse = err as Error & { response?: { data?: { detail?: string } } };
-                     const detail = errorResponse?.response?.data?.detail;
-                    errorMessage += ` ${detail || err.message}`;
-                } else {
-                     errorMessage += " An unknown error occurred.";
-                }
-                setError(errorMessage);
-                toast({ title: "Error loading map", description: errorMessage, status: "error", duration: 9000, isClosable: true });
-                // Clear potentially bad data
-                rawMapDataRef.current = null;
-                setNodes([]);
-                setEdges([]);
-            } finally {
-                console.log("[LivingMap] Fetch/layout attempt finished. Setting loading false.");
-                setIsLoading(false);
-            }
-        };
-
-        fetchAndLayoutData();
-    // Ensure dependency array only includes things that necessitate re-fetching/re-layout
-    }, [token, setNodes, setEdges, toast, apiClient]); // Keep selectedNodeId OUT
-
-    // Effect to apply selection style WHEN selectedNodeId changes
-    useEffect(() => {
-        setNodes((nds) =>
-            nds.map((node) => {
-                // Add or remove the 'node-selected' class based on selection
-                const isSelected = node.id === selectedNodeId;
-                // Preserve existing classes if any, add/remove selected class
-                const baseClasses = (node.className || '').split(' ').filter(cls => cls !== 'node-selected');
-                if (isSelected) {
-                    baseClasses.push('node-selected');
-                }
-                return {
-                    ...node,
-                    className: baseClasses.join(' ').trim() || undefined, // Set undefined if empty
-                };
-            })
-        );
-    }, [selectedNodeId, setNodes]); // Depend only on selection and setter
-
-    const onConnect = useCallback(
-        (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
-    );
-
-    // --- Interaction Handlers ---
-    const handleNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
-        console.log("Hover Enter:", node.id); // Add console log
-        // setHoveredNodeId(node.id); // Commented out for now
-        // Update node style directly? - More complex, try CSS first
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
     }, []);
 
-    const handleNodeMouseLeave = useCallback((_: React.MouseEvent, node: Node) => {
-        console.log("Hover Leave:", node.id); // Add console log
-        // setHoveredNodeId(null); // Commented out for now
+    // --- Effect for Processing API Data for react-sigma (v1) --- 
+    useEffect(() => {
+        if (!rawApiData || !isMounted.current) return;
+        
+        console.log("[LivingMap] Processing raw API data for react-sigma v1...");
+        setIsLoading(true);
+        
+        try {
+            // --- TODO: Filtering/Clustering --- 
+            const nodesToProcess = rawApiData.nodes || [];
+            const edgesToProcess = rawApiData.edges || [];
+            const nodeIdsToRender = new Set(nodesToProcess.map(n => n.id));
+            // -----------------------------------
+
+            const nodes: SigmaNodeTemp[] = nodesToProcess.map(node => ({
+                id: node.id,
+                label: node.label,
+                color: typeColors[node.type] || '#999',
+                size: node.type === MapNodeTypeEnum.TEAM ? 15 : 10,
+                x: Math.random() * 1000, // ADD INITIAL X
+                y: Math.random() * 1000, // ADD INITIAL Y
+                originalApiData: node 
+            }));
+
+            const edges: SigmaEdgeTemp[] = [];
+            (edgesToProcess || []).forEach(edge => {
+                if (nodeIdsToRender.has(edge.source) && nodeIdsToRender.has(edge.target)) {
+                    edges.push({
+                        id: edge.id,
+                        source: edge.source,
+                        target: edge.target,
+                        label: edge.label || undefined,
+                        color: '#ccc',
+                        size: 1,
+                        originalApiData: edge
+                    });
+                }
+            });
+
+            console.log(`[LivingMap] Setting data for react-sigma v1 (${nodes.length} nodes, ${edges.length} edges).`);
+            setSigmaGraphData({ nodes, edges });
+            
+            if (isMounted.current && onMapLoad) {
+                 setTimeout(() => { if(isMounted.current && onMapLoad) onMapLoad(); }, 100);
+            }
+
+        } catch (processingError) {
+            console.error("[LivingMap] Error processing graph data:", processingError);
+            if (isMounted.current) setError(processingError instanceof Error ? processingError.message : "Unknown graph processing error");
+        } finally {
+            if (isMounted.current) setIsLoading(false);
+        }
+
+    }, [rawApiData, onMapLoad]);
+
+    // --- Data Fetching Logic --- 
+    const fetchInitialMapData = useCallback(async () => {
+        if (!isMounted.current || !apiClient) return;
+        console.log("[LivingMap] Fetching initial map data...");
+        setIsLoading(true);
+        setError(null);
+        try {
+            // For now, fetch all data initially - implement viewport loading later if needed
+            const response = await apiClient.get<MapData>(`/map/data`); 
+            if (!isMounted.current) return;
+            console.log("[LivingMap] Initial data received:", response.data);
+            setRawApiData(response.data);
+        } catch (fetchError: unknown) {
+            console.error('[LivingMap] Error fetching initial map data:', fetchError);
+             if (isMounted.current) {
+                const message = fetchError instanceof Error ? fetchError.message : 'An unknown error occurred';
+                setError(message);
+                toast({
+                    title: 'Error fetching map data',
+                    description: message,
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                });
+             }
+        } finally {
+            // Loading state is handled by the processing effect
+            // setIsLoading(false); 
+        }
+    }, [apiClient, toast]);
+
+    // --- useEffect: Initial Map Load --- 
+    useEffect(() => {
+        if (!rawApiData) {
+            fetchInitialMapData();
+        }
+    }, [rawApiData, fetchInitialMapData]);
+
+    // --- Delta Update Logic (Needs adaptation for react-force-graph) --- 
+    const applyDeltaUpdates = useCallback((/* deltaData: DeltaData - Comment out */) => {
+        console.warn("[LivingMap] Delta update logic needs react-force-graph adaptation!");
     }, []);
 
-    const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-        console.log("Click Node:", node.id); // Log click
-        const originalApiNode = node.data?.originalApiNode as MapNode | undefined;
-        setSelectedNodeId(node.id); // Set selected state
-        onNodeClick(originalApiNode || null); // Pass data up to parent
-    }, [onNodeClick]); // Removed setSelectedNodeId from deps for now, managed outside layout
+    // Delta handler remains largely the same, calls the adapted applyDeltaUpdates
+    const handleDeltaUpdate = useCallback((deltaData: DeltaData) => {
+        const now = Date.now(); // Define now
+        if (now - lastDeltaUpdateRef.current < 1000) {
+            // ... (batching logic needs pendingDeltaUpdatesRef)
+            console.warn("Delta batching skipped - pendingDeltaUpdatesRef commented out");
+        } else {
+             lastDeltaUpdateRef.current = now; // Define now
+             applyDeltaUpdates(deltaData);
+        }
+    }, [applyDeltaUpdates]);
 
-    const handlePaneClick = useCallback(() => {
-        console.log("Click Pane"); // Log click
-        setSelectedNodeId(null); // Clear selection
-        onNodeClick(null); // Notify parent
-    }, [onNodeClick]); // Removed setSelectedNodeId from deps
+    useDeltaStream(handleDeltaUpdate);
 
-    if (isLoading && nodes.length === 0) {
-        return <Box display="flex" justifyContent="center" alignItems="center" height="100%"><Spinner size="xl" /></Box>;
+    // --- Search Logic --- 
+    const focusOnNode = useCallback((nodeId: string) => {
+        const node = sigmaGraphData?.nodes.find(n => n.id === nodeId);
+        if (node && node.x !== undefined && node.y !== undefined) {
+            // Remove expect-error comments if errors are gone
+            // sigmaGraphData?.nodes.forEach((n) => {
+            //     if (n.id === nodeId) {
+            //         n.x = node.x;
+            //         n.y = node.y;
+            //     }
+            // });
+        }
+        setSearchResults([]);
+    }, [sigmaGraphData]); 
+
+    useEffect(() => {
+        const query = searchQuery.trim().toLowerCase();
+        if (query.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        const matches: SearchResult[] = [];
+        sigmaGraphData?.nodes.forEach((node) => {
+            if (node.label?.toLowerCase().includes(query)) {
+                matches.push({ id: node.id, label: node.label || node.id }); 
+            }
+        });
+        setSearchResults(matches.slice(0, 8));
+    }, [searchQuery, sigmaGraphData]); // Depend on sigmaGraphData
+
+    // ---------------------------------------------------------------------------
+    // Child component to load graphology graph into Sigma v5 and register events
+    // ---------------------------------------------------------------------------
+
+    interface SigmaLoaderProps {
+        graphData: SigmaGraphTemp;
     }
 
-    if (error && nodes.length === 0) {
+    const SigmaLoader: React.FC<SigmaLoaderProps & { onSigmaNodeClick: (id: string | null) => void }> = ({ graphData, onSigmaNodeClick }) => {
+        const loadGraph = useLoadGraph();
+        const registerEvents = useRegisterEvents();
+
+        // Load graph when data changes
+        useEffect(() => {
+            if (!graphData) return;
+            const graph = new Graph();
+            graphData.nodes.forEach((n) => {
+                graph.addNode(n.id, {
+                    label: n.label,
+                    color: n.color,
+                    size: n.size ?? 10,
+                    x: n.x ?? Math.random(),
+                    y: n.y ?? Math.random(),
+                });
+            });
+            graphData.edges.forEach((e) => {
+                graph.addEdgeWithKey(e.id, e.source, e.target, { color: e.color ?? '#ccc', size: e.size ?? 1 });
+            });
+            loadGraph(graph);
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [graphData, loadGraph]);
+
+        // Register click events
+        useEffect(() => {
+            const handlers = registerEvents({
+                clickNode: ({ node }) => onSigmaNodeClick(node as string),
+                clickStage: () => onSigmaNodeClick(null),
+            });
+            return () => {
+                // cleanup events
+                handlers();
+            };
+        }, [onSigmaNodeClick, registerEvents]);
+
+        return null;
+    };
+
+    // --- Filter Panel State ---
+    const { isOpen: isFilterPanelOpen, onToggle: onFilterPanelToggle } = useDisclosure();
+
+    // --- Render Logic --- 
+    if (isLoading && sigmaGraphData?.nodes.length === 0) { 
+        return <Box display="flex" justifyContent="center" alignItems="center" height="100%"><Spinner size="xl" /></Box>;
+    }
+    if (error) { 
         return <Box p={5}><Text color="red.500">Error: {error}</Text></Box>;
     }
 
     return (
-        <div style={{ height: '100%', width: '100%', position: 'relative' }}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                fitView
-                attributionPosition="bottom-left"
-                nodeTypes={nodeTypes}
-                // Add hover handlers
-                onNodeMouseEnter={handleNodeMouseEnter}
-                onNodeMouseLeave={handleNodeMouseLeave}
-                onNodeClick={handleNodeClick}
-                onPaneClick={handlePaneClick}
+        <Box height="100%" width="100%" position="relative">
+            <Box height="100%" width="100%" background="#f8f8f8" minH="300px"> 
+                 {sigmaGraphData ? (
+                    <SigmaContainer style={{ width: '100%', height: '100%' }} settings={{ allowInvalidContainer: true }}>
+                        <SigmaLoader graphData={sigmaGraphData} onSigmaNodeClick={(id)=>onNodeClick(id)} />
+                        <ControlsContainer position={"bottom-right"}>
+                            <LayoutForceAtlas2Control autoRunFor={2000} />
+                        </ControlsContainer>
+                    </SigmaContainer>
+                ) : (
+                     <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                         {isLoading ? <Spinner size="xl" /> : <Text>No graph data to display.</Text>}
+                     </Box>
+                 )}
+            </Box>
+
+            {/* Keep Overlays */} 
+            {/* Filter Toggle Button */} 
+            <IconButton
+                aria-label="Toggle Filters"
+                icon={<FaFilter />}
+                size="sm"
+                position="absolute"
+                top="15px"
+                right="15px"
+                zIndex={4}
+                onClick={onFilterPanelToggle}
+                colorScheme={isFilterPanelOpen ? 'blue' : 'gray'}
+                variant={isFilterPanelOpen ? 'solid' : 'outline'}
+            />
+            
+            {/* Filter Panel (Logic needs reimplementing) */} 
+            {isFilterPanelOpen && (
+                 <Box 
+                    position="absolute"
+                    top="55px" // Adjust position
+                    right="15px"
+                    bg="white"
+                    p={4}
+                    borderRadius="md"
+                    boxShadow="md"
+                    zIndex={4}
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                    minWidth="220px"
+                 >
+                    {/* TODO: Reimplement filter logic based on graphology/sigma */} 
+                    <Text fontWeight="bold" mb={3}>Filters (WIP)</Text>
+                    <Text fontSize="sm">Node Type / Status filters need reimplementation.</Text>
+                 </Box>
+            )}
+
+            {/* Search Bar */} 
+            <HStack
+                position="absolute"
+                top="15px"
+                left="15px" // Moved to left
+                zIndex={4}
+                bg="white"
+                p={1}
+                borderRadius="md"
+                shadow="sm"
             >
-                <Controls />
-                <MiniMap nodeStrokeWidth={3} zoomable pannable />
-                <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-            </ReactFlow>
-        </div>
+                <Input 
+                    size="sm" 
+                    placeholder="Search node..." 
+                    value={searchQuery} 
+                    onChange={(e)=>setSearchQuery(e.target.value)} 
+                    onKeyDown={(e)=>{
+                        if (e.key === 'Enter' && searchResults.length) {
+                            focusOnNode(searchResults[0].id);
+                        }
+                    }}
+                    width="160px" 
+                />
+                <IconButton
+                    aria-label="Search"
+                    icon={<FiSearch />}
+                    size="sm"
+                    onClick={() => {
+                        if (searchResults.length) {
+                            focusOnNode(searchResults[0].id);
+                        }
+                    }}
+                />
+            </HStack>
+
+            {/* Search Suggestions Dropdown */} 
+            {searchResults.length > 0 && (
+                <Box
+                    position="absolute"
+                    top="50px" 
+                    left="15px" // Moved to left
+                    zIndex={5}
+                    bg="white"
+                    borderWidth="1px"
+                    borderRadius="md"
+                    shadow="sm"
+                    maxHeight="220px"
+                    overflowY="auto"
+                    width="220px"
+                >
+                    <List spacing={0}>
+                        {searchResults.map((node) => (
+                            <ListItem
+                                key={node.id}
+                                px={3}
+                                py={2}
+                                _hover={{ bg: 'gray.100' }}
+                                cursor="pointer"
+                                onClick={() => focusOnNode(node.id)}
+                            >
+                                {node.label}
+                            </ListItem>
+                        ))}
+                    </List>
+                </Box>
+            )}
+            
+            {/* Loading Indicator Overlay */} 
+            {isLoading && (
+                 <Box 
+                    position="absolute" 
+                    top={0} 
+                    left={0} 
+                    right={0} 
+                    bottom={0} 
+                    bg="rgba(255, 255, 255, 0.7)" 
+                    display="flex" 
+                    justifyContent="center" 
+                    alignItems="center"
+                    zIndex={10} // Ensure it's above the map container
+                 >
+                    <Spinner size="xl" />
+                 </Box>
+            )}
+        </Box>
     );
 };
 
-// Wrapper needs to accept and pass down the props
-const LivingMapWrapper: React.FC<LivingMapProps> = (props) => {
-    return (
-        <ReactFlowProvider>
-            <LivingMap {...props} />
-        </ReactFlowProvider>
-    );
-};
+// Remove ReactFlowProvider wrapper
+// const LivingMapWrapper: React.FC<LivingMapProps> = (props) => {
+//     return (
+//         <ReactFlowProvider>
+//             <LivingMap {...props} />
+//         </ReactFlowProvider>
+//     );
+// };
 
-export default LivingMapWrapper; 
+export default LivingMap; // Export the component directly 

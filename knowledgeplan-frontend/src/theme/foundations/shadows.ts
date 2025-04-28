@@ -1,23 +1,30 @@
-// KnowledgePlane AI Shadow System
-// Consistent shadow styles for depth and elevation
+/**
+ * KnowledgePlane AI Shadow System
+ * 
+ * Defines box shadows used throughout the application for elevation and focus states.
+ */
 
 const shadows = {
-  xs: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-  sm: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-  '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-  outline: '0 0 0 3px rgba(9, 103, 210, 0.6)',
-  inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
-  none: 'none',
+  // Base shadows for different elevation levels
+  'xs': '0 1px 2px rgba(0, 0, 0, 0.05)',
+  'sm': '0 1px 3px rgba(0, 0, 0, 0.1)',
+  'md': '0 4px 6px rgba(0, 0, 0, 0.1)',
+  'lg': '0 10px 15px rgba(0, 0, 0, 0.1)',
+  'xl': '0 20px 25px rgba(0, 0, 0, 0.15)',
+  '2xl': '0 25px 50px rgba(0, 0, 0, 0.25)',
+  'inner': 'inset 0 2px 4px rgba(0, 0, 0, 0.06)',
+  'none': 'none',
   
-  // Special shadows for components
-  card: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-  dropdown: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-  modal: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-  popover: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-  toast: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-};
+  // Special shadows for specific states
+  'focus': '0 0 0 3px rgba(66, 153, 225, 0.5)',  // Blue focus ring
+  
+  // Shadows for specific components
+  'card': '0 4px 6px rgba(0, 0, 0, 0.1)',                // Same as md
+  'card-hover': '0 8px 12px rgba(0, 0, 0, 0.15)',        // Elevated card on hover
+  'dropdown': '0 10px 15px rgba(0, 0, 0, 0.1)',          // Same as lg
+  'modal': '0 20px 25px rgba(0, 0, 0, 0.15)',            // Same as xl
+  'tooltip': '0 4px 6px rgba(0, 0, 0, 0.15)',           // Similar to md but darker
+  'popover': '0 10px 15px rgba(0, 0, 0, 0.12)',         // Similar to lg but slightly darker
+}
 
 export default shadows; 

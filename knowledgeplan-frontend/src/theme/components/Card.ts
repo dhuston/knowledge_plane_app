@@ -1,189 +1,174 @@
 // KnowledgePlane AI Card Component
-import { createMultiStyleConfigHelpers } from '@chakra-ui/react';
+// Modern, professional card styles with brand identity
 
-// Create helpers for card component
-const helpers = createMultiStyleConfigHelpers(['container', 'header', 'body', 'footer']);
+import { defineStyleConfig } from '@chakra-ui/react';
 
-const Card = helpers.defineMultiStyleConfig({
-  // Base styles for all card parts
+const Card = defineStyleConfig({
+  // Base styles applied to all cards
   baseStyle: {
     container: {
       bg: 'white',
-      borderRadius: 'lg',
+      borderRadius: 'card',
       boxShadow: 'card',
-      overflow: 'hidden',
-      position: 'relative',
       transition: 'all 0.2s',
+      position: 'relative',
+      width: '100%',
       display: 'flex',
       flexDirection: 'column',
     },
     header: {
-      px: 6,
-      pt: 6,
-      pb: 4,
-      display: 'flex',
-      flexDirection: 'column',
+      padding: 'card-padding',
+      borderBottom: '1px solid',
+      borderColor: 'neutral.200',
     },
     body: {
-      px: 6,
-      py: 2,
+      padding: 'card-padding',
       flex: 1,
     },
     footer: {
-      px: 6,
-      pt: 4,
-      pb: 6,
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: 2,
+      padding: 'card-padding',
+      borderTop: '1px solid',
+      borderColor: 'neutral.200',
     },
   },
-  
-  // Card variants
+
+  // Variations
   variants: {
-    // Elevated card with shadow
+    // Default card
     elevated: {
       container: {
-        boxShadow: 'lg',
+        _hover: {
+          boxShadow: 'card-hover',
+        },
       },
     },
-    
-    // Outlined card with border instead of shadow
-    outline: {
+
+    // Outlined card
+    outlined: {
       container: {
         boxShadow: 'none',
         border: '1px solid',
         borderColor: 'neutral.200',
       },
     },
-    
-    // Filled card with background color
+
+    // Filled card
     filled: {
       container: {
         bg: 'neutral.50',
         boxShadow: 'none',
       },
     },
-    
-    // Unstyled card without padding for custom content
-    unstyled: {
+
+    // Interactive card
+    interactive: {
       container: {
-        boxShadow: 'none',
-        bg: 'transparent',
-        p: 0,
-      },
-      header: {
-        p: 0,
-      },
-      body: {
-        p: 0,
-      },
-      footer: {
-        p: 0,
+        cursor: 'pointer',
+        _hover: {
+          boxShadow: 'card-hover',
+          transform: 'translateY(-2px)',
+        },
+        _active: {
+          transform: 'translateY(0)',
+        },
       },
     },
-    
-    // Entity-specific card variants with top borders
-    user: {
+
+    // Feature card with accent
+    feature: {
       container: {
-        borderTop: '3px solid',
-        borderTopColor: 'entity.user',
+        borderTop: '4px solid',
+        borderColor: 'brand.500',
+        _hover: {
+          boxShadow: 'card-hover',
+        },
       },
     },
-    team: {
+
+    // Success card
+    success: {
       container: {
-        borderTop: '3px solid',
-        borderTopColor: 'entity.team',
+        borderLeft: '4px solid',
+        borderColor: 'success.500',
+        bg: 'success.50',
       },
     },
-    department: {
+
+    // Warning card
+    warning: {
       container: {
-        borderTop: '3px solid',
-        borderTopColor: 'entity.department',
+        borderLeft: '4px solid',
+        borderColor: 'warning.500',
+        bg: 'warning.50',
       },
     },
-    project: {
+
+    // Error card
+    error: {
       container: {
-        borderTop: '3px solid',
-        borderTopColor: 'entity.project',
+        borderLeft: '4px solid',
+        borderColor: 'error.500',
+        bg: 'error.50',
       },
     },
-    goal: {
+
+    // Info card
+    info: {
       container: {
-        borderTop: '3px solid',
-        borderTopColor: 'entity.goal',
-      },
-    },
-    knowledge: {
-      container: {
-        borderTop: '3px solid',
-        borderTopColor: 'entity.knowledge',
+        borderLeft: '4px solid',
+        borderColor: 'info.500',
+        bg: 'info.50',
       },
     },
   },
-  
-  // Card sizes
+
+  // Sizes
   sizes: {
     sm: {
       container: {
-        borderRadius: 'md',
+        borderRadius: 'sm',
       },
       header: {
-        px: 4,
-        pt: 4,
-        pb: 2,
+        padding: 3,
       },
       body: {
-        px: 4,
-        py: 2,
+        padding: 3,
       },
       footer: {
-        px: 4,
-        pt: 2,
-        pb: 4,
+        padding: 3,
       },
     },
     md: {
       container: {
-        borderRadius: 'lg',
+        borderRadius: 'card',
       },
       header: {
-        px: 6,
-        pt: 6,
-        pb: 4,
+        padding: 'card-padding',
       },
       body: {
-        px: 6,
-        py: 2,
+        padding: 'card-padding',
       },
       footer: {
-        px: 6,
-        pt: 4,
-        pb: 6,
+        padding: 'card-padding',
       },
     },
     lg: {
       container: {
-        borderRadius: 'xl',
+        borderRadius: 'lg',
       },
       header: {
-        px: 8,
-        pt: 8,
-        pb: 4,
+        padding: 6,
       },
       body: {
-        px: 8,
-        py: 4,
+        padding: 6,
       },
       footer: {
-        px: 8,
-        pt: 4,
-        pb: 8,
+        padding: 6,
       },
     },
   },
-  
-  // Default props
+
+  // Default values
   defaultProps: {
     variant: 'elevated',
     size: 'md',

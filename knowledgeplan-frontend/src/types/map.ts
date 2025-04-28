@@ -3,12 +3,13 @@
 // Mirroring backend schemas/map.py
 
 export enum MapNodeTypeEnum {
-    USER = "USER",
-    TEAM = "TEAM",
-    PROJECT = "PROJECT",
-    GOAL = "GOAL",
-    KNOWLEDGE_ASSET = "KNOWLEDGE_ASSET",
-    DEPARTMENT = "DEPARTMENT",
+    USER = "user",
+    TEAM = "team",
+    PROJECT = "project",
+    GOAL = "goal",
+    KNOWLEDGE_ASSET = "knowledge_asset",
+    DEPARTMENT = "department",
+    TEAM_CLUSTER = "team_cluster",
 }
 
 export enum MapEdgeTypeEnum {
@@ -43,4 +44,9 @@ export interface MapEdge {
 export interface MapData {
     nodes: MapNode[];
     edges: MapEdge[];
+}
+
+// Response type for project overlaps insight
+export interface ProjectOverlapResponse {
+    overlaps: Record<string, string[]>; // { [projectId: string]: string[] }
 } 
