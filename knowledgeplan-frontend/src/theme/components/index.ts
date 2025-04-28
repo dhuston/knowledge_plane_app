@@ -7,6 +7,7 @@ import Input from './Input';
 import Modal from './modal';
 import Tag from './Tag';
 import Badge from './Badge';
+import Map from './map';
 
 const components = {
   Button,
@@ -15,6 +16,7 @@ const components = {
   Modal,
   Tag,
   Badge,
+  ...Map, // Spread map components
 };
 
-export default components; 
+export default components;

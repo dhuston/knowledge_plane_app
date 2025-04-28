@@ -20,8 +20,12 @@ import {
   Tag,
   Divider,
   Portal,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
 } from "@chakra-ui/react";
-import { FiCheckCircle, FiClock, FiMap } from 'react-icons/fi';
+import { FiCheckCircle, FiClock, FiMap, FiMaximize } from 'react-icons/fi';
+import { AddIcon } from '@chakra-ui/icons';
 import { MdOutlineInsights } from 'react-icons/md';
 import { useAuth } from '../../context/AuthContext';
 import CreateProjectModal from '../modals/CreateProjectModal';
@@ -84,16 +88,21 @@ export default function MainLayout() {
   const [isMapLoading, setIsMapLoading] = useState(true);
   const [dailySummary, setDailySummary] = useState<string>('');
   const [isLoadingDailySummary, setIsLoadingDailySummary] = useState(true);
-  
+
   const apiClient = useApiClient();
-  
-  // Theme colors
+
+  // Theme colors - refined for better visual hierarchy and harmony
   const bgColor = useColorModeValue('gray.50', 'gray.900');
   const cardBgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const secondaryTextColor = useColorModeValue('gray.600', 'gray.400');
+  const tertiaryTextColor = useColorModeValue('gray.500', 'gray.500');
   const highlightColor = useColorModeValue('primary.50', 'primary.900');
   const accentColor = useColorModeValue('primary.500', 'primary.300');
+  const subtleBgColor = useColorModeValue('gray.50', 'gray.800');
+  const hoverBgColor = useColorModeValue('gray.100', 'gray.700');
+  const glassBgColor = useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)');
+  const shadowColor = useColorModeValue('rgba(0, 0, 0, 0.1)', 'rgba(0, 0, 0, 0.4)');
 
   const handleLogout = () => {
     setToken(null);
@@ -170,10 +179,10 @@ export default function MainLayout() {
           </Flex>
         </CardHeader>
         <CardBody>
-          <Box 
-            position="relative" 
-            h="100%" 
-            borderRadius="md" 
+          <Box
+            position="relative"
+            h="100%"
+            borderRadius="md"
             overflow="hidden"
           >
             <ErrorBoundary>
@@ -223,7 +232,7 @@ export default function MainLayout() {
             <Text>Internal process optimization</Text>
           </CardBody>
         </Card>
-        
+
         {/* Team Cards */}
         <Card>
           <CardHeader>
@@ -241,7 +250,7 @@ export default function MainLayout() {
             <Text>12 members - Platform & Infrastructure</Text>
           </CardBody>
         </Card>
-        
+
         {/* Knowledge Cards */}
         <Card>
           <CardHeader>
@@ -255,63 +264,116 @@ export default function MainLayout() {
     </Box>
   );
 
-  // Render Command Center View
+  // Render Command Center View - Refined for better visual hierarchy and user experience
   const renderCommandCenterView = () => (
-    <Box height="100%">
-      {/* Dashboard Header with Welcome and Date */}
-      <Flex justifyContent="space-between" alignItems="center" p={4} pb={2}>
-        <VStack align="start" spacing={1}>
-          <Heading size="lg">
-            Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}, 
-            {' '}{user?.name?.split(' ')[0] || 'there'}
-          </Heading>
-          <Text color={secondaryTextColor}>
-            {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </Text>
-        </VStack>
-      </Flex>
-      
-      {/* Dashboard Grid Layout */}
+    <Box>
+      {/* Dashboard Header - Refined with better styling and breadcrumbs */}
+      <Box mb={6}>
+        <Flex justify="space-between" align="center" mb={2}>
+          <Box>
+            <Breadcrumb separator="/" fontSize="sm" color={tertiaryTextColor} mb={1}>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="#">Home</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbItem isCurrentPage>
+                <BreadcrumbLink href="#">Command Center</BreadcrumbLink>
+              </BreadcrumbItem>
+            </Breadcrumb>
+            <Heading
+              size="lg"
+              letterSpacing="tight"
+              bgGradient="linear(to-r, primary.500, primary.400)"
+              bgClip="text"
+            >
+              Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'},
+              {' '}{user?.name?.split(' ')[0] || 'there'}
+            </Heading>
+          </Box>
+          <HStack spacing={3}>
+            <Button
+              variant="outline"
+              leftIcon={<Icon as={FiClock} />}
+              size="sm"
+              onClick={() => {/* View recent activity */}}
+            >
+              Recent
+            </Button>
+            <Button
+              leftIcon={<AddIcon />}
+              colorScheme="primary"
+              onClick={handleCreateProjectClick}
+              size="sm"
+            >
+              New Project
+            </Button>
+          </HStack>
+        </Flex>
+        <Text color={secondaryTextColor}>
+          {new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}
+        </Text>
+      </Box>
+
+      {/* Dashboard Grid Layout - Refined with better spacing and visual hierarchy */}
       <Grid
         templateColumns={{ base: "1fr", lg: "3fr 1fr" }}
         templateRows={{ base: "auto 1fr", lg: "1fr" }}
-        gap={4}
-        px={4}
-        pb={4}
-        h="calc(100% - 60px)" // Account for dashboard header
+        gap={6}
+        h="calc(100% - 80px)" // Account for dashboard header
       >
-        {/* Map Section - Large in left column */}
+        {/* Map Section - Large in left column - Refined with better styling */}
         <GridItem rowSpan={{ base: 1, lg: 2 }}>
-          <Card h="100%" shadow="sm" bg={cardBgColor} borderColor={borderColor} borderWidth="1px">
-            <CardHeader pb={0}>
+          <Card
+            h="100%"
+            shadow="md"
+            bg={cardBgColor}
+            borderColor={borderColor}
+            borderWidth="1px"
+            borderRadius="lg"
+            overflow="hidden"
+            transition="all 0.2s"
+            _hover={{ boxShadow: "lg" }}
+          >
+            <CardHeader pb={2}>
               <Flex justify="space-between" align="center">
-                <HStack>
+                <HStack spacing={3}>
                   <Icon as={FiMap} color={accentColor} boxSize={5} />
-                  <Heading size="md">Living Map</Heading>
+                  <VStack align="start" spacing={0}>
+                    <Heading size="md">Living Map</Heading>
+                    <Text fontSize="xs" color={secondaryTextColor}>Interactive organizational visualization</Text>
+                  </VStack>
                 </HStack>
-                <HStack>
-                  <Tag size="sm" colorScheme={useWebGL ? "green" : "blue"}>
+                <HStack spacing={2}>
+                  <Tag size="sm" colorScheme={useWebGL ? "green" : "blue"} borderRadius="full">
                     {useWebGL ? "WebGL" : "Standard"}
                   </Tag>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleViewChange('map-focus')}
+                    aria-label="Expand map"
+                  >
+                    <Icon as={FiMaximize} />
+                  </Button>
                 </HStack>
               </Flex>
             </CardHeader>
-            <CardBody>
-              <Box 
-                position="relative" 
-                h="100%" 
-                borderRadius="md" 
+            <CardBody pt={0}>
+              <Box
+                position="relative"
+                h="100%"
+                borderRadius="md"
                 overflow="hidden"
+                boxShadow="inner"
               >
                 <ErrorBoundary>
                   {isMapLoading && (
-                    <Center position="absolute" inset={0} bgColor="rgba(0,0,0,0.1)" zIndex={1}>
-                      <Spinner size="xl" color="primary.500" />
+                    <Center position="absolute" inset={0} bg="rgba(0,0,0,0.05)" zIndex={1} backdropFilter="blur(2px)">
+                      <Spinner size="xl" color="primary.500" thickness="3px" speed="0.8s" />
                     </Center>
                   )}
                   <WebGLMap
@@ -324,23 +386,37 @@ export default function MainLayout() {
           </Card>
         </GridItem>
 
-        {/* Right Column - Command Cards */}
+        {/* Right Column - Command Cards - Refined with better styling */}
         <GridItem>
-          {/* Daily Briefing Card */}
-          <Card shadow="sm" bg={cardBgColor} borderColor={borderColor} borderWidth="1px" h="100%" mb={4}>
-            <CardHeader pb={0}>
+          {/* Daily Briefing Card - Refined with better styling */}
+          <Card
+            shadow="md"
+            bg={cardBgColor}
+            borderColor={borderColor}
+            borderWidth="1px"
+            h="100%"
+            mb={6}
+            borderRadius="lg"
+            transition="all 0.2s"
+            _hover={{ boxShadow: "lg", transform: "translateY(-2px)" }}
+          >
+            <CardHeader pb={2}>
               <Flex justify="space-between" align="center">
-                <HStack>
+                <HStack spacing={3}>
                   <Icon as={MdOutlineInsights} color={accentColor} boxSize={5} />
-                  <Heading size="md">Daily Briefing</Heading>
+                  <VStack align="start" spacing={0}>
+                    <Heading size="md">Daily Briefing</Heading>
+                    <Text fontSize="xs" color={secondaryTextColor}>Your daily organizational summary</Text>
+                  </VStack>
                 </HStack>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   colorScheme="primary"
                   onClick={onBriefingOpen}
+                  aria-label="Expand briefing"
                 >
-                  Expand
+                  <Icon as={FiMaximize} />
                 </Button>
               </Flex>
             </CardHeader>
@@ -350,70 +426,108 @@ export default function MainLayout() {
                   <Spinner color="primary.500" />
                 </Center>
               ) : (
-                <VStack align="stretch" spacing={3}>
-                  <Text>{dailySummary}</Text>
+                <VStack align="stretch" spacing={4}>
+                  <Text fontSize="sm" lineHeight="tall">{dailySummary}</Text>
                   <Divider />
-                  <Text fontSize="sm" fontWeight="medium">Top Insights:</Text>
-                  <VStack align="stretch" spacing={2}>
-                    {mockInsights.map((insight) => (
-                      <Box 
-                        key={insight.id} 
-                        p={2} 
-                        bg={highlightColor} 
-                        borderRadius="md"
-                        borderLeftWidth="3px"
-                        borderLeftColor={
-                          insight.importance === 'high' ? 'error.500' : 
-                          insight.importance === 'medium' ? 'warning.500' : 
-                          'info.500'
-                        }
-                      >
-                        <Text fontSize="sm">{insight.title}</Text>
-                      </Box>
-                    ))}
-                  </VStack>
+                  <Box>
+                    <Text fontSize="sm" fontWeight="medium" mb={2}>Top Insights:</Text>
+                    <VStack align="stretch" spacing={3}>
+                      {mockInsights.map((insight) => (
+                        <Box
+                          key={insight.id}
+                          p={3}
+                          bg={highlightColor}
+                          borderRadius="md"
+                          borderLeftWidth="3px"
+                          borderLeftColor={
+                            insight.importance === 'high' ? 'error.500' :
+                            insight.importance === 'medium' ? 'warning.500' :
+                            'info.500'
+                          }
+                          transition="all 0.2s"
+                          _hover={{ transform: "translateX(2px)" }}
+                          cursor="pointer"
+                        >
+                          <Text fontSize="sm">{insight.title}</Text>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </Box>
                 </VStack>
               )}
             </CardBody>
           </Card>
+        </GridItem>
 
-          {/* Tasks Card */}
-          <Card shadow="sm" bg={cardBgColor} borderColor={borderColor} borderWidth="1px" h="100%">
-            <CardHeader pb={0}>
-              <HStack>
-                <Icon as={FiCheckCircle} color={accentColor} boxSize={5} />
-                <Heading size="md">Today's Tasks</Heading>
-              </HStack>
+        {/* Tasks Card - Refined with better styling */}
+        <GridItem>
+          <Card
+            shadow="md"
+            bg={cardBgColor}
+            borderColor={borderColor}
+            borderWidth="1px"
+            h="100%"
+            borderRadius="lg"
+            transition="all 0.2s"
+            _hover={{ boxShadow: "lg", transform: "translateY(-2px)" }}
+          >
+            <CardHeader pb={2}>
+              <Flex justify="space-between" align="center">
+                <HStack spacing={3}>
+                  <Icon as={FiCheckCircle} color={accentColor} boxSize={5} />
+                  <VStack align="start" spacing={0}>
+                    <Heading size="md">Today's Tasks</Heading>
+                    <Text fontSize="xs" color={secondaryTextColor}>Your upcoming tasks and deadlines</Text>
+                  </VStack>
+                </HStack>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  colorScheme="primary"
+                  aria-label="View all tasks"
+                >
+                  <Icon as={FiMaximize} />
+                </Button>
+              </Flex>
             </CardHeader>
             <CardBody>
-              <VStack align="stretch" spacing={2}>
+              <VStack align="stretch" spacing={4}>
                 {mockTasks.filter(t => !t.completed).slice(0, 3).map((task) => (
-                  <HStack 
-                    key={task.id} 
-                    p={2} 
-                    bg="transparent" 
-                    borderRadius="md"
-                    borderWidth="1px"
-                    borderColor={borderColor}
+                  <Flex
+                    key={task.id}
                     justify="space-between"
+                    align="center"
+                    p={3}
+                    borderRadius="md"
+                    borderLeft="3px solid"
+                    borderLeftColor={
+                      task.priority === 'high' ? 'error.500' :
+                      task.priority === 'medium' ? 'warning.500' :
+                      'info.500'
+                    }
+                    bg={subtleBgColor}
+                    _hover={{ bg: hoverBgColor, transform: "translateX(2px)" }}
+                    cursor="pointer"
+                    transition="all 0.2s"
                   >
                     <VStack align="start" spacing={0}>
                       <Text fontSize="sm" fontWeight="medium">{task.title}</Text>
                       <Text fontSize="xs" color={secondaryTextColor}>Due: {task.dueDate}</Text>
                     </VStack>
-                    <Tag 
-                      size="sm" 
+                    <Tag
+                      size="sm"
                       colorScheme={
-                        task.priority === 'high' ? 'error' : 
-                        task.priority === 'medium' ? 'warning' : 
-                        'info'
+                        task.priority === 'high' ? 'red' :
+                        task.priority === 'medium' ? 'orange' :
+                        'blue'
                       }
+                      borderRadius="full"
                     >
                       {task.priority}
                     </Tag>
-                  </HStack>
+                  </Flex>
                 ))}
-                <Button size="sm" variant="ghost" rightIcon={<FiClock />}>
+                <Button size="sm" variant="outline" rightIcon={<FiClock />} width="full">
                   View All Tasks
                 </Button>
               </VStack>
@@ -426,42 +540,74 @@ export default function MainLayout() {
 
   return (
     <ErrorBoundary>
-      <Box h="100vh" overflow="hidden" bg={bgColor}>
+      <Box h="100vh" overflow="hidden" bg={bgColor} position="relative">
         {/* Accessibility Skip Link */}
         <SkipNavLink targetId="main-content" />
-        
-        {/* Header */} 
-        <Header 
+
+        {/* Header - Refined with better styling */}
+        <Header
           user={user}
-          onCreateProjectClick={handleCreateProjectClick} 
+          onCreateProjectClick={handleCreateProjectClick}
           onLogout={handleLogout}
           onOpenBriefing={onBriefingOpen}
           onOpenNotifications={onNotificationsOpen}
         />
-        
-        {/* Main Layout Grid */}
+
+        {/* Main Layout Grid - Improved with better spacing and visual hierarchy */}
         <Grid
           templateColumns={{ base: "1fr", md: "64px 1fr" }}
           h={`calc(100vh - ${HEADER_HEIGHT})`}
           mt={HEADER_HEIGHT}
         >
-          {/* Sidebar - Command Navigation Hub */}
+          {/* Sidebar - Command Navigation Hub - Refined with better styling */}
           <GridItem
             as="aside"
             bg={cardBgColor}
             borderRightWidth="1px"
             borderColor={borderColor}
+            boxShadow={`1px 0 3px ${shadowColor}`}
+            zIndex="10"
+            transition="all 0.2s"
+            _hover={{
+              width: { base: "auto", md: "200px" },
+              position: { base: "fixed", md: "relative" },
+              height: "100%",
+            }}
           >
             {/* Pass the view change handler to SidebarNav */}
             <SidebarNav onViewChange={handleViewChange} activeView={workspaceView} />
           </GridItem>
 
-          {/* Main Content Area - Command Center */}
-          <GridItem 
+          {/* Main Content Area - Command Center - Refined with better styling */}
+          <GridItem
             as="main"
             overflow="auto"
             id="main-content"
+            position="relative"
+            bg={bgColor}
+            px={{ base: 2, md: 4 }}
+            py={{ base: 2, md: 4 }}
           >
+            {/* Global Command Bar - Keyboard accessible (⌘+K) */}
+            <Box
+              position="absolute"
+              top="16px"
+              left="50%"
+              transform="translateX(-50%)"
+              zIndex="100"
+              width={{ base: "90%", md: "600px" }}
+              maxWidth="600px"
+              bg={glassBgColor}
+              backdropFilter="blur(8px)"
+              borderRadius="lg"
+              boxShadow="lg"
+              border="1px solid"
+              borderColor={borderColor}
+              display={false ? "block" : "none"} // Toggle with keyboard shortcut
+            >
+              {/* Command bar content would go here */}
+            </Box>
+
             {/* Render different views based on selected workspace view */}
             {workspaceView === 'command-center' && renderCommandCenterView()}
             {workspaceView === 'map-focus' && renderMapFocusView()}
@@ -469,7 +615,7 @@ export default function MainLayout() {
           </GridItem>
         </Grid>
 
-        {/* Modals and Panels */}
+        {/* Modals and Panels - Refined with better styling */}
         <Portal>
           <CreateProjectModal
             isOpen={isCreateProjectOpen}
@@ -495,7 +641,30 @@ export default function MainLayout() {
             onClose={onNotificationsClose}
           />
         </Portal>
+
+        {/* Keyboard Shortcuts Help - Toggle with ? key */}
+        <Box
+          position="fixed"
+          bottom="16px"
+          right="16px"
+          zIndex="100"
+          bg={cardBgColor}
+          borderRadius="full"
+          boxShadow="md"
+          border="1px solid"
+          borderColor={borderColor}
+          width="40px"
+          height="40px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          cursor="pointer"
+          _hover={{ bg: hoverBgColor }}
+          onClick={() => {/* Toggle keyboard shortcuts help */}}
+        >
+          <Text fontSize="lg" fontWeight="bold">?</Text>
+        </Box>
       </Box>
     </ErrorBoundary>
   );
-} 
+}
