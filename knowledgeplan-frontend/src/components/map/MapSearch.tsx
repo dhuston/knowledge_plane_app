@@ -44,9 +44,9 @@ const MapSearch: React.FC<MapSearchProps> = ({
   const [selectedTypes, setSelectedTypes] = useState<MapNodeTypeEnum[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const bg = useColorModeValue('white', 'gray.700');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const hoverBg = useColorModeValue('gray.50', 'gray.600');
+  const bg = useColorModeValue('surface.500', '#363636'); // White : Lighter button color
+  const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
+  const hoverBg = useColorModeValue('secondary.400', '#464646'); // Off-white/cream : Even lighter button color
 
   // Get type color based on node type
   const getTypeColor = (type: MapNodeTypeEnum): string => {
@@ -85,25 +85,25 @@ const MapSearch: React.FC<MapSearchProps> = ({
       }
 
       const label = node.label.toLowerCase();
-      
+
       // Exact match gets highest score
       if (label === query) {
         results.push({ node, matchScore: 100 });
         return;
       }
-      
+
       // Starts with gets high score
       if (label.startsWith(query)) {
         results.push({ node, matchScore: 80 });
         return;
       }
-      
+
       // Contains gets medium score
       if (label.includes(query)) {
         results.push({ node, matchScore: 60 });
         return;
       }
-      
+
       // Word boundary match gets lower score
       const words = label.split(/\s+/);
       for (const word of words) {
@@ -112,11 +112,11 @@ const MapSearch: React.FC<MapSearchProps> = ({
           return;
         }
       }
-      
+
       // Fuzzy match (contains all characters in sequence)
       let lastIndex = -1;
       let allCharsFound = true;
-      
+
       for (const char of query) {
         const index = label.indexOf(char, lastIndex + 1);
         if (index === -1) {
@@ -125,7 +125,7 @@ const MapSearch: React.FC<MapSearchProps> = ({
         }
         lastIndex = index;
       }
-      
+
       if (allCharsFound) {
         results.push({ node, matchScore: 20 });
       }
@@ -133,7 +133,7 @@ const MapSearch: React.FC<MapSearchProps> = ({
 
     // Sort by score (highest first)
     results.sort((a, b) => b.matchScore - a.matchScore);
-    
+
     // Limit to top 10 results
     setSearchResults(results.slice(0, 10));
   }, [searchQuery, nodes, selectedTypes]);
@@ -146,7 +146,7 @@ const MapSearch: React.FC<MapSearchProps> = ({
         e.preventDefault();
         inputRef.current?.focus();
       }
-      
+
       // Escape to clear search
       if (e.key === 'Escape' && document.activeElement === inputRef.current) {
         setSearchQuery('');
@@ -189,7 +189,7 @@ const MapSearch: React.FC<MapSearchProps> = ({
           <InputLeftElement pointerEvents="none">
             <FiSearch color="gray.300" />
           </InputLeftElement>
-          
+
           <Input
             ref={inputRef}
             placeholder={placeholder}
@@ -199,7 +199,7 @@ const MapSearch: React.FC<MapSearchProps> = ({
             borderRadius="md"
             pr="4.5rem"
           />
-          
+
           <InputRightElement width="4.5rem">
             {searchQuery && (
               <IconButton

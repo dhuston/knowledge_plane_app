@@ -1,6 +1,6 @@
 /**
  * KnowledgePlane AI Button Component
- * 
+ *
  * This file defines the button component styles, variants, and sizes
  * based on the design system.
  */
@@ -70,44 +70,44 @@ const Button = defineStyleConfig({
 
   // Variants
   variants: {
-    // Primary button (solid with brand color)
+    // Primary button (solid with dark color)
     primary: {
-      bg: 'primary.500',
+      bg: '#262626',
       color: 'white',
       _hover: {
-        bg: 'primary.600',
+        bg: '#363636',
         _disabled: {
-          bg: 'primary.500',
+          bg: '#262626',
         },
       },
       _active: {
-        bg: 'primary.700',
+        bg: '#464646',
       },
     },
 
-    // Secondary button (outlined with brand color)
+    // Secondary button (outlined with dark color)
     secondary: {
       bg: 'white',
-      color: 'primary.500',
+      color: '#262626',
       border: '1px solid',
-      borderColor: 'primary.500',
+      borderColor: '#262626',
       _hover: {
-        bg: 'primary.50',
+        bg: 'secondary.400',
       },
       _active: {
-        bg: 'primary.100',
+        bg: 'secondary.500',
       },
     },
 
-    // Tertiary button (ghost style with brand color)
+    // Tertiary button (ghost style with dark color)
     tertiary: {
       bg: 'transparent',
-      color: 'primary.500',
+      color: '#262626',
       _hover: {
-        bg: 'primary.50',
+        bg: 'secondary.400',
       },
       _active: {
-        bg: 'primary.100',
+        bg: 'secondary.500',
       },
     },
 
@@ -146,25 +146,51 @@ const Button = defineStyleConfig({
       padding: 0,
       height: 'auto',
       lineHeight: 'normal',
-      color: 'primary.500',
+      color: '#262626',
       _hover: {
         textDecoration: 'underline',
-        color: 'primary.600',
+        color: '#363636',
       },
       _active: {
-        color: 'primary.700',
+        color: '#464646',
       },
     },
 
     // Subtle (low emphasis)
     subtle: {
-      bg: 'primary.50',
-      color: 'primary.700',
+      bg: 'secondary.400',
+      color: '#262626',
       _hover: {
-        bg: 'primary.100',
+        bg: 'secondary.500',
       },
       _active: {
-        bg: 'primary.200',
+        bg: 'secondary.600',
+      },
+    },
+
+    // Ghost variant (transparent with hover effect)
+    ghost: {
+      bg: 'transparent',
+      color: '#262626',
+      _hover: {
+        bg: 'secondary.400',
+      },
+      _active: {
+        bg: 'secondary.500',
+      },
+    },
+
+    // Map control button
+    mapControl: {
+      bg: 'surface.500',
+      color: '#262626',
+      boxShadow: 'sm',
+      borderRadius: 'md',
+      _hover: {
+        bg: 'secondary.400',
+      },
+      _active: {
+        bg: 'secondary.500',
       },
     },
   },
@@ -176,4 +202,4 @@ const Button = defineStyleConfig({
   },
 });
 
-export default Button; 
+export default Button;

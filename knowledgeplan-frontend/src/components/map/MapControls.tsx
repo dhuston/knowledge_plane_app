@@ -18,11 +18,11 @@ import {
   PopoverArrow,
   Text,
 } from '@chakra-ui/react';
-import { 
-  FiZoomIn, 
-  FiZoomOut, 
-  FiMaximize, 
-  FiRefreshCw, 
+import {
+  FiZoomIn,
+  FiZoomOut,
+  FiMaximize,
+  FiRefreshCw,
   FiHome,
   FiFilter,
   FiLayers,
@@ -54,8 +54,8 @@ const MapControls: React.FC<MapControlsProps> = ({
   onToggleLayers,
   onToggleSettings,
 }) => {
-  const bg = useColorModeValue('white', 'gray.700');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const bg = useColorModeValue('surface.500', '#363636'); // White : Lighter button color
+  const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
 
   return (
     <Box
@@ -78,10 +78,11 @@ const MapControls: React.FC<MapControlsProps> = ({
             aria-label="Zoom In"
             icon={<FiZoomIn />}
             size="sm"
+            variant="mapControl"
             onClick={onZoomIn}
           />
         </Tooltip>
-        
+
         {/* Zoom Slider */}
         <Popover trigger="hover" placement="left">
           <PopoverTrigger>
@@ -94,8 +95,8 @@ const MapControls: React.FC<MapControlsProps> = ({
                 value={zoomLevel}
                 onChange={onZoomChange}
               >
-                <SliderTrack>
-                  <SliderFilledTrack />
+                <SliderTrack bg="primary.300">
+                  <SliderFilledTrack bg="#262626" />
                 </SliderTrack>
                 <SliderThumb />
               </Slider>
@@ -108,48 +109,52 @@ const MapControls: React.FC<MapControlsProps> = ({
             </PopoverBody>
           </PopoverContent>
         </Popover>
-        
+
         <Tooltip label="Zoom Out (- or Scroll Down)" placement="left">
           <IconButton
             aria-label="Zoom Out"
             icon={<FiZoomOut />}
             size="sm"
+            variant="mapControl"
             onClick={onZoomOut}
           />
         </Tooltip>
-        
+
         <Divider />
-        
+
         {/* Navigation Controls */}
         <Tooltip label="Center View" placement="left">
           <IconButton
             aria-label="Center View"
             icon={<FiHome />}
             size="sm"
+            variant="mapControl"
             onClick={onCenter}
           />
         </Tooltip>
-        
+
         <Tooltip label="Reset Layout" placement="left">
           <IconButton
             aria-label="Reset Layout"
             icon={<FiRefreshCw />}
             size="sm"
+            variant="mapControl"
             onClick={onReset}
           />
         </Tooltip>
-        
+
         <Tooltip label="Full Screen (F)" placement="left">
           <IconButton
             aria-label="Full Screen"
             icon={<FiMaximize />}
             size="sm"
+            variant="mapControl"
             onClick={onFullScreen}
           />
         </Tooltip>
-        
+
         <Divider />
-        
+
         {/* Additional Controls */}
         {onToggleFilters && (
           <Tooltip label="Filters" placement="left">
@@ -157,28 +162,31 @@ const MapControls: React.FC<MapControlsProps> = ({
               aria-label="Filters"
               icon={<FiFilter />}
               size="sm"
+              variant="mapControl"
               onClick={onToggleFilters}
             />
           </Tooltip>
         )}
-        
+
         {onToggleLayers && (
           <Tooltip label="Layers" placement="left">
             <IconButton
               aria-label="Layers"
               icon={<FiLayers />}
               size="sm"
+              variant="mapControl"
               onClick={onToggleLayers}
             />
           </Tooltip>
         )}
-        
+
         {onToggleSettings && (
           <Tooltip label="Settings" placement="left">
             <IconButton
               aria-label="Settings"
               icon={<FiSettings />}
               size="sm"
+              variant="mapControl"
               onClick={onToggleSettings}
             />
           </Tooltip>

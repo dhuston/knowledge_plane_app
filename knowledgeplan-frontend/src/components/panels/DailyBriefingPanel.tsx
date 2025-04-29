@@ -8,14 +8,56 @@ import {
     AlertIcon,
     CloseButton,
     HStack,
-    // Add Drawer or Modal components if needed for display
+    VStack,
+    Icon,
+    Flex,
+    Badge,
+    Divider,
+    Link,
+    useColorModeValue,
 } from '@chakra-ui/react';
+import { MdOutlineInsights } from 'react-icons/md';
+import { FiClock, FiCalendar, FiAlertCircle, FiCheckCircle, FiFileText, FiUsers } from 'react-icons/fi';
 
 import { useApiClient } from '../../hooks/useApiClient';
 
-// Define interface for the briefing response
+// Define interfaces for the briefing response
+interface Experiment {
+    id: string;
+    name: string;
+    status: string;
+    dueTime?: string;
+    dueMinutes?: number;
+}
+
+interface ScheduleItem {
+    id: string;
+    title: string;
+    time: string;
+    type: 'meeting' | 'deadline' | 'reminder';
+}
+
+interface Update {
+    id: string;
+    title: string;
+    type: string;
+    time?: string;
+}
+
+interface Action {
+    id: string;
+    title: string;
+    priority: 'high' | 'medium' | 'low';
+}
+
 interface BriefingResponse {
     summary: string;
+    greeting?: string;
+    name?: string;
+    experiments?: Experiment[];
+    schedule?: ScheduleItem[];
+    updates?: Update[];
+    actions?: Action[];
 }
 
 interface DailyBriefingPanelProps {
@@ -24,34 +66,47 @@ interface DailyBriefingPanelProps {
 }
 
 const DailyBriefingPanel: React.FC<DailyBriefingPanelProps> = ({ isOpen, onClose }) => {
-    // State to hold the briefing summary string
-    const [briefingSummary, setBriefingSummary] = React.useState<string | null>(null);
+    // State to hold the briefing data
+    const [briefingData, setBriefingData] = React.useState<BriefingResponse | null>(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
-    
+
     // API client for authenticated calls
     const apiClient = useApiClient();
 
+    // Colors for styling
+    const cardBg = useColorModeValue('white', 'gray.800');
+    const borderColor = useColorModeValue('gray.200', 'gray.700');
+    const highlightBg = useColorModeValue('primary.50', 'primary.900');
+    const secondaryText = useColorModeValue('gray.600', 'gray.400');
+    const accentColor = useColorModeValue('primary.500', 'primary.300');
+    const subtleBg = useColorModeValue('gray.50', 'gray.800');
+
     React.useEffect(() => {
         if (!isOpen) {
-             // Optionally clear state when closed
-            // setBriefingSummary(null);
-            // setError(null);
-            return; 
+            return;
         }
 
         const fetchBriefing = async () => {
             setIsLoading(true);
             setError(null);
-            setBriefingSummary(null);
+            setBriefingData(null);
             try {
-                // Fetch from the new briefing endpoint
+                // Fetch from the briefing endpoint
                 const response = await apiClient.get<BriefingResponse>('/briefings/daily');
-                setBriefingSummary(response.data.summary || "No briefing summary available.");
+
+                // Just use the data from the API response
+                setBriefingData({
+                    summary: response.data.summary || "No summary available for today.",
+                    // We'll use the current time of day for the greeting
+                    greeting: `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}`,
+                    // Use the user's name if available from the response
+                    name: response.data.name
+                });
             } catch (err) {
                 console.error("Error fetching daily briefing:", err);
                 setError("Failed to load briefing data.");
-                setBriefingSummary(null); // Clear summary on error
+                setBriefingData(null);
             } finally {
                 setIsLoading(false);
             }
@@ -61,37 +116,83 @@ const DailyBriefingPanel: React.FC<DailyBriefingPanelProps> = ({ isOpen, onClose
 
     }, [isOpen, apiClient]); // Re-fetch when isOpen changes or apiClient changes
 
-    // Basic rendering logic
-    const renderContent = () => {
-        if (isLoading) {
-            return <Spinner />;
+    // We'll use a single function to render the AI-generated summary
+    const renderSummary = () => {
+        if (!briefingData?.summary) {
+            return null;
         }
-        if (error) {
-            return <Alert status="error"><AlertIcon />{error}</Alert>;
-        }
-        if (!briefingSummary) {
-            return <Text>No briefing available.</Text>;
-        }
+
         return (
-            // Display the summary text, potentially using Markdown or similar rendering later
-            // For now, just display the raw string, respecting whitespace
-            <Text whiteSpace="pre-wrap"> 
-                {briefingSummary}
-            </Text>
+            <Box>
+                <Text whiteSpace="pre-wrap" fontSize="md" lineHeight="tall">
+                    {briefingData.summary}
+                </Text>
+            </Box>
         );
     };
 
-    // TODO: Wrap with Drawer or Modal component if needed
-    // Example using a simple Box for now if rendered directly in layout
+    // Basic rendering logic
+    const renderContent = () => {
+        if (isLoading) {
+            return (
+                <Center py={8}>
+                    <Spinner color="primary.500" size="lg" />
+                </Center>
+            );
+        }
+
+        if (error) {
+            return <Alert status="error" variant="left-accent"><AlertIcon />{error}</Alert>;
+        }
+
+        if (!briefingData) {
+            return (
+                <Box textAlign="center" py={8}>
+                    <Icon as={MdOutlineInsights} boxSize={12} color="gray.400" mb={4} />
+                    <Text fontSize="lg" fontWeight="medium" mb={2}>No briefing available</Text>
+                    <Text color="gray.500">Check back later for your daily research insights</Text>
+                </Box>
+            );
+        }
+
+        return (
+            <VStack spacing={4} align="stretch">
+                {/* Greeting */}
+                <Heading size="md">
+                    {briefingData.greeting || 'Good afternoon'}, {briefingData.name || 'there'}
+                </Heading>
+
+                {/* Main content - AI-generated summary */}
+                <Box mt={2}>
+                    {renderSummary()}
+                </Box>
+            </VStack>
+        );
+    };
+
     return (
-        <Box p={4}>
+        <Box
+            p={5}
+            bg={cardBg}
+            borderRadius="lg"
+            borderWidth="1px"
+            borderColor={borderColor}
+            boxShadow="md"
+            maxW="800px"
+            mx="auto"
+            my={4}
+        >
             <HStack justifyContent="space-between" mb={4}>
-                 <Heading size="md">Daily Briefing</Heading>
-                 <CloseButton onClick={onClose} />
-             </HStack>
+                <HStack spacing={2}>
+                    <Icon as={MdOutlineInsights} color={accentColor} boxSize={5} />
+                    <Heading size="md">Daily Briefing</Heading>
+                </HStack>
+                <CloseButton onClick={onClose} />
+            </HStack>
+            <Divider mb={4} />
             {renderContent()}
         </Box>
     );
 };
 
-export default DailyBriefingPanel; 
+export default DailyBriefingPanel;

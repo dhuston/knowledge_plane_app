@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 // Remove react-force-graph import
-// import { ForceGraph2D } from 'react-force-graph'; 
+// import { ForceGraph2D } from 'react-force-graph';
 
 // React-Sigma (v1 Wrapper) Imports
 // import { Sigma, RelativeSize, RandomizeNodePositions, SigmaEnableWebGL, ForceAtlas2 } from "react-sigma";
@@ -153,15 +153,15 @@ const LivingMap: React.FC<LivingMapProps> = ({
         return () => { isMounted.current = false; };
     }, []);
 
-    // --- Effect for Processing API Data for react-sigma (v1) --- 
+    // --- Effect for Processing API Data for react-sigma (v1) ---
     useEffect(() => {
         if (!rawApiData || !isMounted.current) return;
-        
+
         console.log("[LivingMap] Processing raw API data for react-sigma v1...");
         setIsLoading(true);
-        
+
         try {
-            // --- TODO: Filtering/Clustering --- 
+            // --- TODO: Filtering/Clustering ---
             const nodesToProcess = rawApiData.nodes || [];
             const edgesToProcess = rawApiData.edges || [];
             const nodeIdsToRender = new Set(nodesToProcess.map(n => n.id));
@@ -174,7 +174,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
                 size: node.type === MapNodeTypeEnum.TEAM ? 15 : 10,
                 x: Math.random() * 1000, // ADD INITIAL X
                 y: Math.random() * 1000, // ADD INITIAL Y
-                originalApiData: node 
+                originalApiData: node
             }));
 
             const edges: SigmaEdgeTemp[] = [];
@@ -194,7 +194,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
 
             console.log(`[LivingMap] Setting data for react-sigma v1 (${nodes.length} nodes, ${edges.length} edges).`);
             setSigmaGraphData({ nodes, edges });
-            
+
             if (isMounted.current && onMapLoad) {
                  setTimeout(() => { if(isMounted.current && onMapLoad) onMapLoad(); }, 100);
             }
@@ -208,7 +208,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
 
     }, [rawApiData, onMapLoad]);
 
-    // --- Data Fetching Logic --- 
+    // --- Data Fetching Logic ---
     const fetchInitialMapData = useCallback(async () => {
         if (!isMounted.current || !apiClient) return;
         console.log("[LivingMap] Fetching initial map data...");
@@ -216,7 +216,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
         setError(null);
         try {
             // For now, fetch all data initially - implement viewport loading later if needed
-            const response = await apiClient.get<MapData>(`/map/data`); 
+            const response = await apiClient.get<MapData>(`/map/data`);
             if (!isMounted.current) return;
             console.log("[LivingMap] Initial data received:", response.data);
             setRawApiData(response.data);
@@ -235,18 +235,18 @@ const LivingMap: React.FC<LivingMapProps> = ({
              }
         } finally {
             // Loading state is handled by the processing effect
-            // setIsLoading(false); 
+            // setIsLoading(false);
         }
     }, [apiClient, toast]);
 
-    // --- useEffect: Initial Map Load --- 
+    // --- useEffect: Initial Map Load ---
     useEffect(() => {
         if (!rawApiData) {
             fetchInitialMapData();
         }
     }, [rawApiData, fetchInitialMapData]);
 
-    // --- Delta Update Logic (Needs adaptation for react-force-graph) --- 
+    // --- Delta Update Logic (Needs adaptation for react-force-graph) ---
     const applyDeltaUpdates = useCallback((/* deltaData: DeltaData - Comment out */) => {
         console.warn("[LivingMap] Delta update logic needs react-force-graph adaptation!");
     }, []);
@@ -265,7 +265,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
 
     useDeltaStream(handleDeltaUpdate);
 
-    // --- Search Logic --- 
+    // --- Search Logic ---
     const focusOnNode = useCallback((nodeId: string) => {
         const node = sigmaGraphData?.nodes.find(n => n.id === nodeId);
         if (node && node.x !== undefined && node.y !== undefined) {
@@ -278,7 +278,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
             // });
         }
         setSearchResults([]);
-    }, [sigmaGraphData]); 
+    }, [sigmaGraphData]);
 
     useEffect(() => {
         const query = searchQuery.trim().toLowerCase();
@@ -289,7 +289,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
         const matches: SearchResult[] = [];
         sigmaGraphData?.nodes.forEach((node) => {
             if (node.label?.toLowerCase().includes(query)) {
-                matches.push({ id: node.id, label: node.label || node.id }); 
+                matches.push({ id: node.id, label: node.label || node.id });
             }
         });
         setSearchResults(matches.slice(0, 8));
@@ -345,17 +345,17 @@ const LivingMap: React.FC<LivingMapProps> = ({
     // --- Filter Panel State ---
     const { isOpen: isFilterPanelOpen, onToggle: onFilterPanelToggle } = useDisclosure();
 
-    // --- Render Logic --- 
-    if (isLoading && sigmaGraphData?.nodes.length === 0) { 
+    // --- Render Logic ---
+    if (isLoading && sigmaGraphData?.nodes.length === 0) {
         return <Box display="flex" justifyContent="center" alignItems="center" height="100%"><Spinner size="xl" /></Box>;
     }
-    if (error) { 
+    if (error) {
         return <Box p={5}><Text color="red.500">Error: {error}</Text></Box>;
     }
 
     return (
         <Box height="100%" width="100%" position="relative">
-            <Box height="100%" width="100%" background="#f8f8f8" minH="300px"> 
+            <Box height="100%" width="100%" background="#f8f8f8" minH="300px">
                  {sigmaGraphData ? (
                     <SigmaContainer style={{ width: '100%', height: '100%' }} settings={{ allowInvalidContainer: true }}>
                         <SigmaLoader graphData={sigmaGraphData} onSigmaNodeClick={(id)=>onNodeClick(id)} />
@@ -370,8 +370,8 @@ const LivingMap: React.FC<LivingMapProps> = ({
                  )}
             </Box>
 
-            {/* Keep Overlays */} 
-            {/* Filter Toggle Button */} 
+            {/* Keep Overlays */}
+            {/* Filter Toggle Button */}
             <IconButton
                 aria-label="Toggle Filters"
                 icon={<FaFilter />}
@@ -384,10 +384,10 @@ const LivingMap: React.FC<LivingMapProps> = ({
                 colorScheme={isFilterPanelOpen ? 'blue' : 'gray'}
                 variant={isFilterPanelOpen ? 'solid' : 'outline'}
             />
-            
-            {/* Filter Panel (Logic needs reimplementing) */} 
+
+            {/* Filter Panel (Logic needs reimplementing) */}
             {isFilterPanelOpen && (
-                 <Box 
+                 <Box
                     position="absolute"
                     top="55px" // Adjust position
                     right="15px"
@@ -400,39 +400,57 @@ const LivingMap: React.FC<LivingMapProps> = ({
                     borderColor="gray.200"
                     minWidth="220px"
                  >
-                    {/* TODO: Reimplement filter logic based on graphology/sigma */} 
+                    {/* TODO: Reimplement filter logic based on graphology/sigma */}
                     <Text fontWeight="bold" mb={3}>Filters (WIP)</Text>
                     <Text fontSize="sm">Node Type / Status filters need reimplementation.</Text>
                  </Box>
             )}
 
-            {/* Search Bar */} 
+            {/* Search Bar */}
             <HStack
                 position="absolute"
                 top="15px"
                 left="15px" // Moved to left
                 zIndex={4}
-                bg="white"
+                bg="surface.500" // White
                 p={1}
                 borderRadius="md"
                 shadow="sm"
+                borderWidth="1px"
+                borderColor="primary.300" // Light mint green
+                _dark={{
+                    bg: '#363636', // Lighter button color
+                    borderColor: 'primary.600', // Sage green
+                }}
             >
-                <Input 
-                    size="sm" 
-                    placeholder="Search node..." 
-                    value={searchQuery} 
-                    onChange={(e)=>setSearchQuery(e.target.value)} 
+                <Input
+                    size="sm"
+                    placeholder="Search node..."
+                    value={searchQuery}
+                    onChange={(e)=>setSearchQuery(e.target.value)}
                     onKeyDown={(e)=>{
                         if (e.key === 'Enter' && searchResults.length) {
                             focusOnNode(searchResults[0].id);
                         }
                     }}
-                    width="160px" 
+                    width="160px"
+                    variant="outline"
+                    bg="surface.500" // White
+                    color="#262626" // Button color - dark gray/almost black
+                    _dark={{
+                        bg: '#363636', // Lighter button color
+                        color: 'secondary.400', // Off-white/cream
+                    }}
                 />
                 <IconButton
                     aria-label="Search"
                     icon={<FiSearch />}
                     size="sm"
+                    variant="ghost"
+                    color="#262626" // Button color - dark gray/almost black
+                    _dark={{
+                        color: 'secondary.400', // Off-white/cream
+                    }}
                     onClick={() => {
                         if (searchResults.length) {
                             focusOnNode(searchResults[0].id);
@@ -441,20 +459,25 @@ const LivingMap: React.FC<LivingMapProps> = ({
                 />
             </HStack>
 
-            {/* Search Suggestions Dropdown */} 
+            {/* Search Suggestions Dropdown */}
             {searchResults.length > 0 && (
                 <Box
                     position="absolute"
-                    top="50px" 
+                    top="50px"
                     left="15px" // Moved to left
                     zIndex={5}
-                    bg="white"
+                    bg="surface.500" // White
                     borderWidth="1px"
+                    borderColor="primary.300" // Light mint green
                     borderRadius="md"
                     shadow="sm"
                     maxHeight="220px"
                     overflowY="auto"
                     width="220px"
+                    _dark={{
+                        bg: '#363636', // Lighter button color
+                        borderColor: 'primary.600', // Sage green
+                    }}
                 >
                     <List spacing={0}>
                         {searchResults.map((node) => (
@@ -462,8 +485,13 @@ const LivingMap: React.FC<LivingMapProps> = ({
                                 key={node.id}
                                 px={3}
                                 py={2}
-                                _hover={{ bg: 'gray.100' }}
+                                _hover={{ bg: 'secondary.400' }} // Off-white/cream
                                 cursor="pointer"
+                                color="#262626" // Button color - dark gray/almost black
+                                _dark={{
+                                    _hover: { bg: '#464646' }, // Even lighter button color
+                                    color: 'secondary.400', // Off-white/cream
+                                }}
                                 onClick={() => focusOnNode(node.id)}
                             >
                                 {node.label}
@@ -472,22 +500,25 @@ const LivingMap: React.FC<LivingMapProps> = ({
                     </List>
                 </Box>
             )}
-            
-            {/* Loading Indicator Overlay */} 
+
+            {/* Loading Indicator Overlay */}
             {isLoading && (
-                 <Box 
-                    position="absolute" 
-                    top={0} 
-                    left={0} 
-                    right={0} 
-                    bottom={0} 
-                    bg="rgba(255, 255, 255, 0.7)" 
-                    display="flex" 
-                    justifyContent="center" 
+                 <Box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    right={0}
+                    bottom={0}
+                    bg="rgba(241, 242, 234, 0.7)" // Off-white/cream with transparency
+                    display="flex"
+                    justifyContent="center"
                     alignItems="center"
                     zIndex={10} // Ensure it's above the map container
+                    _dark={{
+                        bg: "rgba(38, 38, 38, 0.7)" // Button color with transparency
+                    }}
                  >
-                    <Spinner size="xl" />
+                    <Spinner size="xl" color="#262626" _dark={{ color: "secondary.400" }} />
                  </Box>
             )}
         </Box>
@@ -503,4 +534,4 @@ const LivingMap: React.FC<LivingMapProps> = ({
 //     );
 // };
 
-export default LivingMap; // Export the component directly 
+export default LivingMap; // Export the component directly

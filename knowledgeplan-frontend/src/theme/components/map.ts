@@ -6,21 +6,21 @@ import { defineStyleConfig } from '@chakra-ui/react';
 // Map container styling
 const MapContainer = defineStyleConfig({
   baseStyle: {
-    bg: 'gray.50',
+    bg: 'secondary.400', // Off-white/cream
     borderRadius: 'md',
     overflow: 'hidden',
     position: 'relative',
     _dark: {
-      bg: 'gray.800',
+      bg: '#363636', // Lighter button color
     },
   },
   variants: {
     default: {},
     bordered: {
       border: '1px solid',
-      borderColor: 'gray.200',
+      borderColor: 'primary.300', // Light mint green
       _dark: {
-        borderColor: 'gray.700',
+        borderColor: 'primary.600', // Sage green
       },
     },
   },
@@ -32,12 +32,12 @@ const MapContainer = defineStyleConfig({
 // Map controls styling
 const MapControls = defineStyleConfig({
   baseStyle: {
-    bg: 'white',
+    bg: 'surface.500', // White
     borderRadius: 'md',
     boxShadow: 'sm',
     p: 2,
     _dark: {
-      bg: 'gray.700',
+      bg: '#363636', // Lighter button color
     },
   },
   variants: {
@@ -53,14 +53,17 @@ const MapControls = defineStyleConfig({
 // Map legend styling
 const MapLegend = defineStyleConfig({
   baseStyle: {
-    bg: 'white',
+    bg: 'surface.500', // White
     borderRadius: 'md',
     boxShadow: 'sm',
     p: 2,
     fontSize: 'xs',
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
     _dark: {
-      bg: 'gray.700',
-      color: 'white',
+      bg: '#363636', // Lighter button color
+      color: 'secondary.400', // Off-white/cream
+      borderColor: 'primary.600', // Sage green
     },
   },
   variants: {
@@ -77,12 +80,15 @@ const MapLegend = defineStyleConfig({
 // Map search styling
 const MapSearch = defineStyleConfig({
   baseStyle: {
-    bg: 'white',
+    bg: 'surface.500', // White
     borderRadius: 'md',
     boxShadow: 'sm',
     p: 2,
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
     _dark: {
-      bg: 'gray.700',
+      bg: '#363636', // Lighter button color
+      borderColor: 'primary.600', // Sage green
     },
   },
   variants: {
@@ -101,15 +107,19 @@ const MapSearch = defineStyleConfig({
 // Node tooltip styling
 const NodeTooltip = defineStyleConfig({
   baseStyle: {
-    bg: 'white',
+    bg: 'surface.500', // White
     borderRadius: 'md',
     boxShadow: 'md',
     p: 3,
     maxWidth: '300px',
     zIndex: 1000,
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
+    color: '#262626', // Button color - dark gray/almost black
     _dark: {
-      bg: 'gray.700',
-      color: 'white',
+      bg: '#363636', // Lighter button color
+      color: 'secondary.400', // Off-white/cream
+      borderColor: 'primary.600', // Sage green
     },
   },
   variants: {

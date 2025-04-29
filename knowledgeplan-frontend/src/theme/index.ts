@@ -2,59 +2,15 @@
 // Main theme configuration with brand identity and enterprise styling
 
 import { extendTheme } from '@chakra-ui/react';
-import colorModeValues from './foundations/colorModes';
+import { palette } from './foundations/colors';
 import components from './components';
 
-// Color palette following enterprise SaaS standards
-const colors = {
-  primary: {
-    50: '#E6F6FF',
-    100: '#BAE3FF',
-    200: '#7CC4FA',
-    300: '#47A3F3',
-    400: '#2186EB',
-    500: '#0967D2', // primary brand color
-    600: '#0552B5',
-    700: '#03449E',
-    800: '#01337D',
-    900: '#002159',
-  },
-  secondary: {
-    50: '#F5F7FA',
-    100: '#E4E7EB',
-    200: '#CBD2D9',
-    300: '#9AA5B1',
-    400: '#7B8794',
-    500: '#616E7C',
-    600: '#52606D',
-    700: '#3E4C59',
-    800: '#323F4B',
-    900: '#1F2933',
-  },
-  success: {
-    500: '#27AB83',
-    600: '#199473',
-  },
-  warning: {
-    500: '#F7B955',
-    600: '#F59F00',
-  },
-  error: {
-    500: '#D64545',
-    600: '#BA2525',
-  },
-  info: {
-    500: '#4299E1',
-    600: '#2B6CB0',
-  },
-};
-
-// Typography system
+// Typography system - using modern, clean fonts
 const typography = {
   fonts: {
-    heading: 'Inter, -apple-system, system-ui, sans-serif',
-    body: 'Inter, -apple-system, system-ui, sans-serif',
-    mono: 'JetBrains Mono, monospace',
+    heading: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+    body: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+    mono: '"JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   },
   fontSizes: {
     xs: '0.75rem',
@@ -66,6 +22,29 @@ const typography = {
     '3xl': '1.875rem',
     '4xl': '2.25rem',
     '5xl': '3rem',
+  },
+  fontWeights: {
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    bold: 700,
+  },
+  lineHeights: {
+    normal: 'normal',
+    none: 1,
+    shorter: 1.25,
+    short: 1.375,
+    base: 1.5,
+    tall: 1.625,
+    taller: 2,
+  },
+  letterSpacings: {
+    tighter: '-0.05em',
+    tight: '-0.025em',
+    normal: '0',
+    wide: '0.025em',
+    wider: '0.05em',
+    widest: '0.1em',
   },
 };
 
@@ -112,14 +91,14 @@ const config = {
   useSystemColorMode: true, // Enable system preference detection
 };
 
-// Global styles
+// Global styles with improved aesthetics
 const styles = {
-  global: (props) => ({
+  global: (props: { colorMode: string }) => ({
     // Base styles
     'html, body': {
-      color: props.colorMode === 'dark' ? 'gray.50' : 'gray.800',
-      bg: props.colorMode === 'dark' ? 'gray.900' : 'gray.50',
-      lineHeight: 'body',
+      color: props.colorMode === 'dark' ? 'secondary.400' : '#262626', // Off-white/cream : Button color
+      bg: props.colorMode === 'dark' ? '#262626' : 'secondary.400', // Button color : Off-white/cream
+      lineHeight: 'base',
       fontFamily: 'body',
       fontSize: 'md',
       WebkitFontSmoothing: 'antialiased',
@@ -129,48 +108,49 @@ const styles = {
 
     // Default text selection
     '::selection': {
-      bg: props.colorMode === 'dark' ? 'brand.800' : 'brand.100',
-      color: props.colorMode === 'dark' ? 'brand.100' : 'brand.900',
+      bg: props.colorMode === 'dark' ? 'primary.600' : 'primary.300', // Sage green : Light mint green
+      color: props.colorMode === 'dark' ? 'secondary.400' : '#262626', // Off-white/cream : Button color
     },
 
-    // Scrollbar styling
+    // Scrollbar styling - thinner, more modern
     '::-webkit-scrollbar': {
-      width: '8px',
-      height: '8px',
+      width: '6px',
+      height: '6px',
     },
     '::-webkit-scrollbar-track': {
-      bg: props.colorMode === 'dark' ? 'gray.800' : 'gray.100',
+      bg: props.colorMode === 'dark' ? '#363636' : 'secondary.400', // Lighter button color : Off-white/cream
     },
     '::-webkit-scrollbar-thumb': {
-      bg: props.colorMode === 'dark' ? 'gray.600' : 'gray.300',
+      bg: props.colorMode === 'dark' ? '#565656' : 'primary.300', // Button variant : Light mint green
       borderRadius: 'full',
     },
     '::-webkit-scrollbar-thumb:hover': {
-      bg: props.colorMode === 'dark' ? 'gray.500' : 'gray.400',
+      bg: props.colorMode === 'dark' ? 'primary.600' : 'primary.400', // Sage green : Lighter mint green
     },
 
-    // Focus outline
+    // Focus outline - more subtle
     '*:focus': {
       outline: 'none',
-      boxShadow: 'focus',
+      boxShadow: '0 0 0 2px rgba(197, 212, 202, 0.5)', // Light mint green with transparency
     },
     '*:focus:not(:focus-visible)': {
       boxShadow: 'none',
     },
     '*:focus-visible': {
-      boxShadow: 'focus',
+      boxShadow: '0 0 0 2px rgba(141, 162, 148, 0.5)', // Sage green with transparency
     },
 
-    // Default transitions
+    // Default transitions - smoother
     '*': {
-      borderColor: props.colorMode === 'dark' ? 'gray.700' : 'gray.200',
-      transitionProperty: 'common',
-      transitionDuration: 'normal',
+      borderColor: props.colorMode === 'dark' ? 'primary.600' : 'primary.300', // Sage green : Light mint green
+      transitionProperty: 'all',
+      transitionDuration: '0.2s',
+      transitionTimingFunction: 'ease-in-out',
     },
 
     // Placeholder styling
     '::placeholder': {
-      color: props.colorMode === 'dark' ? 'gray.500' : 'gray.400',
+      color: props.colorMode === 'dark' ? '#565656' : 'primary.600', // Button variant : Sage green
     },
 
     // Disabled state
@@ -179,57 +159,99 @@ const styles = {
       opacity: 0.6,
     },
 
-    // Headings
+    // Headings - more modern typography
     'h1, h2, h3, h4, h5, h6': {
       fontFamily: 'heading',
       fontWeight: 'semibold',
       letterSpacing: 'tight',
-      color: props.colorMode === 'dark' ? 'gray.100' : 'gray.900',
+      lineHeight: 'shorter',
+      color: props.colorMode === 'dark' ? 'secondary.400' : '#262626', // Off-white/cream : Button color
     },
 
-    // Links
+    // Links - more vibrant
     a: {
-      color: props.colorMode === 'dark' ? 'brand.300' : 'brand.500',
+      color: props.colorMode === 'dark' ? 'primary.400' : 'primary.600', // Lighter mint green : Sage green
       textDecoration: 'none',
       _hover: {
-        textDecoration: 'underline',
+        color: props.colorMode === 'dark' ? 'primary.300' : 'primary.700', // Light mint green : Darker sage green
+        textDecoration: 'none',
       },
     },
 
-    // Code blocks
+    // Code blocks - better contrast
     'pre, code': {
       fontFamily: 'mono',
-      bg: props.colorMode === 'dark' ? 'gray.800' : 'gray.100',
+      fontSize: '0.9em',
+      padding: '0.2em 0.4em',
+      borderRadius: 'md',
+      bg: props.colorMode === 'dark' ? '#363636' : 'secondary.400', // Lighter button color : Off-white/cream
     },
   }),
 };
 
-// Layer styles for common patterns
+// Layer styles for common patterns - more modern and refined
 const layerStyles = {
   card: {
-    bg: 'bg.card',
-    borderRadius: 'card',
-    boxShadow: 'card',
-    p: 'card-padding',
+    bg: 'surface.500', // White
+    borderRadius: 'lg',
+    boxShadow: 'sm',
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
+    p: 4,
+    transition: 'all 0.2s',
+    _dark: {
+      bg: '#363636', // Lighter button color
+      borderColor: 'primary.600', // Sage green
+    }
   },
   'card-hover': {
-    bg: 'bg.card',
-    borderRadius: 'card',
-    boxShadow: 'card',
-    p: 'card-padding',
-    _hover: {
-      boxShadow: 'card-hover',
-      transform: 'translateY(-2px)',
-    },
+    bg: 'surface.500', // White
+    borderRadius: 'lg',
+    boxShadow: 'sm',
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
+    p: 4,
     transition: 'all 0.2s',
+    _dark: {
+      bg: '#363636', // Lighter button color
+      borderColor: 'primary.600', // Sage green
+    },
+    _hover: {
+      boxShadow: 'md',
+      transform: 'translateY(-2px)',
+      borderColor: 'primary.400', // Lighter mint green
+      _dark: {
+        borderColor: 'primary.500', // Darker sage green
+      }
+    },
   },
   'glass-panel': {
-    bg: 'whiteAlpha.800',
-    backdropFilter: 'blur(8px)',
-    borderRadius: 'lg',
+    bg: 'whiteAlpha.900',
+    backdropFilter: 'blur(10px)',
+    borderRadius: 'xl',
     boxShadow: 'lg',
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
     _dark: {
-      bg: 'blackAlpha.600',
+      bg: 'blackAlpha.700',
+      borderColor: 'primary.600', // Sage green
+    },
+  },
+  'feature-card': {
+    bg: 'surface.500', // White
+    borderRadius: 'xl',
+    boxShadow: 'md',
+    p: 6,
+    borderWidth: '1px',
+    borderColor: 'primary.300', // Light mint green
+    transition: 'all 0.3s',
+    _dark: {
+      bg: '#363636', // Lighter button color
+      borderColor: 'primary.600', // Sage green
+    },
+    _hover: {
+      transform: 'translateY(-4px)',
+      boxShadow: 'lg',
     },
   },
 };
@@ -299,17 +321,23 @@ const layout = {
   },
 };
 
-// Shadows
+// Shadows - more subtle and modern
 const shadows = {
-  xs: '0 0 0 1px rgba(0, 0, 0, 0.05)',
-  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-  base: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-  '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-  inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
-  outline: '0 0 0 3px rgba(66, 153, 225, 0.6)',
+  xs: '0 0 0 1px rgba(197, 212, 202, 0.1)', // Light mint green with transparency
+  sm: '0 1px 3px rgba(197, 212, 202, 0.1), 0 1px 2px rgba(197, 212, 202, 0.06)',
+  base: '0 1px 4px rgba(197, 212, 202, 0.15), 0 1px 2px rgba(197, 212, 202, 0.08)',
+  md: '0 4px 8px rgba(197, 212, 202, 0.15), 0 2px 4px rgba(197, 212, 202, 0.08)',
+  lg: '0 10px 20px rgba(197, 212, 202, 0.15), 0 3px 6px rgba(197, 212, 202, 0.08)',
+  xl: '0 20px 25px rgba(197, 212, 202, 0.15), 0 10px 10px rgba(197, 212, 202, 0.05)',
+  '2xl': '0 25px 50px rgba(197, 212, 202, 0.2)',
+  inner: 'inset 0 2px 4px rgba(197, 212, 202, 0.08)',
+  outline: '0 0 0 3px rgba(197, 212, 202, 0.5)', // Light mint green with transparency
+  'outline-primary': '0 0 0 3px rgba(197, 212, 202, 0.5)', // Light mint green with transparency
+  'outline-success': '0 0 0 3px rgba(34, 197, 94, 0.4)', // Success green with transparency
+  'outline-error': '0 0 0 3px rgba(176, 0, 32, 0.4)', // Deep red with transparency
+  'outline-warning': '0 0 0 3px rgba(245, 158, 11, 0.4)', // Warning amber with transparency
+  'card-hover': '0 8px 16px rgba(197, 212, 202, 0.15), 0 3px 6px rgba(197, 212, 202, 0.08)',
+  'card-focus': '0 0 0 3px rgba(197, 212, 202, 0.5), 0 4px 8px rgba(197, 212, 202, 0.15)',
   none: 'none',
 };
 
@@ -340,18 +368,26 @@ const transition = {
 
 // Combine all tokens into the theme
 const theme = extendTheme({
-  colors,
+  colors: {
+    primary: palette.primary,
+    secondary: palette.secondary,
+    surface: palette.surface,
+    error: palette.error,
+    warning: palette.warning,
+    info: palette.info,
+    success: palette.success,
+    gray: palette.gray,
+  },
   ...typography,
   space,
-  components,
   ...layout,
   shadows,
   transition,
+  components,
   styles,
   layerStyles,
   textStyles,
-  semanticTokens: colorModeValues, // Add the color mode values
   config,
 });
 
-export default theme; 
+export default theme;

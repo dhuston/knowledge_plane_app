@@ -18,48 +18,30 @@ import {
   Icon,
   Button,
   Tag,
-  Divider,
   Portal,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
 } from "@chakra-ui/react";
-import { FiCheckCircle, FiClock, FiMap, FiMaximize } from 'react-icons/fi';
+import { FiMap } from 'react-icons/fi';
 import { AddIcon } from '@chakra-ui/icons';
-import { MdOutlineInsights } from 'react-icons/md';
 import { useAuth } from '../../context/AuthContext';
 import CreateProjectModal from '../modals/CreateProjectModal';
 import WebGLMap from '../map/WebGLMap';
 import BriefingPanel from '../panels/BriefingPanel';
-import DailyBriefingPanel from '../panels/DailyBriefingPanel';
 import NotificationCenter from '../notifications/NotificationCenter';
-import { MapNode } from '../../types/map';
+import { MapNode, MapNodeTypeEnum } from '../../types/map';
 import Header from './Header';
-import { SidebarNav } from '../ui/SidebarNav';
 import SkipNavLink from '../ui/SkipNavLink';
 import { useApiClient } from '../../hooks/useApiClient';
 import { useNavigate } from 'react-router-dom';
 import ErrorBoundary from '../error/ErrorBoundary';
-
-// Define a fixed header height (adjust as needed based on Header content)
-const HEADER_HEIGHT = '110px';
-
-// Mock data for dashboard components
-const mockTasks = [
-  { id: '1', title: 'Complete project proposal', dueDate: '2023-09-15', priority: 'high', completed: false },
-  { id: '2', title: 'Review team insights', dueDate: '2023-09-14', priority: 'medium', completed: false },
-  { id: '3', title: 'Prepare quarterly report', dueDate: '2023-09-20', priority: 'high', completed: false },
-  { id: '4', title: 'Knowledge base review', dueDate: '2023-09-18', priority: 'low', completed: true },
-];
-
-const mockInsights = [
-  { id: '1', title: 'Collaboration opportunity with Design team', type: 'collaboration', importance: 'high' },
-  { id: '2', title: 'Project Alpha is at risk of missing deadline', type: 'risk', importance: 'high' },
-  { id: '3', title: 'Knowledge overlap found in Team Beta and Team Gamma', type: 'overlap', importance: 'medium' },
-];
+import MyTeamTile from '../tiles/MyTeamTile';
 
 // Different workspace view types
 type WorkspaceViewType = 'command-center' | 'map-focus' | 'grid';
+
+// Define a fixed header height (adjust as needed based on Header content)
+const HEADER_HEIGHT = '60px';
+
+// No mock data needed anymore
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -70,19 +52,15 @@ export default function MainLayout() {
     onClose: onCreateProjectClose
   } = useDisclosure();
   const {
-    isOpen: isBriefingOpen,
-    onOpen: onBriefingOpen,
-    onClose: onBriefingClose
-  } = useDisclosure();
-  const {
     isOpen: isNotificationsOpen,
-    onOpen: onNotificationsOpen,
     onClose: onNotificationsClose
   } = useDisclosure();
 
   // Workspace view state
   const [workspaceView, setWorkspaceView] = useState<WorkspaceViewType>('command-center');
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
+  // State for active view
+  const [activeView, setActiveView] = useState<'myWork' | 'explore'>('myWork');
   // Placeholder until overlaps feature re-implemented
   const projectOverlaps: Record<string, string[]> = {};
   const [isMapLoading, setIsMapLoading] = useState(true);
@@ -91,18 +69,14 @@ export default function MainLayout() {
 
   const apiClient = useApiClient();
 
-  // Theme colors - refined for better visual hierarchy and harmony
-  const bgColor = useColorModeValue('gray.50', 'gray.900');
-  const cardBgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const secondaryTextColor = useColorModeValue('gray.600', 'gray.400');
-  const tertiaryTextColor = useColorModeValue('gray.500', 'gray.500');
-  const highlightColor = useColorModeValue('primary.50', 'primary.900');
-  const accentColor = useColorModeValue('primary.500', 'primary.300');
-  const subtleBgColor = useColorModeValue('gray.50', 'gray.800');
-  const hoverBgColor = useColorModeValue('gray.100', 'gray.700');
-  const glassBgColor = useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)');
-  const shadowColor = useColorModeValue('rgba(0, 0, 0, 0.1)', 'rgba(0, 0, 0, 0.4)');
+  // Theme colors - using our new color palette
+  const bgColor = useColorModeValue('secondary.400', '#262626'); // Off-white/cream : Button color
+  const cardBgColor = useColorModeValue('surface.500', '#363636'); // White : Lighter button color
+  const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
+  const secondaryTextColor = useColorModeValue('#565656', 'secondary.300'); // Button variant : Lighter off-white
+  const accentColor = useColorModeValue('primary.600', 'primary.300'); // Sage green : Light mint green
+  const hoverBgColor = useColorModeValue('secondary.500', '#464646'); // Darker off-white : Even lighter button color
+  const glassBgColor = useColorModeValue('rgba(241, 242, 234, 0.8)', 'rgba(38, 38, 38, 0.8)'); // Off-white/cream : Button color with transparency
 
   const handleLogout = () => {
     setToken(null);
@@ -110,7 +84,19 @@ export default function MainLayout() {
   };
 
   const handleMapNodeClick = (node: MapNode | null) => {
-    setSelectedNode(node);
+    if (node) {
+      // Handle different node types
+      if (node.type === MapNodeTypeEnum.TEAM) {
+        // Navigate to team page
+        navigate(`/team/${node.id}`);
+        return;
+      }
+      // For other node types, show the briefing panel
+      setSelectedNode(node);
+    } else {
+      // Clear selection when clicking on empty space
+      setSelectedNode(null);
+    }
   };
 
   const handleCreateProjectClick = () => {
@@ -119,13 +105,18 @@ export default function MainLayout() {
 
   const useWebGL = ((import.meta as unknown) as { env: Record<string, string> }).env.VITE_WEBGL_MAP === 'true';
 
-  // Fetch daily summary - fix the endpoint to match backend
+  // Fetch daily summary from the briefing endpoint
   const fetchDailySummary = React.useCallback(async () => {
     setIsLoadingDailySummary(true);
     try {
-      // Changed from '/briefings/daily_summary' to '/briefings/daily'
       const response = await apiClient.get('/briefings/daily');
-      setDailySummary(response.data.summary || 'No summary available for today.');
+
+      // For the dashboard, we'll just use the summary text
+      if (response.data && response.data.summary) {
+        setDailySummary(response.data.summary);
+      } else {
+        setDailySummary("Here's what's happening in your research today");
+      }
     } catch (err) {
       console.error("[MainLayout] Error fetching daily summary:", err);
       setDailySummary('Unable to load daily summary. Please try again later.');
@@ -163,9 +154,9 @@ export default function MainLayout() {
 
   // Render Map-Only View
   const renderMapFocusView = () => (
-    <Box height="100%" p={4}>
+    <Box height="100%" p={{ base: 6, md: 8 }}>
       <Card h="100%" shadow="sm" bg={cardBgColor} borderColor={borderColor} borderWidth="1px">
-        <CardHeader pb={0}>
+        <CardHeader pb={0} p={{ base: 6, md: 8 }}>
           <Flex justify="space-between" align="center">
             <HStack>
               <Icon as={FiMap} color={accentColor} boxSize={5} />
@@ -178,7 +169,7 @@ export default function MainLayout() {
             </HStack>
           </Flex>
         </CardHeader>
-        <CardBody>
+        <CardBody p={{ base: 6, md: 8 }} pt={2}>
           <Box
             position="relative"
             h="100%"
@@ -202,61 +193,64 @@ export default function MainLayout() {
     </Box>
   );
 
+  // This state is already defined at the top of the component
+  // const [activeView, setActiveView] = useState<'myWork' | 'explore'>('myWork');
+
   // Render Grid View (could be customized as needed)
   const renderGridView = () => (
-    <Box p={4} height="100%">
-      <Heading size="lg" mb={4}>Grid View</Heading>
-      <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4}>
+    <Box p={{ base: 6, md: 8 }} height="100%">
+      <Heading size="lg" mb={6}>Grid View</Heading>
+      <Grid templateColumns="repeat(auto-fill, minmax(320px, 1fr))" gap={{ base: 6, md: 8, lg: 10 }}>
         {/* Project Cards */}
         <Card>
-          <CardHeader>
+          <CardHeader p={{ base: 6, md: 8 }}>
             <Heading size="md">Project Alpha</Heading>
           </CardHeader>
-          <CardBody>
+          <CardBody p={{ base: 6, md: 8 }} pt={0}>
             <Text>Strategy initiative focused on market expansion</Text>
           </CardBody>
         </Card>
         <Card>
-          <CardHeader>
+          <CardHeader p={{ base: 6, md: 8 }}>
             <Heading size="md">Project Beta</Heading>
           </CardHeader>
-          <CardBody>
+          <CardBody p={{ base: 6, md: 8 }} pt={0}>
             <Text>Product development for next-gen platform</Text>
           </CardBody>
         </Card>
         <Card>
-          <CardHeader>
+          <CardHeader p={{ base: 6, md: 8 }}>
             <Heading size="md">Project Gamma</Heading>
           </CardHeader>
-          <CardBody>
+          <CardBody p={{ base: 6, md: 8 }} pt={0}>
             <Text>Internal process optimization</Text>
           </CardBody>
         </Card>
 
         {/* Team Cards */}
         <Card>
-          <CardHeader>
+          <CardHeader p={{ base: 6, md: 8 }}>
             <Heading size="md">Design Team</Heading>
           </CardHeader>
-          <CardBody>
+          <CardBody p={{ base: 6, md: 8 }} pt={0}>
             <Text>8 members - UI/UX focus</Text>
           </CardBody>
         </Card>
         <Card>
-          <CardHeader>
+          <CardHeader p={{ base: 6, md: 8 }}>
             <Heading size="md">Engineering Team</Heading>
           </CardHeader>
-          <CardBody>
+          <CardBody p={{ base: 6, md: 8 }} pt={0}>
             <Text>12 members - Platform & Infrastructure</Text>
           </CardBody>
         </Card>
 
         {/* Knowledge Cards */}
         <Card>
-          <CardHeader>
+          <CardHeader p={{ base: 6, md: 8 }}>
             <Heading size="md">Q3 Strategy</Heading>
           </CardHeader>
-          <CardBody>
+          <CardBody p={{ base: 6, md: 8 }} pt={0}>
             <Text>Organization focus areas and priorities</Text>
           </CardBody>
         </Card>
@@ -264,194 +258,67 @@ export default function MainLayout() {
     </Box>
   );
 
-  // Render Command Center View - Refined for better visual hierarchy and user experience
+  // Render Command Center View - Simplified with rearranged components
   const renderCommandCenterView = () => (
     <Box>
-      {/* Dashboard Header - Refined with better styling and breadcrumbs */}
-      <Box mb={6}>
-        <Flex justify="space-between" align="center" mb={2}>
-          <Box>
-            <Breadcrumb separator="/" fontSize="sm" color={tertiaryTextColor} mb={1}>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="#">Home</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem isCurrentPage>
-                <BreadcrumbLink href="#">Command Center</BreadcrumbLink>
-              </BreadcrumbItem>
-            </Breadcrumb>
-            <Heading
-              size="lg"
-              letterSpacing="tight"
-              bgGradient="linear(to-r, primary.500, primary.400)"
-              bgClip="text"
-            >
-              Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'},
-              {' '}{user?.name?.split(' ')[0] || 'there'}
-            </Heading>
-          </Box>
-          <HStack spacing={3}>
-            <Button
-              variant="outline"
-              leftIcon={<Icon as={FiClock} />}
-              size="sm"
-              onClick={() => {/* View recent activity */}}
-            >
-              Recent
-            </Button>
-            <Button
-              leftIcon={<AddIcon />}
-              colorScheme="primary"
-              onClick={handleCreateProjectClick}
-              size="sm"
-            >
-              New Project
-            </Button>
-          </HStack>
-        </Flex>
-        <Text color={secondaryTextColor}>
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          })}
-        </Text>
-      </Box>
+      {/* Removed header section - no content needed here */}
+      <Box mb={6}></Box>
 
-      {/* Dashboard Grid Layout - Refined with better spacing and visual hierarchy */}
+      {/* Main Content Grid - Rearranged for better flow with increased spacing */}
       <Grid
-        templateColumns={{ base: "1fr", lg: "3fr 1fr" }}
-        templateRows={{ base: "auto 1fr", lg: "1fr" }}
-        gap={6}
-        h="calc(100% - 80px)" // Account for dashboard header
+        templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
+        gap={{ base: 8, md: 10, lg: 12 }}
       >
-        {/* Map Section - Large in left column - Refined with better styling */}
-        <GridItem rowSpan={{ base: 1, lg: 2 }}>
+        {/* Daily Briefing Card - Updated to match screenshot */}
+        <GridItem colSpan={{ base: 1, md: 2 }}>
           <Card
-            h="100%"
             shadow="md"
             bg={cardBgColor}
             borderColor={borderColor}
             borderWidth="1px"
             borderRadius="lg"
-            overflow="hidden"
             transition="all 0.2s"
-            _hover={{ boxShadow: "lg" }}
-          >
-            <CardHeader pb={2}>
-              <Flex justify="space-between" align="center">
-                <HStack spacing={3}>
-                  <Icon as={FiMap} color={accentColor} boxSize={5} />
-                  <VStack align="start" spacing={0}>
-                    <Heading size="md">Living Map</Heading>
-                    <Text fontSize="xs" color={secondaryTextColor}>Interactive organizational visualization</Text>
-                  </VStack>
-                </HStack>
-                <HStack spacing={2}>
-                  <Tag size="sm" colorScheme={useWebGL ? "green" : "blue"} borderRadius="full">
-                    {useWebGL ? "WebGL" : "Standard"}
-                  </Tag>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleViewChange('map-focus')}
-                    aria-label="Expand map"
-                  >
-                    <Icon as={FiMaximize} />
-                  </Button>
-                </HStack>
-              </Flex>
-            </CardHeader>
-            <CardBody pt={0}>
-              <Box
-                position="relative"
-                h="100%"
-                borderRadius="md"
-                overflow="hidden"
-                boxShadow="inner"
-              >
-                <ErrorBoundary>
-                  {isMapLoading && (
-                    <Center position="absolute" inset={0} bg="rgba(0,0,0,0.05)" zIndex={1} backdropFilter="blur(2px)">
-                      <Spinner size="xl" color="primary.500" thickness="3px" speed="0.8s" />
-                    </Center>
-                  )}
-                  <WebGLMap
-                    onNodeClick={handleMapNodeClick}
-                    onLoad={handleMapLoad}
-                  />
-                </ErrorBoundary>
-              </Box>
-            </CardBody>
-          </Card>
-        </GridItem>
-
-        {/* Right Column - Command Cards - Refined with better styling */}
-        <GridItem>
-          {/* Daily Briefing Card - Refined with better styling */}
-          <Card
-            shadow="md"
-            bg={cardBgColor}
-            borderColor={borderColor}
-            borderWidth="1px"
-            h="100%"
             mb={6}
-            borderRadius="lg"
-            transition="all 0.2s"
-            _hover={{ boxShadow: "lg", transform: "translateY(-2px)" }}
           >
-            <CardHeader pb={2}>
-              <Flex justify="space-between" align="center">
-                <HStack spacing={3}>
-                  <Icon as={MdOutlineInsights} color={accentColor} boxSize={5} />
-                  <VStack align="start" spacing={0}>
-                    <Heading size="md">Daily Briefing</Heading>
-                    <Text fontSize="xs" color={secondaryTextColor}>Your daily organizational summary</Text>
-                  </VStack>
-                </HStack>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  colorScheme="primary"
-                  onClick={onBriefingOpen}
-                  aria-label="Expand briefing"
-                >
-                  <Icon as={FiMaximize} />
-                </Button>
-              </Flex>
-            </CardHeader>
-            <CardBody>
+            <CardBody p={{ base: 8, md: 10 }}>
               {isLoadingDailySummary ? (
-                <Center h="100%">
+                <Center h="100px">
                   <Spinner color="primary.500" />
                 </Center>
               ) : (
                 <VStack align="stretch" spacing={4}>
-                  <Text fontSize="sm" lineHeight="tall">{dailySummary}</Text>
-                  <Divider />
+                  {/* Header with greeting and action button */}
+                  <Flex justify="space-between" align="flex-start">
+                    <Flex direction="column" flex="1">
+                      <Heading
+                        size="lg"
+                        mb={1}
+                        color="#262626" // Dark button color for light mode
+                        fontWeight="bold"
+                        _dark={{ color: "secondary.400" }} // Off-white/cream for dark mode
+                      >
+                        Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0] || 'there'}
+                      </Heading>
+                      <Text fontSize="sm" color={secondaryTextColor}>
+                        Here's what's happening in your research today
+                      </Text>
+                    </Flex>
+                    <Button
+                      leftIcon={<AddIcon />}
+                      variant="primary"
+                      onClick={handleCreateProjectClick}
+                      size="sm"
+                      ml={4}
+                    >
+                      New Project
+                    </Button>
+                  </Flex>
+
+                  {/* Display the AI-generated summary */}
                   <Box>
-                    <Text fontSize="sm" fontWeight="medium" mb={2}>Top Insights:</Text>
-                    <VStack align="stretch" spacing={3}>
-                      {mockInsights.map((insight) => (
-                        <Box
-                          key={insight.id}
-                          p={3}
-                          bg={highlightColor}
-                          borderRadius="md"
-                          borderLeftWidth="3px"
-                          borderLeftColor={
-                            insight.importance === 'high' ? 'error.500' :
-                            insight.importance === 'medium' ? 'warning.500' :
-                            'info.500'
-                          }
-                          transition="all 0.2s"
-                          _hover={{ transform: "translateX(2px)" }}
-                          cursor="pointer"
-                        >
-                          <Text fontSize="sm">{insight.title}</Text>
-                        </Box>
-                      ))}
-                    </VStack>
+                    <Text fontSize="md" whiteSpace="pre-wrap">
+                      {dailySummary}
+                    </Text>
                   </Box>
                 </VStack>
               )}
@@ -459,84 +326,35 @@ export default function MainLayout() {
           </Card>
         </GridItem>
 
-        {/* Tasks Card - Refined with better styling */}
-        <GridItem>
-          <Card
-            shadow="md"
-            bg={cardBgColor}
-            borderColor={borderColor}
-            borderWidth="1px"
-            h="100%"
-            borderRadius="lg"
-            transition="all 0.2s"
-            _hover={{ boxShadow: "lg", transform: "translateY(-2px)" }}
-          >
-            <CardHeader pb={2}>
-              <Flex justify="space-between" align="center">
-                <HStack spacing={3}>
-                  <Icon as={FiCheckCircle} color={accentColor} boxSize={5} />
-                  <VStack align="start" spacing={0}>
-                    <Heading size="md">Today's Tasks</Heading>
-                    <Text fontSize="xs" color={secondaryTextColor}>Your upcoming tasks and deadlines</Text>
-                  </VStack>
-                </HStack>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  colorScheme="primary"
-                  aria-label="View all tasks"
-                >
-                  <Icon as={FiMaximize} />
-                </Button>
-              </Flex>
-            </CardHeader>
-            <CardBody>
-              <VStack align="stretch" spacing={4}>
-                {mockTasks.filter(t => !t.completed).slice(0, 3).map((task) => (
-                  <Flex
-                    key={task.id}
-                    justify="space-between"
-                    align="center"
-                    p={3}
-                    borderRadius="md"
-                    borderLeft="3px solid"
-                    borderLeftColor={
-                      task.priority === 'high' ? 'error.500' :
-                      task.priority === 'medium' ? 'warning.500' :
-                      'info.500'
-                    }
-                    bg={subtleBgColor}
-                    _hover={{ bg: hoverBgColor, transform: "translateX(2px)" }}
-                    cursor="pointer"
-                    transition="all 0.2s"
-                  >
-                    <VStack align="start" spacing={0}>
-                      <Text fontSize="sm" fontWeight="medium">{task.title}</Text>
-                      <Text fontSize="xs" color={secondaryTextColor}>Due: {task.dueDate}</Text>
-                    </VStack>
-                    <Tag
-                      size="sm"
-                      colorScheme={
-                        task.priority === 'high' ? 'red' :
-                        task.priority === 'medium' ? 'orange' :
-                        'blue'
-                      }
-                      borderRadius="full"
-                    >
-                      {task.priority}
-                    </Tag>
-                  </Flex>
-                ))}
-                <Button size="sm" variant="outline" rightIcon={<FiClock />} width="full">
-                  View All Tasks
-                </Button>
-              </VStack>
-            </CardBody>
-          </Card>
+        {/* My Team Tile - Full width */}
+        <GridItem colSpan={{ base: 1, md: 2 }}>
+          <MyTeamTile
+            teamName={user?.team_id ? "My Team" : "Join a Team"}
+            teamId={user?.team_id || undefined}
+            onClick={() => {
+              if (user?.team_id) {
+                navigate(`/team/${user.team_id}`);
+              } else {
+                // If user doesn't have a team, show a message or navigate to teams list
+                alert("You are not currently assigned to a team.");
+              }
+            }}
+          />
         </GridItem>
       </Grid>
     </Box>
   );
+
+  // This state is already defined at the top of the component
+  // const [activeView, setActiveView] = useState<'myWork' | 'explore'>('myWork');
+
+  // Handle view change
+  const handleViewToggle = (view: 'myWork' | 'explore') => {
+    setActiveView(view);
+    // Map 'myWork' to 'command-center' and 'explore' to 'map-focus'
+    const mappedView = view === 'myWork' ? 'command-center' : 'map-focus';
+    handleViewChange(mappedView as WorkspaceViewType);
+  };
 
   return (
     <ErrorBoundary>
@@ -544,50 +362,28 @@ export default function MainLayout() {
         {/* Accessibility Skip Link */}
         <SkipNavLink targetId="main-content" />
 
-        {/* Header - Refined with better styling */}
+        {/* Header - Simplified with toggle */}
         <Header
           user={user}
-          onCreateProjectClick={handleCreateProjectClick}
           onLogout={handleLogout}
-          onOpenBriefing={onBriefingOpen}
-          onOpenNotifications={onNotificationsOpen}
+          onViewChange={handleViewToggle}
+          activeView={activeView}
         />
 
-        {/* Main Layout Grid - Improved with better spacing and visual hierarchy */}
-        <Grid
-          templateColumns={{ base: "1fr", md: "64px 1fr" }}
+        {/* Main Content Area - Full width without sidebar - Increased margins */}
+        <Box
+          as="main"
+          overflow="auto"
+          id="main-content"
+          position="relative"
+          bg={bgColor}
           h={`calc(100vh - ${HEADER_HEIGHT})`}
           mt={HEADER_HEIGHT}
+          px={{ base: 6, md: 12, lg: 20 }}
+          py={{ base: 6, md: 8 }}
+          maxWidth="1600px"
+          mx="auto"
         >
-          {/* Sidebar - Command Navigation Hub - Refined with better styling */}
-          <GridItem
-            as="aside"
-            bg={cardBgColor}
-            borderRightWidth="1px"
-            borderColor={borderColor}
-            boxShadow={`1px 0 3px ${shadowColor}`}
-            zIndex="10"
-            transition="all 0.2s"
-            _hover={{
-              width: { base: "auto", md: "200px" },
-              position: { base: "fixed", md: "relative" },
-              height: "100%",
-            }}
-          >
-            {/* Pass the view change handler to SidebarNav */}
-            <SidebarNav onViewChange={handleViewChange} activeView={workspaceView} />
-          </GridItem>
-
-          {/* Main Content Area - Command Center - Refined with better styling */}
-          <GridItem
-            as="main"
-            overflow="auto"
-            id="main-content"
-            position="relative"
-            bg={bgColor}
-            px={{ base: 2, md: 4 }}
-            py={{ base: 2, md: 4 }}
-          >
             {/* Global Command Bar - Keyboard accessible (⌘+K) */}
             <Box
               position="absolute"
@@ -603,7 +399,7 @@ export default function MainLayout() {
               boxShadow="lg"
               border="1px solid"
               borderColor={borderColor}
-              display={false ? "block" : "none"} // Toggle with keyboard shortcut
+              display="none" // Hidden by default, toggle with keyboard shortcut
             >
               {/* Command bar content would go here */}
             </Box>
@@ -612,8 +408,7 @@ export default function MainLayout() {
             {workspaceView === 'command-center' && renderCommandCenterView()}
             {workspaceView === 'map-focus' && renderMapFocusView()}
             {workspaceView === 'grid' && renderGridView()}
-          </GridItem>
-        </Grid>
+        </Box>
 
         {/* Modals and Panels - Refined with better styling */}
         <Portal>
@@ -631,10 +426,7 @@ export default function MainLayout() {
             />
           )}
 
-          <DailyBriefingPanel
-            isOpen={isBriefingOpen}
-            onClose={onBriefingClose}
-          />
+          {/* Daily briefing panel removed as it's now integrated in the main view */}
 
           <NotificationCenter
             isOpen={isNotificationsOpen}

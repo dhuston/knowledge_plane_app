@@ -2,75 +2,52 @@ import React from 'react';
 import {
     Box,
     Flex,
-    Heading,
     Button,
     useColorModeValue,
-    HStack,
     Avatar,
     Menu,
     MenuButton,
     MenuList,
     MenuItem,
     MenuDivider,
-    IconButton,
-    Tooltip,
     Container,
-    Badge,
     Text,
     VStack,
     Portal,
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
 } from '@chakra-ui/react';
-import { AddIcon, ChevronRightIcon } from '@chakra-ui/icons';
-import { 
-    MdOutlineInsights,
-    MdWorkspaces,
-    MdNotifications,
-} from "react-icons/md";
-import { 
+import {
     FiUser,
-    FiLogOut, 
+    FiLogOut,
     FiSettings,
     FiHelpCircle,
     FiBook,
     FiStar,
     FiClock,
+    FiUsers,
 } from 'react-icons/fi';
-import ColorModeToggle from '../ui/ColorModeToggle';
 import { useLocation, Link } from 'react-router-dom';
 import { User } from '../../context/AuthContext';
+import ViewToggle from '../ui/ViewToggle';
 
 interface HeaderProps {
-    onCreateProjectClick: () => void;
+    onCreateProjectClick?: () => void;
     onLogout: () => void;
-    onOpenBriefing: () => void;
-    onOpenNotifications: () => void;
+    onViewChange?: (view: 'myWork' | 'explore') => void;
+    activeView?: 'myWork' | 'explore';
     user: User | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-    onCreateProjectClick, 
-    onLogout, 
-    onOpenBriefing,
-    onOpenNotifications,
-    user 
+const Header: React.FC<HeaderProps> = ({
+    onCreateProjectClick,
+    onLogout,
+    onViewChange,
+    activeView = 'myWork',
+    user
 }) => {
     const location = useLocation();
-    const bgColor = useColorModeValue('white', 'gray.800');
-    const borderColor = useColorModeValue('gray.200', 'gray.700');
-    const logoColor = useColorModeValue('primary.700', 'primary.300');
-    const buttonVariant = useColorModeValue('solid', 'solid');
-    const secondaryBgColor = useColorModeValue('gray.50', 'gray.700');
-    
-    // Generate breadcrumbs from current path
-    const breadcrumbs = location.pathname.split('/')
-        .filter(Boolean)
-        .map(path => ({
-            label: path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, ' '),
-            path: `/${path}`
-        }));
+    const bgColor = useColorModeValue('surface.500', '#262626'); // White : Button color
+    const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
+    const logoColor = useColorModeValue('#262626', 'secondary.400'); // Button color : Off-white/cream
 
     return (
         <Box
@@ -84,87 +61,24 @@ const Header: React.FC<HeaderProps> = ({
             borderColor={borderColor}
             boxShadow="sm"
         >
-            {/* Main Header */}
+            {/* Main Header - Simplified */}
             <Container maxW="container.xl" py={3}>
                 <Flex alignItems="center" justifyContent="space-between" height="48px">
-                    <HStack spacing={8} alignItems="center">
-                        <Heading 
-                            size="md" 
-                            color={logoColor}
-                            fontWeight="bold"
-                            letterSpacing="tight"
-                            cursor="pointer"
-                            as={Link}
-                            to="/"
-                            _hover={{ opacity: 0.8 }}
-                        >
-                            KnowledgePlane AI
-                        </Heading>
+                    {/* Left section - Empty in new design */}
+                    <Box width="200px">
+                        {/* Empty space for balance */}
+                    </Box>
 
-                        <HStack spacing={2}>
-                            <Tooltip label="Switch Workspace">
-                                <IconButton
-                                    aria-label="Switch Workspace"
-                                    icon={<MdWorkspaces size="20px" />}
-                                    variant="ghost"
-                                    colorScheme="primary"
-                                    size="md"
-                                />
-                            </Tooltip>
-                        </HStack>
-                    </HStack>
-                    
-                    <HStack spacing={4}>
-                        <Button
-                            variant={buttonVariant}
-                            colorScheme="primary"
-                            size="sm"
-                            leftIcon={<AddIcon />}
-                            onClick={onCreateProjectClick}
-                            fontWeight="semibold"
-                        >
-                            Create Project
-                        </Button>
+                    {/* Center section - View Toggle */}
+                    <Box>
+                        <ViewToggle
+                            activeView={activeView}
+                            onViewChange={(view) => onViewChange?.(view)}
+                        />
+                    </Box>
 
-                        <Tooltip label="Daily Briefing" placement="bottom">
-                            <IconButton 
-                                aria-label="Open Daily Briefing"
-                                icon={<MdOutlineInsights size="20px" />}
-                                variant="ghost"
-                                colorScheme="primary"
-                                size="md"
-                                onClick={onOpenBriefing}
-                            />
-                        </Tooltip>
-
-                        <Tooltip label="Notifications" placement="bottom">
-                            <Box position="relative">
-                                <IconButton
-                                    aria-label="Notifications"
-                                    icon={<MdNotifications size="20px" />}
-                                    variant="ghost"
-                                    colorScheme="primary"
-                                    size="md"
-                                    onClick={onOpenNotifications}
-                                />
-                                <Badge
-                                    position="absolute"
-                                    top="-1"
-                                    right="-1"
-                                    colorScheme="error"
-                                    borderRadius="full"
-                                    boxSize="5"
-                                    display="flex"
-                                    alignItems="center"
-                                    justifyContent="center"
-                                >
-                                    3
-                                </Badge>
-                            </Box>
-                        </Tooltip>
-                        
-                        <ColorModeToggle />
-                        
+                    {/* Right section - User Profile */}
+                    <Box width="200px" display="flex" justifyContent="flex-end">
                         <Menu>
                             <MenuButton
                                 as={Button}
@@ -174,37 +88,37 @@ const Header: React.FC<HeaderProps> = ({
                                 minW={0}
                                 px={2}
                             >
-                                <HStack spacing={2}>
-                                    <Avatar 
-                                        size="sm" 
-                                        name={user?.name || 'User'} 
-                                        src={user?.avatar_url}
-                                        bg="primary.500"
-                                    />
-                                    <VStack
-                                        display={{ base: 'none', md: 'flex' }}
-                                        alignItems="flex-start"
-                                        spacing={0}
-                                        ml={2}
-                                    >
-                                        <Text fontSize="sm" fontWeight="medium">
-                                            {user?.name || 'User'}
-                                        </Text>
-                                        <Text fontSize="xs" color="gray.500">
-                                            {user?.team?.name || user?.role || 'Guest'}
-                                        </Text>
-                                    </VStack>
-                                </HStack>
+                                <Avatar
+                                    size="sm"
+                                    name={user?.name || 'User'}
+                                    src={user?.avatar_url}
+                                    bg="#262626" // Button color
+                                    color="white" // White text for contrast
+                                    getInitials={(name) => name.split(' ').map(n => n[0]).join('')}
+                                />
                             </MenuButton>
                             <Portal>
                                 <MenuList zIndex={1001} p={2}>
                                     <VStack align="stretch" spacing={2}>
-                                        <Box px={3} py={2} bg={secondaryBgColor} borderRadius="md">
+                                        <Box px={3} py={2} borderRadius="md" bg={useColorModeValue('secondary.400', '#363636')}>
                                             <Text fontWeight="medium">{user?.name}</Text>
-                                            <Text fontSize="sm" color="gray.500">{user?.email}</Text>
+                                            <Text fontSize="sm" color={useColorModeValue('#565656', 'secondary.300')}>{user?.email}</Text>
                                         </Box>
                                         <MenuDivider my={1} />
                                         <MenuItem icon={<FiUser />} command="⌘P">Profile</MenuItem>
+                                        <MenuItem
+                                            icon={<FiUsers />}
+                                            as={Link}
+                                            to={user?.team_id ? `/team/${user.team_id}` : '#'}
+                                            onClick={(e) => {
+                                                if (!user?.team_id) {
+                                                    e.preventDefault();
+                                                    alert("You are not currently assigned to a team.");
+                                                }
+                                            }}
+                                        >
+                                            My Team
+                                        </MenuItem>
                                         <MenuItem icon={<FiSettings />} command="⌘,">Settings</MenuItem>
                                         <MenuItem icon={<FiStar />}>Favorites</MenuItem>
                                         <MenuItem icon={<FiClock />}>Recent</MenuItem>
@@ -212,8 +126,8 @@ const Header: React.FC<HeaderProps> = ({
                                         <MenuItem icon={<FiHelpCircle />}>Help Center</MenuItem>
                                         <MenuItem icon={<FiBook />}>Documentation</MenuItem>
                                         <MenuDivider my={1} />
-                                        <MenuItem 
-                                            icon={<FiLogOut />} 
+                                        <MenuItem
+                                            icon={<FiLogOut />}
                                             onClick={onLogout}
                                             color="error.500"
                                             _hover={{ bg: 'error.50' }}
@@ -224,31 +138,11 @@ const Header: React.FC<HeaderProps> = ({
                                 </MenuList>
                             </Portal>
                         </Menu>
-                    </HStack>
+                    </Box>
                 </Flex>
             </Container>
-
-            {/* Breadcrumb Navigation */}
-            {breadcrumbs.length > 0 && (
-                <Box bg={secondaryBgColor} py={2} borderBottomWidth="1px" borderColor={borderColor}>
-                    <Container maxW="container.xl">
-                        <Breadcrumb spacing="8px" separator={<ChevronRightIcon color="gray.500" />}>
-                            <BreadcrumbItem>
-                                <BreadcrumbLink as={Link} to="/">Home</BreadcrumbLink>
-                            </BreadcrumbItem>
-                            {breadcrumbs.map((crumb, index) => (
-                                <BreadcrumbItem key={index} isCurrentPage={index === breadcrumbs.length - 1}>
-                                    <BreadcrumbLink as={Link} to={crumb.path}>
-                                        {crumb.label}
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                            ))}
-                        </Breadcrumb>
-                    </Container>
-                </Box>
-            )}
         </Box>
     );
 };
 
-export default Header; 
+export default Header;

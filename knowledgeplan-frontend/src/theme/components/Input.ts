@@ -21,27 +21,27 @@ const Input = defineStyleConfig({
       px: 'input-padding-x',
       py: 'input-padding-y',
       fontSize: 'md',
-      bg: 'white',
+      bg: 'surface.500', // White
       border: '1px solid',
-      borderColor: 'neutral.300',
+      borderColor: 'primary.300', // Light mint green
       _hover: {
-        borderColor: 'neutral.400',
+        borderColor: 'primary.400',
       },
       _focus: {
-        borderColor: 'brand.500',
-        boxShadow: 'focus',
+        borderColor: '#262626', // Button color - dark gray/almost black
+        boxShadow: '0 0 0 1px #262626',
       },
       _disabled: {
         opacity: 0.6,
         cursor: 'not-allowed',
-        bg: 'neutral.50',
+        bg: 'secondary.400', // Off-white/cream
       },
       _invalid: {
-        borderColor: 'error.500',
-        boxShadow: 'focus-error',
+        borderColor: 'error.800', // Deep red
+        boxShadow: '0 0 0 1px #B00020',
       },
       _placeholder: {
-        color: 'neutral.400',
+        color: '#565656', // Button variant - medium gray
       },
     },
     addon: {
@@ -57,15 +57,15 @@ const Input = defineStyleConfig({
     // Default outline style
     outline: {
       field: {
-        bg: 'white',
+        bg: 'surface.500', // White
         border: '1px solid',
-        borderColor: 'neutral.300',
+        borderColor: 'primary.300', // Light mint green
         _hover: {
-          borderColor: 'neutral.400',
+          borderColor: 'primary.400',
         },
         _focus: {
-          borderColor: 'brand.500',
-          boxShadow: 'focus',
+          borderColor: '#262626', // Button color - dark gray/almost black
+          boxShadow: '0 0 0 1px #262626',
         },
       },
     },
@@ -73,16 +73,16 @@ const Input = defineStyleConfig({
     // Filled style
     filled: {
       field: {
-        bg: 'neutral.50',
+        bg: 'secondary.400', // Off-white/cream
         border: '2px solid',
         borderColor: 'transparent',
         _hover: {
-          bg: 'neutral.100',
+          bg: 'secondary.500',
         },
         _focus: {
-          bg: 'white',
-          borderColor: 'brand.500',
-          boxShadow: 'focus',
+          bg: 'surface.500', // White
+          borderColor: '#262626', // Button color - dark gray/almost black
+          boxShadow: '0 0 0 1px #262626',
         },
       },
     },
@@ -94,12 +94,12 @@ const Input = defineStyleConfig({
         borderRadius: 0,
         px: 0,
         borderBottom: '1px solid',
-        borderColor: 'neutral.300',
+        borderColor: 'primary.300', // Light mint green
         _hover: {
-          borderColor: 'neutral.400',
+          borderColor: 'primary.400',
         },
         _focus: {
-          borderColor: 'brand.500',
+          borderColor: '#262626', // Button color - dark gray/almost black
           boxShadow: 'none',
           borderBottom: '2px solid',
         },
@@ -188,4 +188,4 @@ const Input = defineStyleConfig({
   },
 });
 
-export default Input; 
+export default Input;
