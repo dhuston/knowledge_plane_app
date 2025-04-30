@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: ./knowledgeplan-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000" # Expose backend on host port 8001
+    volumes:
+      # Map entire backend directory for hot reloading of all code/scripts
+      - ./knowledgeplan-backend:/app
+      # Use a named volume for the venv to prevent overwriting
+      - backend_venv:/app/.venv
+    env_file:
+      - ./knowledgeplan-backend/.env # Load environment variables
+    environment:
+      - RUNNING_IN_DOCKER=true # Add this variable
+    depends_on:
+      db:
+        condition: service_healthy # Wait for DB to be ready
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload # Use reload for dev
+
+  db:
+    image: postgres:15-alpine # Use PostgreSQL 15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/ # Persist data
+    ports:
+      - "5433:5432" # Expose DB on host port 5433 (avoid conflict with local install)
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres} # Use .env variable or default
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password} # Use .env variable or default
+      POSTGRES_DB: ${POSTGRES_DB:-knowledgeplan_dev} # Use .env variable or default
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-knowledgeplan_dev}"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+
+volumes:
+  postgres_data: # Define the volume for data persistence 
+  backend_venv: # Define the named volume for the virtual environment 

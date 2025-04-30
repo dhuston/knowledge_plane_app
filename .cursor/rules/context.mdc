@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rules for automatically including relevant context based on the current file
+autoContext:
+  rules:
+    # Backend Context
+    - pattern: "knowledgeplan-backend/**"
+      rules:
+        - include: "knowledgeplan-backend/app/**" # Core application code
+        - include: "knowledgeplan-backend/scripts/**" # Utility/seeding scripts
+        - include: "knowledgeplan-backend/pyproject.toml" # Dependencies
+        - include: "knowledgeplan-backend/alembic.ini" # Migrations config
+        - include: "knowledgeplan-backend/app/db/migrations/env.py" # Migration environment
+        - include: "knowledgeplan-backend/app/core/config.py" # Settings
+        - include: ".env" # Environment variables (if exists at root or backend)
+        - include: "docker-compose.yml" # Docker setup
+
+    # Frontend Context
+    - pattern: "knowledgeplan-frontend/**"
+      rules:
+        - include: "knowledgeplan-frontend/src/**" # Source code
+        - include: "knowledgeplan-frontend/package.json" # Dependencies
+        - include: "knowledgeplan-frontend/vite.config.ts" # Build config
+        - include: "knowledgeplan-frontend/tsconfig.json" # TypeScript config
+        - include: ".env" # Environment variables (if exists at root or frontend)
+        - include: "docker-compose.yml" # Docker setup
+
+    # Docker Context
+    - pattern: "docker-compose.yml"
+      rules:
+        - include: "knowledgeplan-backend/**" # Include relevant backend code/config
+        - include: "knowledgeplan-frontend/**" # Include relevant frontend code/config
+        - include: ".env"
+
+    # General Config Files
+    - pattern: "{.env,pyproject.toml,package.json,tsconfig.json,vite.config.ts,alembic.ini}"
+      rules:
+        - include: "knowledgeplan-backend/**"
+        - include: "knowledgeplan-frontend/**"
+        - include: "docker-compose.yml"
