@@ -16,14 +16,11 @@ import {
   CardHeader,
   CardBody,
   Icon,
-  Button,
   Tag,
   Portal,
 } from "@chakra-ui/react";
 import { FiMap } from 'react-icons/fi';
-import { AddIcon } from '@chakra-ui/icons';
 import { useAuth } from '../../context/AuthContext';
-import CreateProjectModal from '../modals/CreateProjectModal';
 import WebGLMap from '../map/WebGLMap';
 import BriefingPanel from '../panels/BriefingPanel';
 import NotificationCenter from '../notifications/NotificationCenter';
@@ -34,6 +31,8 @@ import { useApiClient } from '../../hooks/useApiClient';
 import { useNavigate } from 'react-router-dom';
 import ErrorBoundary from '../error/ErrorBoundary';
 import MyTeamTile from '../tiles/MyTeamTile';
+import EntityActionButton from '../actions/EntityActionButton';
+import HighlightedText, { HighlightedTextSegment } from '../text/HighlightedText';
 
 // Different workspace view types
 type WorkspaceViewType = 'command-center' | 'map-focus' | 'grid';
@@ -47,11 +46,6 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const { isLoading, setToken, user } = useAuth();
   const {
-    isOpen: isCreateProjectOpen,
-    onOpen: onCreateProjectOpen,
-    onClose: onCreateProjectClose
-  } = useDisclosure();
-  const {
     isOpen: isNotificationsOpen,
     onClose: onNotificationsClose
   } = useDisclosure();
@@ -64,7 +58,7 @@ export default function MainLayout() {
   // Placeholder until overlaps feature re-implemented
   const projectOverlaps: Record<string, string[]> = {};
   const [isMapLoading, setIsMapLoading] = useState(true);
-  const [dailySummary, setDailySummary] = useState<string>('');
+  const [highlightedSummary, setHighlightedSummary] = useState<HighlightedTextSegment[]>([]);
   const [isLoadingDailySummary, setIsLoadingDailySummary] = useState(true);
 
   const apiClient = useApiClient();
@@ -75,7 +69,7 @@ export default function MainLayout() {
   const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
   const secondaryTextColor = useColorModeValue('#565656', 'secondary.300'); // Button variant : Lighter off-white
   const accentColor = useColorModeValue('primary.600', 'primary.300'); // Sage green : Light mint green
-  const hoverBgColor = useColorModeValue('secondary.500', '#464646'); // Darker off-white : Even lighter button color
+  // Removed unused hoverBgColor variable
   const glassBgColor = useColorModeValue('rgba(241, 242, 234, 0.8)', 'rgba(38, 38, 38, 0.8)'); // Off-white/cream : Button color with transparency
 
   const handleLogout = () => {
@@ -99,8 +93,25 @@ export default function MainLayout() {
     }
   };
 
-  const handleCreateProjectClick = () => {
-    onCreateProjectOpen();
+  // Handle linking nodes from the map
+  const handleLinkNodes = (sourceNode: MapNode, targetNode: MapNode) => {
+    // Open the entity linking modal with pre-filled source and target
+    const sourceNodeId = sourceNode.id;
+    const sourceNodeType = sourceNode.type;
+    const targetNodeId = targetNode.id;
+    const targetNodeType = targetNode.type;
+
+    // Here you would open a modal to confirm the link type
+    // For now, we'll just log the information
+    console.log('Linking nodes:', {
+      source: { id: sourceNodeId, type: sourceNodeType, label: sourceNode.label },
+      target: { id: targetNodeId, type: targetNodeType, label: targetNode.label }
+    });
+
+    // You could implement a modal to confirm the link type
+    // For example:
+    // setLinkingNodes({ sourceNode, targetNode });
+    // onLinkingModalOpen();
   };
 
   const useWebGL = ((import.meta as unknown) as { env: Record<string, string> }).env.VITE_WEBGL_MAP === 'true';
@@ -109,17 +120,33 @@ export default function MainLayout() {
   const fetchDailySummary = React.useCallback(async () => {
     setIsLoadingDailySummary(true);
     try {
+      // Make the API call to get the daily briefing
       const response = await apiClient.get('/briefings/daily');
 
-      // For the dashboard, we'll just use the summary text
       if (response.data && response.data.summary) {
-        setDailySummary(response.data.summary);
+        // If the API returns highlighted_summary, use it
+        if (response.data.highlightedSummary && response.data.highlightedSummary.length > 0) {
+          setHighlightedSummary(response.data.highlightedSummary);
+        } else {
+          // If no highlighted summary, create a simple text segment
+          setHighlightedSummary([{
+            type: 'text',
+            content: response.data.summary
+          }]);
+        }
       } else {
-        setDailySummary("Here's what's happening in your research today");
+        // Fallback if no summary is returned
+        setHighlightedSummary([{
+          type: 'text',
+          content: "Here's what's happening in your research today"
+        }]);
       }
     } catch (err) {
       console.error("[MainLayout] Error fetching daily summary:", err);
-      setDailySummary('Unable to load daily summary. Please try again later.');
+      setHighlightedSummary([{
+        type: 'text',
+        content: 'Unable to load daily summary. Please try again later.'
+      }]);
     } finally {
       setIsLoadingDailySummary(false);
     }
@@ -185,6 +212,7 @@ export default function MainLayout() {
               <WebGLMap
                 onNodeClick={handleMapNodeClick}
                 onLoad={handleMapLoad}
+                onLinkNodes={handleLinkNodes}
               />
             </ErrorBoundary>
           </Box>
@@ -260,14 +288,14 @@ export default function MainLayout() {
 
   // Render Command Center View - Simplified with rearranged components
   const renderCommandCenterView = () => (
-    <Box>
+    <Box maxWidth="1400px" mx="auto">
       {/* Removed header section - no content needed here */}
-      <Box mb={6}></Box>
+      <Box mb={8}></Box>
 
       {/* Main Content Grid - Rearranged for better flow with increased spacing */}
       <Grid
         templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
-        gap={{ base: 8, md: 10, lg: 12 }}
+        gap={{ base: 10, md: 12, lg: 16 }}
       >
         {/* Daily Briefing Card - Updated to match screenshot */}
         <GridItem colSpan={{ base: 1, md: 2 }}>
@@ -276,49 +304,36 @@ export default function MainLayout() {
             bg={cardBgColor}
             borderColor={borderColor}
             borderWidth="1px"
-            borderRadius="lg"
+            borderRadius="xl"
             transition="all 0.2s"
-            mb={6}
+            mb={10}
           >
-            <CardBody p={{ base: 8, md: 10 }}>
+            <CardBody p={{ base: 10, md: 12 }}>
               {isLoadingDailySummary ? (
                 <Center h="100px">
                   <Spinner color="primary.500" />
                 </Center>
               ) : (
-                <VStack align="stretch" spacing={4}>
+                <VStack align="stretch" spacing={6}>
                   {/* Header with greeting and action button */}
-                  <Flex justify="space-between" align="flex-start">
-                    <Flex direction="column" flex="1">
-                      <Heading
-                        size="lg"
-                        mb={1}
-                        color="#262626" // Dark button color for light mode
-                        fontWeight="bold"
-                        _dark={{ color: "secondary.400" }} // Off-white/cream for dark mode
-                      >
-                        Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0] || 'there'}
-                      </Heading>
-                      <Text fontSize="sm" color={secondaryTextColor}>
-                        Here's what's happening in your research today
-                      </Text>
-                    </Flex>
-                    <Button
-                      leftIcon={<AddIcon />}
-                      variant="primary"
-                      onClick={handleCreateProjectClick}
-                      size="sm"
-                      ml={4}
+                  <Flex direction="column" width="100%">
+                    <Heading
+                      size="lg"
+                      mb={2}
+                      color="#262626" // Dark button color for light mode
+                      fontWeight="bold"
+                      _dark={{ color: "secondary.400" }} // Off-white/cream for dark mode
                     >
-                      New Project
-                    </Button>
+                      Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0] || 'there'}
+                    </Heading>
+                    <Text fontSize="sm" color={secondaryTextColor}>
+                      Here's what's happening in your research today
+                    </Text>
                   </Flex>
 
-                  {/* Display the AI-generated summary */}
+                  {/* Display the AI-generated summary with highlighted entities */}
                   <Box>
-                    <Text fontSize="md" whiteSpace="pre-wrap">
-                      {dailySummary}
-                    </Text>
+                    <HighlightedText segments={highlightedSummary} />
                   </Box>
                 </VStack>
               )}
@@ -379,9 +394,9 @@ export default function MainLayout() {
           bg={bgColor}
           h={`calc(100vh - ${HEADER_HEIGHT})`}
           mt={HEADER_HEIGHT}
-          px={{ base: 6, md: 12, lg: 20 }}
-          py={{ base: 6, md: 8 }}
-          maxWidth="1600px"
+          px={{ base: 8, md: 16, lg: 32 }}
+          py={{ base: 8, md: 10 }}
+          maxWidth="1800px"
           mx="auto"
         >
             {/* Global Command Bar - Keyboard accessible (⌘+K) */}
@@ -412,11 +427,6 @@ export default function MainLayout() {
 
         {/* Modals and Panels - Refined with better styling */}
         <Portal>
-          <CreateProjectModal
-            isOpen={isCreateProjectOpen}
-            onClose={onCreateProjectClose}
-          />
-
           {selectedNode && (
             <BriefingPanel
               selectedNode={selectedNode}
@@ -434,28 +444,21 @@ export default function MainLayout() {
           />
         </Portal>
 
-        {/* Keyboard Shortcuts Help - Toggle with ? key */}
-        <Box
-          position="fixed"
-          bottom="16px"
-          right="16px"
-          zIndex="100"
-          bg={cardBgColor}
-          borderRadius="full"
-          boxShadow="md"
-          border="1px solid"
-          borderColor={borderColor}
-          width="40px"
-          height="40px"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          cursor="pointer"
-          _hover={{ bg: hoverBgColor }}
-          onClick={() => {/* Toggle keyboard shortcuts help */}}
-        >
-          <Text fontSize="lg" fontWeight="bold">?</Text>
-        </Box>
+        {/* Removed the question mark help button */}
+
+        {/* Entity Action Button for creating and linking entities */}
+        <EntityActionButton
+          onEntityCreated={(entityType, entity) => {
+            // Refresh the map data when a new entity is created
+            console.log(`New ${entityType} created:`, entity);
+            // You could trigger a map refresh here
+          }}
+          onEntityLinked={() => {
+            // Refresh the map data when entities are linked
+            console.log('Entities linked');
+            // You could trigger a map refresh here
+          }}
+        />
       </Box>
     </ErrorBoundary>
   );

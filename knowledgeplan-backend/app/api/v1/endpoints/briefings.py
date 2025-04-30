@@ -14,6 +14,13 @@ async def get_daily_briefing(
     db: AsyncSession = Depends(get_db_session),
     current_user: models.User = Depends(security.get_current_user),
 ):
-    """Retrieve the AI-generated daily briefing summary for the current user."""
-    summary = await briefing_service.get_daily_briefing(db=db, user=current_user)
-    return schemas.BriefingResponse(summary=summary) 
+    """
+    Retrieve the AI-generated daily briefing summary for the current user.
+
+    Returns both a plain text summary and a highlighted version with entity recognition.
+    """
+    summary, highlighted_summary = await briefing_service.get_daily_briefing(db=db, user=current_user)
+    return schemas.BriefingResponse(
+        summary=summary,
+        highlighted_summary=highlighted_summary
+    )

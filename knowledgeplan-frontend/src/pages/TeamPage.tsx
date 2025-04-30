@@ -192,11 +192,11 @@ const TeamPage: React.FC = () => {
             variant="outline"
             size="sm"
             mb={6}
-            onClick={() => navigate('/map')}
+            onClick={() => navigate('/workspace')}
             bg={cardBg}
             _hover={{ bg: hoverBg }}
           >
-            Back to Map
+            Back to Workspace
           </Button>
 
           {/* Team Header Content */}

@@ -50,7 +50,7 @@ function App() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
           {/* Protected Routes */}
-          <Route path="/map" element={ <ProtectedRoute> <MainLayout /> </ProtectedRoute> } />
+          <Route path="/workspace" element={ <ProtectedRoute> <MainLayout /> </ProtectedRoute> } />
 
           {/* Example of another protected route */}
           <Route path="/profile/:userId" element={ <ProtectedRoute> <ProfilePage /> </ProtectedRoute>} />
@@ -65,11 +65,11 @@ function App() {
           {/* <Route path="/explore" element={<ExplorePage />} /> */}
 
           {/* Default route: Redirect to login if not authenticated,
-               ProtectedRoute on /map will handle redirecting logged-in users */}
-          <Route path="/" element={<Navigate to="/map" replace />} />
+               ProtectedRoute on /workspace will handle redirecting logged-in users */}
+          <Route path="/" element={<Navigate to="/workspace" replace />} />
 
-          {/* Catch-all: Redirect unknown routes to map (which will redirect to login if needed) */}
-          <Route path="*" element={<Navigate to="/map" replace />} />
+          {/* Catch-all: Redirect unknown routes to workspace (which will redirect to login if needed) */}
+          <Route path="*" element={<Navigate to="/workspace" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

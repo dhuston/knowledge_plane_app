@@ -12,12 +12,12 @@ from .knowledge_asset import (
 )
 from .map import MapData, MapNode, MapEdge, MapNodeTypeEnum, MapEdgeTypeEnum
 from .activity_log import ActivityLogCreate, ActivityLogRead
-from .briefing import BriefingResponse
+from .briefing import BriefingResponse, HighlightedEntity, HighlightedTextSegment
 from .insight import ProjectOverlapResponse
 from .note import NoteBase, NoteCreate, NoteUpdate, NoteRead, NoteReadRecent, NoteInDB
-# from .token import Token, TokenData # Placeholder for token schemas 
+# from .token import Token, TokenData # Placeholder for token schemas
 # Import Goal schemas here later
-# Import KnowledgeAsset schemas here later 
+# Import KnowledgeAsset schemas here later
 
 __all__ = [
     "UserRead", "UserCreate", "UserUpdate", "UserReadBasic",
@@ -31,7 +31,7 @@ __all__ = [
     "NoteCreate", "NoteRead",
     "MapData", "MapNode", "MapEdge", "MapNodeTypeEnum", "MapEdgeTypeEnum",
     "ActivityLogCreate", "ActivityLogRead",
-    "BriefingResponse",
+    "BriefingResponse", "HighlightedEntity", "HighlightedTextSegment",
     "ProjectOverlapResponse",
     "NoteBase",
     "NoteCreate",
@@ -39,4 +39,4 @@ __all__ = [
     "NoteRead",
     "NoteReadRecent",
     "NoteInDB",
-] 
+]

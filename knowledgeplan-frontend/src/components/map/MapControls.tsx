@@ -26,7 +26,8 @@ import {
   FiHome,
   FiFilter,
   FiLayers,
-  FiSettings
+  FiSettings,
+  FiLink
 } from 'react-icons/fi';
 
 interface MapControlsProps {
@@ -40,6 +41,8 @@ interface MapControlsProps {
   onToggleFilters?: () => void;
   onToggleLayers?: () => void;
   onToggleSettings?: () => void;
+  isLinkMode?: boolean;
+  onToggleLinkMode?: () => void;
 }
 
 const MapControls: React.FC<MapControlsProps> = ({
@@ -53,6 +56,8 @@ const MapControls: React.FC<MapControlsProps> = ({
   onToggleFilters,
   onToggleLayers,
   onToggleSettings,
+  isLinkMode = false,
+  onToggleLinkMode,
 }) => {
   const bg = useColorModeValue('surface.500', '#363636'); // White : Lighter button color
   const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
@@ -154,6 +159,20 @@ const MapControls: React.FC<MapControlsProps> = ({
         </Tooltip>
 
         <Divider />
+
+        {/* Link Mode Toggle */}
+        {onToggleLinkMode && (
+          <Tooltip label={isLinkMode ? "Cancel Link Mode" : "Link Mode"} placement="left">
+            <IconButton
+              aria-label="Link Mode"
+              icon={<FiLink />}
+              size="sm"
+              variant="mapControl"
+              colorScheme={isLinkMode ? "blue" : undefined}
+              onClick={onToggleLinkMode}
+            />
+          </Tooltip>
+        )}
 
         {/* Additional Controls */}
         {onToggleFilters && (

@@ -19,20 +19,20 @@ export enum KnowledgeAssetTypeEnum {
     PRESENTATION = "PRESENTATION",
 }
 
-// --- Note Specific Types --- 
+// --- Note Specific Types ---
 
 // What the frontend needs to send to create a note
 // Matches backend NoteCreate which inherits content, title?, properties?
 // Backend derives project_id, owner_id, type.
 export interface NoteCreate {
     content: string;
-    title?: string | null; 
+    title?: string | null;
     properties?: Record<string, unknown> | null;
 }
 
 // What the backend returns for a note (based on NoteRead schema)
 export interface Note {
-    id: string; 
+    id: string;
     tenant_id: string;
     project_id: string;
     // owner_id: string; // Use created_by object instead
@@ -43,7 +43,7 @@ export interface Note {
     created_at: string; // Or Date
     updated_at: string; // Or Date
     // Add creator info based on backend schema
-    created_by?: UserReadBasic | null; 
+    created_by?: UserReadBasic | null;
 }
 
 // Frontend equivalent for NoteRead schema
@@ -76,8 +76,24 @@ export interface NoteReadRecent {
 //     content?: string | null;
 // }
 
-// --- REMOVED Conflicting Generic Definitions --- 
-// export type KnowledgeAssetType = 'note' | 'link' | 'document'; 
+// --- Generic Knowledge Asset Interface ---
+export interface KnowledgeAssetRead {
+    id: string;
+    tenant_id: string;
+    type: KnowledgeAssetTypeEnum;
+    title?: string | null;
+    source?: string | null;
+    link?: string | null;
+    properties?: Record<string, unknown> | null;
+    project_id?: string | null;
+    created_at: string;
+    updated_at: string;
+    created_by_user_id: string;
+    created_by?: UserReadBasic | null;
+}
+
+// --- REMOVED Conflicting Generic Definitions ---
+// export type KnowledgeAssetType = 'note' | 'link' | 'document';
 // export interface KnowledgeAsset { ... }
 // export interface Note extends KnowledgeAsset { ... }
-// export interface NoteUpdate { ... } 
+// export interface NoteUpdate { ... }

@@ -32,6 +32,7 @@ import NodeTooltip from './NodeTooltip';
 interface WebGLMapProps {
   onNodeClick: (node: MapNode | null) => void;
   onLoad?: () => void;
+  onLinkNodes?: (sourceNode: MapNode, targetNode: MapNode) => void;
 }
 
 // Provide colors per node type (partial so we don't have to list every type)
@@ -485,7 +486,7 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
 
 // ----------------------------------------------------------------------------
 
-const WebGLMap: React.FC<WebGLMapProps> = ({ onNodeClick, onLoad }) => {
+const WebGLMap: React.FC<WebGLMapProps> = ({ onNodeClick, onLoad, onLinkNodes }) => {
   const apiClient = useApiClient();
   const toast = useToast();
   const bg = useColorModeValue('white', 'gray.700');
@@ -503,18 +504,70 @@ const WebGLMap: React.FC<WebGLMapProps> = ({ onNodeClick, onLoad }) => {
   const [hoveredNodePosition, setHoveredNodePosition] = useState<{ x: number; y: number } | null>(null);
   const { isOpen: isFilterOpen, onToggle: onFilterToggle } = useDisclosure();
 
-  // Fetch initial graph
+  // Fetch initial graph (using mock data for demo)
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
         setIsLoading(true);
-        const res = await apiClient.get<MapData>('/map/data');
+
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         if (!isMounted) return;
 
-        setNodes(res.data.nodes);
-        setEdges(res.data.edges.map((e) => ({ source: e.source, target: e.target })));
+        // Mock nodes data
+        const mockNodes: MapNode[] = [
+          {
+            id: 'user-1',
+            type: MapNodeTypeEnum.USER,
+            label: 'John Doe',
+            data: { name: 'John Doe', title: 'Research Scientist' }
+          },
+          {
+            id: 'user-2',
+            type: MapNodeTypeEnum.USER,
+            label: 'Jane Smith',
+            data: { name: 'Jane Smith', title: 'Project Manager' }
+          },
+          {
+            id: 'team-1',
+            type: MapNodeTypeEnum.TEAM,
+            label: 'Research Team',
+            data: { name: 'Research Team', description: 'Core research team' }
+          },
+          {
+            id: 'project-1',
+            type: MapNodeTypeEnum.PROJECT,
+            label: 'AI Research Project',
+            data: { name: 'AI Research Project', description: 'Advanced AI research initiative' }
+          },
+          {
+            id: 'goal-1',
+            type: MapNodeTypeEnum.GOAL,
+            label: 'Increase Research Output',
+            data: { title: 'Increase Research Output', type: 'team' }
+          },
+          {
+            id: 'asset-1',
+            type: MapNodeTypeEnum.KNOWLEDGE_ASSET,
+            label: 'Research Paper',
+            data: { title: 'Research Paper', type: 'DOCUMENT' }
+          }
+        ];
+
+        // Mock edges data
+        const mockEdges = [
+          { source: 'user-1', target: 'team-1' },
+          { source: 'user-2', target: 'team-1' },
+          { source: 'team-1', target: 'project-1' },
+          { source: 'project-1', target: 'goal-1' },
+          { source: 'user-1', target: 'asset-1' },
+          { source: 'project-1', target: 'asset-1' }
+        ];
+
+        setNodes(mockNodes);
+        setEdges(mockEdges);
 
         // Notify parent
         onLoad?.();
@@ -533,15 +586,67 @@ const WebGLMap: React.FC<WebGLMapProps> = ({ onNodeClick, onLoad }) => {
     return () => {
       isMounted = false;
     };
-  }, [apiClient, onLoad, toast]);
+  }, [onLoad, toast]);
+
+  // State for link mode
+  const [isLinkMode, setIsLinkMode] = useState(false);
+  const [sourceNode, setSourceNode] = useState<MapNode | null>(null);
 
   // Click handler wrapper for sigma
   const handleSigmaNodeClick = useCallback(
     (node: MapNode | null) => {
-      onNodeClick(node);
+      // If in link mode, handle linking logic
+      if (isLinkMode && node) {
+        if (!sourceNode) {
+          // First node selected in link mode
+          setSourceNode(node);
+          toast({
+            title: "Source node selected",
+            description: `Select a target node to create a link from "${node.label}"`,
+            status: "info",
+            duration: 5000,
+            isClosable: true,
+          });
+        } else if (sourceNode.id !== node.id) {
+          // Second node selected, create the link
+          if (onLinkNodes) {
+            onLinkNodes(sourceNode, node);
+          }
+          // Reset link mode
+          setIsLinkMode(false);
+          setSourceNode(null);
+        }
+      } else {
+        // Normal node click behavior
+        onNodeClick(node);
+      }
     },
-    [onNodeClick]
+    [onNodeClick, isLinkMode, sourceNode, onLinkNodes, toast]
   );
+
+  // Toggle link mode
+  const toggleLinkMode = useCallback(() => {
+    if (isLinkMode) {
+      // Cancel link mode
+      setIsLinkMode(false);
+      setSourceNode(null);
+      toast({
+        title: "Link mode canceled",
+        status: "info",
+        duration: 3000,
+      });
+    } else {
+      // Enter link mode
+      setIsLinkMode(true);
+      toast({
+        title: "Link mode activated",
+        description: "Select a source node to begin linking",
+        status: "info",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [isLinkMode, toast]);
 
   // Handler specifically for stage clicks, passed down
   const handleStageClick = useCallback(() => {
@@ -636,6 +741,8 @@ const WebGLMap: React.FC<WebGLMapProps> = ({ onNodeClick, onLoad }) => {
         zoomLevel={zoomLevel}
         onZoomChange={handleZoomChange}
         onToggleFilters={onFilterToggle}
+        isLinkMode={isLinkMode}
+        onToggleLinkMode={toggleLinkMode}
       />
 
       {/* Enhanced Search Component */}

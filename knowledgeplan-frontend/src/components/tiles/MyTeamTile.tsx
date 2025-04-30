@@ -55,7 +55,7 @@ const MyTeamTile: React.FC<MyTeamTileProps> = ({
       borderColor={borderColor}
       borderWidth="1px"
       h="100%"
-      borderRadius="lg"
+      borderRadius="xl"
       transition="all 0.2s"
       _hover={{ boxShadow: "lg" }}
       cursor="pointer"
@@ -71,7 +71,7 @@ const MyTeamTile: React.FC<MyTeamTileProps> = ({
                   bg={accentColor}
                   color="white"
                   p={3}
-                  borderRadius="md"
+                  borderRadius="lg"
                   display="flex"
                   alignItems="center"
                   justifyContent="center"
@@ -125,7 +125,7 @@ const MyTeamTile: React.FC<MyTeamTileProps> = ({
                     <Box
                       p={4}
                       bg={sectionBg}
-                      borderRadius="md"
+                      borderRadius="lg"
                       textAlign="center"
                       _hover={{ transform: 'translateY(-2px)', shadow: 'md' }}
                       transition="all 0.2s"
@@ -142,15 +142,15 @@ const MyTeamTile: React.FC<MyTeamTileProps> = ({
               <Box>
                 <Text fontWeight="medium" mb={2}>Recent Updates</Text>
                 <VStack align="stretch" spacing={2}>
-                  <HStack p={2} bg={sectionBg} borderRadius="md">
+                  <HStack p={2} bg={sectionBg} borderRadius="lg">
                     <Badge colorScheme="green">New</Badge>
                     <Text fontSize="sm">Biomarker research project started</Text>
                   </HStack>
-                  <HStack p={2} bg={sectionBg} borderRadius="md">
+                  <HStack p={2} bg={sectionBg} borderRadius="lg">
                     <Badge colorScheme="blue">Update</Badge>
                     <Text fontSize="sm">Clinical trial data analysis completed</Text>
                   </HStack>
-                  <HStack p={2} bg={sectionBg} borderRadius="md">
+                  <HStack p={2} bg={sectionBg} borderRadius="lg">
                     <Badge colorScheme="purple">Research</Badge>
                     <Text fontSize="sm">New publication submitted for review</Text>
                   </HStack>
