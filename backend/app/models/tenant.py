@@ -10,7 +10,8 @@ if TYPE_CHECKING:
     from .user import User  # noqa: F401
     from .project import Project # noqa: F401
     from .team import Team # noqa: F401
-    from .department import Department # Add Department import for TYPE_CHECKING
+    from .department import Department # noqa: F401
+    from .notification import Notification # noqa: F401
 
 class Tenant(Base):
     __tablename__ = "tenants"
@@ -31,8 +32,11 @@ class Tenant(Base):
     # Relationship to Projects (One-to-Many)
     projects = relationship("Project", back_populates="tenant", cascade="all, delete-orphan")
 
-    # Relationship to Departments (One-to-Many) - ADDED
+    # Relationship to Departments (One-to-Many)
     departments = relationship("Department", back_populates="tenant", cascade="all, delete-orphan")
+    
+    # Relationship to Notifications (One-to-Many)
+    notifications = relationship("Notification", back_populates="tenant", cascade="all, delete-orphan")
 
     # Relationships can be added later (e.g., users = relationship("User", back_populates="tenant")) 
 

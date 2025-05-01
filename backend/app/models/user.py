@@ -9,6 +9,7 @@ from .project import project_participants # Assuming project.py is where it's de
 
 if TYPE_CHECKING:
     from .tenant import Tenant  # noqa: F401
+    from .notification import NotificationRecipient  # noqa: F401
 
 class User(Base):
     __tablename__ = "users"
@@ -52,6 +53,10 @@ class User(Base):
         secondary=project_participants,
         back_populates="participants"
     )
+    
+    # Add relationship to notifications
+    notifications = relationship("NotificationRecipient", back_populates="user")
+    notification_preferences = relationship("NotificationPreference", back_populates="user")
 
     def __repr__(self):
         # Ensure correct indentation

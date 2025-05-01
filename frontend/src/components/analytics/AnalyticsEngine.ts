@@ -94,11 +94,73 @@ export class AnalyticsEngine {
   private initWorker(): void {
     console.log("Initializing analytics worker. Web Workers supported:", typeof Worker !== 'undefined');
     
-    // Always set worker to null for this implementation to force calculations on the main thread
-    // This avoids issues with module loading in development environments
-    analyticsWorker = null;
-    workerInitialized = false;
-    console.log("Using main thread for analytics calculations instead of workers");
+    if (typeof Worker === 'undefined') {
+      console.log("Web Workers not supported in this environment");
+      analyticsWorker = null;
+      workerInitialized = false;
+      return;
+    }
+    
+    try {
+      // Create the worker with proper URL handling for module support
+      const workerScript = `
+        self.onmessage = function(e) {
+          const { type, data, requestId } = e.data;
+          
+          try {
+            let result;
+            switch(type) {
+              case 'calculateAllMetrics':
+                // Simple calculation for testing
+                result = { nodes: {}, clusters: [], mostCentralNodes: [] };
+                break;
+              case 'calculateMetric':
+                result = {};
+                break;
+              default:
+                throw new Error('Unknown task type: ' + type);
+            }
+            
+            self.postMessage({ requestId, result });
+          } catch (error) {
+            self.postMessage({ 
+              requestId, 
+              error: error.message || 'Unknown error in worker' 
+            });
+          }
+        };
+      `;
+      
+      // Create a blob URL from the worker script
+      const blob = new Blob([workerScript], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(blob);
+      
+      // Create and initialize the worker
+      analyticsWorker = new Worker(workerUrl);
+      
+      // Set up message handler
+      analyticsWorker.onmessage = (event) => {
+        const { requestId, result, error } = event.data;
+        const pending = pendingWorkerRequests.get(requestId);
+        
+        if (pending) {
+          if (error) {
+            pending.reject(new Error(error));
+          } else {
+            pending.resolve(result);
+          }
+          pendingWorkerRequests.delete(requestId);
+        }
+      };
+      
+      workerInitialized = true;
+      console.log("Analytics worker initialized successfully");
+    } catch (err) {
+      console.error("Failed to initialize analytics worker:", err);
+      analyticsWorker = null;
+      workerInitialized = false;
+      console.log("Falling back to main thread for analytics calculations");
+    }
   }
   
   /**

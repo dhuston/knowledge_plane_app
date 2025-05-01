@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   VStack,
@@ -24,11 +24,18 @@ import {
   StatNumber,
   StatHelpText,
   Button,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  useToast,
 } from '@chakra-ui/react';
-import { MdOutlineInsights, MdDataUsage, MdGroups, MdOutlineHub, MdFilterAlt } from 'react-icons/md';
+import { MdOutlineInsights, MdDataUsage, MdGroups, MdOutlineHub, MdFilterAlt, MdDownload, MdPictureAsPdf, MdOutlineTableChart } from 'react-icons/md';
+import { FaChevronDown } from 'react-icons/fa';
 
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
 import { NodeMetrics, GraphMetrics, Cluster } from '../analytics/AnalyticsEngine';
+import { exportToPDF, exportToCSV } from '../../utils/export';
 
 interface InsightsPanelProps {
   graphMetrics: GraphMetrics | null;
@@ -195,6 +202,28 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({
             <Text fontSize="xs" color="gray.500">Network analysis and recommendations</Text>
           </VStack>
         </HStack>
+        
+        {/* Export dropdown menu */}
+        <Menu>
+          <MenuButton
+            as={Button}
+            size="sm"
+            rightIcon={<FaChevronDown />}
+            variant="outline"
+            colorScheme="blue"
+            isDisabled={isLoading || !graphMetrics}
+          >
+            <Icon as={MdDownload} mr={1} /> Export
+          </MenuButton>
+          <MenuList>
+            <MenuItem onClick={() => exportToPDF()} icon={<Icon as={MdPictureAsPdf} />}>
+              Export as PDF
+            </MenuItem>
+            <MenuItem onClick={() => exportToCSV()} icon={<Icon as={MdOutlineTableChart} />}>
+              Export as CSV
+            </MenuItem>
+          </MenuList>
+        </Menu>
       </HStack>
 
       {/* Loading state */}

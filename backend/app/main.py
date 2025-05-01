@@ -2,6 +2,7 @@ import logging # Import logging
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.v1.api import api_router as api_v1_router
@@ -56,22 +57,14 @@ configure_tenant_middleware(app)
 register_tenant_events()
 
 # Add CORS Middleware to handle preflight requests earliest
-# For development, we'll add specific origins instead of "*" since we need allow_credentials=True
+# For development, we'll allow all origins since we're having CORS issues
 from fastapi.middleware.cors import CORSMiddleware
 
-# Define origins
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-]
-
-# Add CORS middleware
+# Add CORS middleware with a wildcard origin for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for now
+    allow_credentials=False,  # Must be False when using wildcard origin
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
@@ -118,12 +111,10 @@ async def cors_test():
     logger.info("CORS test endpoint accessed")
     
     # Create a response with explicit CORS headers
-    from starlette.responses import JSONResponse
     response = JSONResponse({"status": "ok", "cors": "enabled"})
     
     # Add explicit CORS headers for debugging
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
     
@@ -143,8 +134,7 @@ async def dev_login(request: Request):
     # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
         response = JSONResponse({})
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
         return response
@@ -171,7 +161,6 @@ async def dev_login(request: Request):
     )
     
     # Create the response with tokens
-    from starlette.responses import JSONResponse
     response = JSONResponse({
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -179,8 +168,7 @@ async def dev_login(request: Request):
     })
     
     # Add CORS headers
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
     
@@ -190,8 +178,7 @@ async def dev_login(request: Request):
 async def options_mock_me():
     """Handle OPTIONS requests for the mock-me endpoint"""
     response = JSONResponse({})
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
     return response
@@ -212,8 +199,9 @@ async def mock_me(request: Request):
     # Check if authorization header exists and is valid
     if not auth_header or not auth_header.startswith('Bearer '):
         response = JSONResponse({"detail": "Not authenticated"}, status_code=401)
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
         return response
         
     # Extract the token
@@ -247,19 +235,8 @@ async def mock_me(request: Request):
         response = JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
     
     # Add CORS headers
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
     
     return response
-
-# Add CORSMiddleware if needed later (for frontend interaction)
-# from fastapi.middleware.cors import CORSMiddleware
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"] # Configure allowed origins properly
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# ) 

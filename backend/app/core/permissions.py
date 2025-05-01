@@ -1,11 +1,24 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 from uuid import UUID
+from fastapi import HTTPException, status
 
 if TYPE_CHECKING:
     from app.models.user import User  # noqa: F401
     from app.models.project import Project  # noqa: F401
     from app.models.goal import Goal  # noqa: F401
     from app.models.team import Team  # noqa: F401
+
+
+def check_tenant_permissions(user_tenant_id: UUID, resource_tenant_id: UUID) -> None:
+    """
+    Check if the user's tenant matches the resource tenant.
+    Raises HTTPException if not authorized.
+    """
+    if user_tenant_id != resource_tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this resource"
+        )
 
 
 def user_can_view_project(user: "User", project: "Project") -> bool:

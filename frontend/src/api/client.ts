@@ -31,11 +31,11 @@ async function request<T>(endpoint: string, options: RequestInit): Promise<T> {
         headers.append('Authorization', `Bearer ${token}`);
     }
 
-    // Add credential handling for CORS
+    // Don't include credentials since we're using wildcard CORS
     const config: RequestInit = {
         ...options,
         headers,
-        credentials: 'include', // Include credentials for CORS requests
+        credentials: 'omit', // Don't include credentials for CORS requests with wildcard origin
     };
     
     console.log(`API Request to: ${url}`);

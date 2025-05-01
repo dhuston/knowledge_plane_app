@@ -73,13 +73,14 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           } catch (error) {
             console.warn("[AuthContext] Regular /users/me failed, trying development endpoint...");
             // If that fails, try the development endpoint with proper auth header
+            console.log("[AuthContext] Trying mock-me endpoint with token");
             const response = await fetch('http://localhost:8001/api/v1/users/mock-me', {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
               },
-              credentials: 'include'
+              credentials: 'omit' // Must be 'omit' with wildcard CORS
             });
             if (!response.ok) {
               throw new Error(`Mock endpoint failed with status ${response.status}`);

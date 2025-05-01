@@ -25,15 +25,18 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      // Call our development endpoint directly with proper CORS settings
+      console.log("Fetching from dev-login endpoint...");
+      // Call our development endpoint directly - IMPORTANT: don't use credentials: 'include'
+      // when the server is using wildcard CORS origin (*)
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/dev-login`, {
         method: 'GET',
-        credentials: 'include',
+        credentials: 'omit', // Must be 'omit' with wildcard CORS
         headers: {
           'Content-Type': 'application/json',
         },
       });
       
+      console.log("Response status:", response.status);
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
