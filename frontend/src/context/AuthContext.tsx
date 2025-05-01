@@ -20,6 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   logout: () => Promise<void>;
   setToken: (accessToken: string | null, refreshToken: string | null) => void;
+  token: string | null; // Add token getter to the interface
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,9 +48,13 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     console.log(`[AuthContext] Setting tokens: ${!!accessToken}, ${!!refreshToken}`);
     if (accessToken) {
       localStorage.setItem('knowledge_plane_token', accessToken);
+      if (refreshToken) {
+        localStorage.setItem('knowledge_plane_refresh_token', refreshToken);
+      }
       setAuthenticated(true);
     } else {
       localStorage.removeItem('knowledge_plane_token');
+      localStorage.removeItem('knowledge_plane_refresh_token');
       setAuthenticated(false);
     }
   };
@@ -63,11 +68,13 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       localStorage.removeItem('knowledge_plane_token');
+      localStorage.removeItem('knowledge_plane_refresh_token');
       setAuthenticated(false);
     } catch (error) {
       console.error("Logout failed:", error);
       // Even if the backend call fails, clear the frontend state
       localStorage.removeItem('knowledge_plane_token');
+      localStorage.removeItem('knowledge_plane_refresh_token');
       setAuthenticated(false);
     }
   };
@@ -151,13 +158,17 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     fetchUser();
   }, [isAuthenticated, user]);
 
+  // Get current token from storage
+  const token = localStorage.getItem('knowledge_plane_token');
+  
   const contextValue = { 
     isAuthenticated, 
     setAuthenticated, 
     user, 
     isLoading,
     logout,
-    setToken
+    setToken,
+    token
   };
   
   console.log("[AuthContext] Providing context value:", { 

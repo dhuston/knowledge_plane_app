@@ -157,15 +157,6 @@ async def dev_login(request: Request):
     # Let the middleware handle CORS headers
     return response
     
-@app.options("/api/v1/users/mock-me", status_code=200)
-async def options_mock_me():
-    """Handle OPTIONS requests for the mock-me endpoint"""
-    response = JSONResponse({})
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    return response
-
 @app.get("/api/v1/users/mock-me")
 async def mock_me(request: Request):
     """Development-only endpoint that returns mock user data directly, bypassing Pydantic validation"""
@@ -181,11 +172,7 @@ async def mock_me(request: Request):
     
     # Check if authorization header exists and is valid
     if not auth_header or not auth_header.startswith('Bearer '):
-        response = JSONResponse({"detail": "Not authenticated"}, status_code=401)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-        return response
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
         
     # Extract the token
     token = auth_header.split(' ')[1]
@@ -211,15 +198,8 @@ async def mock_me(request: Request):
             "updated_at": "2025-05-01T00:00:00Z"
         }
         
-        response = JSONResponse(mock_user)
+        return JSONResponse(mock_user)
         
     except Exception as e:
         logger.error(f"Token validation error: {e}")
-        response = JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
-    
-    # Add CORS headers
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    
-    return response
+        return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)

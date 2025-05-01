@@ -10,16 +10,7 @@ from app.db.session import get_db_session
 
 router = APIRouter()
 
-@router.options("/me", status_code=200)
-async def options_read_users_me():
-    """Handle OPTIONS requests for /me endpoint"""
-    from fastapi.responses import JSONResponse
-    response = JSONResponse({})
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    return response
+# OPTIONS requests are now handled by the CORS middleware
 
 @router.get("/me")
 async def read_users_me(
@@ -47,12 +38,8 @@ async def read_users_me(
         "auth_provider_id": current_user.auth_provider_id
     }
     
-    # Create custom response with CORS headers
-    response = JSONResponse(content=user_data)
-    response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173" 
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    
-    return response
+    # Let the middleware handle CORS headers
+    return JSONResponse(content=user_data)
 
 # Endpoint to get a specific user by ID
 @router.get("/{user_id}", response_model=schemas.UserRead)

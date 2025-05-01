@@ -22,8 +22,14 @@ class BriefingService:
         Returns:
             Tuple of (plain_text_summary, highlighted_summary_segments)
         """
-
-        # 1. Fetch Input Data
+        
+        # For development mode with mock user, return a placeholder briefing
+        if hasattr(user, 'auth_provider') and user.auth_provider == 'mock':
+            mock_summary = "Welcome to your daily briefing! You have a team meeting at 2 PM today. Yesterday, you updated the Main Project documentation."
+            highlighted_summary = [schemas.HighlightedTextSegment(type="text", content=mock_summary)]
+            return mock_summary, highlighted_summary
+            
+        # 1. Fetch Input Data 
         calendar_summary = await self._get_calendar_summary(user)
         activity_summary = await self._get_activity_summary(db, user)
 

@@ -486,7 +486,108 @@ const LivingMap: React.FC<LivingMapProps> = ({
 
   return (
     <Box height="100%" width="100%" position="relative">
-      <Box height="100%" width="100%" background="#f8f8f8" minH="300px">
+      <Box 
+        height="100%" 
+        width="100%" 
+        background="#f8f8f8" 
+        minH="300px"
+        tabIndex={0} // Make the map container focusable
+        role="application" 
+        aria-label="Interactive map visualization"
+        onKeyDown={(e) => {
+          // Add keyboard navigation for map
+          const step = 50;  // Pixels to move per keystroke
+          const zoomStep = 0.1; // Zoom factor per keystroke
+          
+          switch (e.key) {
+            case 'ArrowUp':
+              // Move camera up
+              if (e.altKey) {
+                // Alt+Arrow = zoom in
+                const newZoom = zoomLevel * (1 + zoomStep);
+                setZoomLevel(newZoom);
+              } else {
+                // Move viewport
+                handleViewportChange({
+                  ...viewport,
+                  y: viewport.y - step / viewport.ratio
+                });
+              }
+              e.preventDefault();
+              break;
+              
+            case 'ArrowDown':
+              // Move camera down
+              if (e.altKey) {
+                // Alt+Arrow = zoom out
+                const newZoom = zoomLevel * (1 - zoomStep);
+                setZoomLevel(newZoom);
+              } else {
+                handleViewportChange({
+                  ...viewport,
+                  y: viewport.y + step / viewport.ratio
+                });
+              }
+              e.preventDefault();
+              break;
+              
+            case 'ArrowLeft':
+              // Move camera left
+              handleViewportChange({
+                ...viewport,
+                x: viewport.x - step / viewport.ratio
+              });
+              e.preventDefault();
+              break;
+              
+            case 'ArrowRight':
+              // Move camera right
+              handleViewportChange({
+                ...viewport,
+                x: viewport.x + step / viewport.ratio
+              });
+              e.preventDefault();
+              break;
+              
+            case '+':
+              // Zoom in
+              const newZoomIn = zoomLevel * (1 + zoomStep);
+              setZoomLevel(newZoomIn);
+              e.preventDefault();
+              break;
+              
+            case '-':
+              // Zoom out
+              const newZoomOut = zoomLevel * (1 - zoomStep);
+              setZoomLevel(newZoomOut);
+              e.preventDefault();
+              break;
+              
+            case 'Home':
+              // Reset view
+              handleViewportChange({ x: 0, y: 0, ratio: 1, angle: 0 });
+              e.preventDefault();
+              break;
+          }
+        }}
+        // Add screen reader instructions
+        aria-describedby="map-instructions"
+      >
+        {/* Visually hidden instructions for screen reader users */}
+        <Box 
+          id="map-instructions" 
+          position="absolute" 
+          width="1px" 
+          height="1px" 
+          padding="0" 
+          margin="-1px" 
+          overflow="hidden" 
+          clip="rect(0, 0, 0, 0)" 
+          border="0"
+        >
+          Use arrow keys to navigate the map. Alt plus arrow up or down to zoom. Plus and minus keys also control zoom. Press Home key to reset the view.
+        </Box>
+        
         {sigmaGraphData ? (
           <SigmaContainer 
             style={{ width: '100%', height: '100%' }} 

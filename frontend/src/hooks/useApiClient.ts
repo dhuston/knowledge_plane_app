@@ -101,14 +101,24 @@ export const useApiClient = (): AxiosInstance => {
                     isRefreshing = true;
 
                     try {
+                        // Get refresh token from localStorage
+                        const refreshToken = localStorage.getItem('knowledge_plane_refresh_token');
+                        if (!refreshToken) {
+                            throw new Error('No refresh token available');
+                        }
+
                         // Use a basic axios instance for the refresh call to avoid interceptor loop
-                        // The refresh token is now sent as an httpOnly cookie
-                        const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {}, {
-                            withCredentials: true // Important to include cookies
-                        });
+                        const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh-token`, 
+                            { refresh_token: refreshToken }, 
+                            { withCredentials: true }
+                        );
                         
                         if (refreshResponse.status === 200) {
                             console.log("[API Client] Session refresh successful.");
+                            
+                            // Update the access token in localStorage
+                            const newAccessToken = refreshResponse.data.access_token;
+                            localStorage.setItem('knowledge_plane_token', newAccessToken);
                             
                             // User is still authenticated, update auth state
                             setAuthenticated(true);
@@ -116,11 +126,20 @@ export const useApiClient = (): AxiosInstance => {
                             // Process queue with no error
                             processQueue(null);
                             
+                            // Update the Authorization header in the original request
+                            if (originalRequest.headers) {
+                                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                            }
+                            
                             // Retry the original request
                             return instance(originalRequest);
                         }
                     } catch (refreshError) {
                         console.error("[API Client] Session refresh failed:", refreshError);
+                        
+                        // Clear tokens on refresh error
+                        localStorage.removeItem('knowledge_plane_token');
+                        localStorage.removeItem('knowledge_plane_refresh_token');
                         
                         // User is not authenticated anymore
                         setAuthenticated(false);

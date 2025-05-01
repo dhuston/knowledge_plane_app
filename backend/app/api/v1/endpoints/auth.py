@@ -57,10 +57,7 @@ async def login_google(request: Request):
         logger.info(f"Redirecting to frontend with mock tokens: {frontend_redirect_url}")
         response = RedirectResponse(url=frontend_redirect_url)
         
-        # Add CORS headers to the redirect response
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        
+        # Let the middleware handle CORS headers
         return response
     
     try:    
@@ -175,10 +172,7 @@ async def callback_google(request: Request, db: AsyncSession = Depends(get_db_se
         
         response = RedirectResponse(url=frontend_redirect_url)
         
-        # Add CORS headers to the redirect response
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        
+        # Let the middleware handle CORS headers
         return response
     
     except Exception as e:
@@ -187,10 +181,7 @@ async def callback_google(request: Request, db: AsyncSession = Depends(get_db_se
         logger.info(f"Redirecting user to frontend login with error.")
         response = RedirectResponse(url=error_redirect_url)
         
-        # Add CORS headers to the redirect response
-        response.headers["Access-Control-Allow-Origin"] = "http://localhost:5173"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        
+        # Let the middleware handle CORS headers
         return response
 
 
@@ -244,11 +235,33 @@ async def refresh_token(
         logger.error(f"Error decoding refresh token JWT: {e}")
         raise credentials_exception
         
-    # 2. Find user by ID from the validated refresh token
-    user = await crud_user.get(db, id=token_data.sub)
-    if not user:
-        logger.error(f"User ID {token_data.sub} from valid refresh token not found in DB.")
-        raise credentials_exception 
+    # 2. Find user by ID from the validated refresh token or use mock user for development
+    
+    # Check for development mode with disabled OAuth
+    if getattr(settings, "DISABLE_OAUTH", False) and str(token_data.sub) == "11111111-1111-1111-1111-111111111111":
+        # Use mock user for development
+        from datetime import datetime, timezone
+        user = UserModel(
+            id=UUID("11111111-1111-1111-1111-111111111111"),
+            email="dev@example.com",
+            name="Development User",
+            title="Software Developer",
+            avatar_url=None,
+            online_status=True,
+            tenant_id=UUID("33333333-3333-3333-3333-333333333333"),  # Match the tenant ID from dev-login
+            auth_provider="mock",
+            auth_provider_id="mock_id",
+            created_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
+            updated_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
+            last_login_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
+        )
+        logger.info("Using mock development user for token refresh")
+    else:
+        # Normal production flow - find user in database
+        user = await crud_user.get(db, id=token_data.sub)
+        if not user:
+            logger.error(f"User ID {token_data.sub} from valid refresh token not found in DB.")
+            raise credentials_exception 
     
     logger.info(f"Found user {user.email} from refresh token JWT.")
 

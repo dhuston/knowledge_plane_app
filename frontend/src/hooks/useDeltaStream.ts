@@ -28,7 +28,8 @@ type DeltaStreamSubscriber = {
  * @param onMessage - Callback to handle incoming messages
  */
 const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
-  const { token } = useAuth();
+  // Get token from localStorage directly to ensure latest token
+  const token = localStorage.getItem('knowledge_plane_token');
   // Store the WebSocket connection in a ref to persist across renders
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
   
@@ -51,8 +52,10 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
 
     // Build authenticated WebSocket URL (token query param)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/delta?token=${encodeURIComponent(token || '')}`;
+    const host = window.location.hostname === 'localhost' ? 'localhost:8001' : window.location.host;
+    const wsUrl = `${protocol}//${host}/api/v1/ws/delta?token=${encodeURIComponent(token || '')}`;
     
+    console.log('Connecting to WebSocket:', wsUrl.replace(/token=.*/, 'token=REDACTED'));
     const ws = new ReconnectingWebSocket(wsUrl, [], wsOptions);
     wsRef.current = ws;
 
