@@ -41,10 +41,33 @@ const WorkspaceNavigation: FC<WorkspaceNavigationProps> = ({
         ];
       case WorkspaceType.RESEARCH:
         return [
-          { id: 'methodology', label: 'Methodology', icon: '🧪' },
-          { id: 'data', label: 'Data', icon: '📊' },
-          { id: 'publications', label: 'Publications', icon: '📝' },
-          { id: 'citations', label: 'Citations', icon: '📚' }
+          { id: 'hypotheses', label: 'Hypotheses', icon: '🧪' },
+          { id: 'evidence', label: 'Evidence', icon: '🔍' },
+          { id: 'questions', label: 'Questions', icon: '❓' },
+          { id: 'sources', label: 'Sources', icon: '📚' },
+          { id: 'experiments', label: 'Experiments', icon: '🧬' }
+        ];
+      case WorkspaceType.DOCUMENT:
+        return [
+          { id: 'editor', label: 'Editor', icon: '✏️' },
+          { id: 'comments', label: 'Comments', icon: '💬' },
+          { id: 'versions', label: 'Versions', icon: '📝' },
+          { id: 'contributors', label: 'Contributors', icon: '👥' }
+        ];
+      case WorkspaceType.MEETING:
+        return [
+          { id: 'agenda', label: 'Agenda', icon: '📋' },
+          { id: 'notes', label: 'Notes', icon: '📝' },
+          { id: 'decisions', label: 'Decisions', icon: '✅' },
+          { id: 'actions', label: 'Actions', icon: '⚡' },
+          { id: 'participants', label: 'Participants', icon: '👥' }
+        ];
+      case WorkspaceType.PERSONAL:
+        return [
+          { id: 'tasks', label: 'Tasks', icon: '✅' },
+          { id: 'notes', label: 'Notes', icon: '📝' },
+          { id: 'bookmarks', label: 'Bookmarks', icon: '🔖' },
+          { id: 'calendar', label: 'Calendar', icon: '📅' }
         ];
       default:
         return [];

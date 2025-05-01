@@ -6,29 +6,28 @@ import { useMemo } from 'react';
 // Use environment variables (e.g., import.meta.env.VITE_API_BASE_URL)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
 
-// Define keys for localStorage (consistent with AuthContext)
-const ACCESS_TOKEN_KEY = 'knowledge_plane_token';
-const REFRESH_TOKEN_KEY = 'knowledge_plane_refresh_token';
+// Anti-CSRF token header
+const CSRF_HEADER = 'X-CSRF-Token';
 
 // Flag to prevent multiple concurrent refresh attempts
 let isRefreshing = false;
 // Array to hold pending requests while token is being refreshed
-let failedQueue: Array<{ resolve: (value: string | null) => void; reject: (reason?: any) => void }> = [];
+let failedQueue: Array<{ resolve: () => void; reject: (reason?: any) => void }> = [];
 
-const processQueue = (error: AxiosError | null, token: string | null = null) => {
+const processQueue = (error: AxiosError | null) => {
   failedQueue.forEach(prom => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token);
+      prom.resolve();
     }
   });
   failedQueue = [];
 };
 
 export const useApiClient = (): AxiosInstance => {
-    // Need setToken from useAuth to update tokens after refresh
-    const { token, setToken } = useAuth();
+    // We still need the auth state to track if user is logged in
+    const { isAuthenticated, setAuthenticated } = useAuth();
 
     const apiClient = useMemo(() => {
         const instance = axios.create({
@@ -36,17 +35,36 @@ export const useApiClient = (): AxiosInstance => {
             headers: {
                 'Content-Type': 'application/json',
             },
+            // This is critical for cookies to be sent with requests
+            withCredentials: true,
         });
 
+        // Get CSRF token if needed
+        const fetchCsrfToken = async () => {
+            try {
+                const response = await axios.get(`${API_BASE_URL}/auth/csrf-token`, {
+                    withCredentials: true
+                });
+                return response.data.csrfToken;
+            } catch (error) {
+                console.error("Failed to fetch CSRF token:", error);
+                return null;
+            }
+        };
+
         instance.interceptors.request.use(
-            (config: InternalAxiosRequestConfig) => {
-                const currentToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-                if (currentToken) {
-                    // Ensure headers object exists
-                    if (!config.headers) {
-                        config.headers = new axios.AxiosHeaders(); // Initialize properly
+            async (config: InternalAxiosRequestConfig) => {
+                // For mutating requests (POST, PUT, DELETE, PATCH), add CSRF token
+                const mutatingMethods = ['post', 'put', 'delete', 'patch'];
+                if (mutatingMethods.includes(config.method?.toLowerCase() || '')) {
+                    try {
+                        const csrfToken = await fetchCsrfToken();
+                        if (csrfToken && config.headers) {
+                            config.headers[CSRF_HEADER] = csrfToken;
+                        }
+                    } catch (error) {
+                        console.error("Error setting CSRF token:", error);
                     }
-                    config.headers.Authorization = `Bearer ${currentToken}`;
                 }
                 return config;
             },
@@ -67,13 +85,10 @@ export const useApiClient = (): AxiosInstance => {
                     // Prevent multiple refresh attempts simultaneously
                     if (isRefreshing) {
                         // If already refreshing, queue the original request
-                        return new Promise<string | null>((resolve, reject) => {
+                        return new Promise<void>((resolve, reject) => {
                             failedQueue.push({ resolve, reject });
                         })
-                        .then(newToken => {
-                            if (originalRequest.headers) {
-                                originalRequest.headers['Authorization'] = 'Bearer ' + newToken;
-                            }
+                        .then(() => {
                             return instance(originalRequest);
                         })
                         .catch(err => {
@@ -81,43 +96,36 @@ export const useApiClient = (): AxiosInstance => {
                         });
                     }
 
-                    console.log("[API Client] Received 401, attempting token refresh...");
+                    console.log("[API Client] Received 401, attempting session refresh...");
                     originalRequest._retry = true; // Mark as retry
                     isRefreshing = true;
 
-                    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-
-                    if (!refreshToken) {
-                        console.error("[API Client] No refresh token found. Logging out.");
-                        setToken(null, null); // Clear tokens and trigger logout via AuthContext
-                        isRefreshing = false;
-                        processQueue(error, null); // Reject queued requests with null token
-                        return Promise.reject(error);
-                    }
-
                     try {
                         // Use a basic axios instance for the refresh call to avoid interceptor loop
-                        const refreshResponse = await axios.post<{ access_token: string }>(`${API_BASE_URL}/auth/refresh-token`, {
-                            refresh_token: refreshToken
+                        // The refresh token is now sent as an httpOnly cookie
+                        const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {}, {
+                            withCredentials: true // Important to include cookies
                         });
                         
-                        const newAccessToken = refreshResponse.data.access_token;
-                        console.log("[API Client] Token refresh successful.");
-                        
-                        // Update tokens using setToken from AuthContext
-                        setToken(newAccessToken, refreshToken); // Keep the same refresh token for now
+                        if (refreshResponse.status === 200) {
+                            console.log("[API Client] Session refresh successful.");
+                            
+                            // User is still authenticated, update auth state
+                            setAuthenticated(true);
 
-                        // Update the header of the original request
-                        if (originalRequest.headers) {
-                           originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+                            // Process queue with no error
+                            processQueue(null);
+                            
+                            // Retry the original request
+                            return instance(originalRequest);
                         }
-                        
-                        processQueue(null, newAccessToken); // Process queue with new token
-                        return instance(originalRequest); // Retry the original request
                     } catch (refreshError) {
-                        console.error("[API Client] Token refresh failed:", refreshError);
-                        setToken(null, null); // Clear tokens on refresh failure
-                        processQueue(refreshError as AxiosError, null); // Reject queue with null token
+                        console.error("[API Client] Session refresh failed:", refreshError);
+                        
+                        // User is not authenticated anymore
+                        setAuthenticated(false);
+                        
+                        processQueue(refreshError as AxiosError);
                         return Promise.reject(refreshError);
                     } finally {
                         isRefreshing = false;
@@ -130,8 +138,8 @@ export const useApiClient = (): AxiosInstance => {
         );
 
         return instance;
-    // Include setToken in dependency array so interceptor gets the latest version
-    }, [token, setToken]); 
+    // Include isAuthenticated in dependency array so interceptor gets the latest auth state
+    }, [isAuthenticated, setAuthenticated]); 
 
     return apiClient;
 }; 

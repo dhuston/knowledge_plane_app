@@ -2,14 +2,13 @@
  * LivingMap.tsx
  * Enhanced map visualization component using Sigma with viewport-based loading and LOD
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MapData, MapNodeTypeEnum, MapNode } from '../../types/map';
-import { Box, Spinner, Text, useToast, IconButton, useDisclosure, Input, HStack, List, 
-         ListItem, Select, FormControl, FormLabel, Switch, VStack, Badge } from '@chakra-ui/react';
+import { Box, Spinner, Text, useToast, IconButton, useDisclosure } from '@chakra-ui/react';
 import { FaFilter } from 'react-icons/fa';
-import { FiSearch, FiRefreshCw } from 'react-icons/fi';
 import { useApiClient } from '../../hooks/useApiClient';
 import { useDeltaStream } from '../../hooks/useDeltaStream';
+import debounce from 'lodash/debounce';
 
 // Import from the shared styles
 import { nodeStyles } from './styles/MapStyles';
@@ -19,20 +18,15 @@ import {
   SigmaContainer, 
   ControlsContainer, 
   LayoutForceAtlas2Control,
-  useCamera, 
-  useSigma 
+  useCamera
 } from '@react-sigma/core';
 import SigmaGraphLoader from './SigmaGraphLoader';
 
-// Import ContextPanel
-import ContextPanel from '../panels/ContextPanel';
-
-// Define type for search results
-interface SearchResult {
-  id: string;
-  label: string;
-  type?: MapNodeTypeEnum;
-}
+// Import extracted components
+import MapSearchBar, { SearchResult } from './search/MapSearchBar';
+import SearchResultsList from './search/SearchResultsList';
+import MapFilterPanel, { MapFilters, AVAILABLE_STATUSES } from './filters/MapFilterPanel';
+import MapLoadingOverlay from './loading/MapLoadingOverlay';
 
 // Define viewport type for camera position tracking
 interface Viewport {
@@ -41,18 +35,6 @@ interface Viewport {
   ratio: number;
   angle: number;
 }
-
-// Define filter options
-interface MapFilters {
-  types: MapNodeTypeEnum[];
-  statuses: string[];
-  depth: number;
-  clusterTeams: boolean;
-  centerNodeId?: string | null;
-}
-
-// Define available statuses
-const AVAILABLE_STATUSES = ['active', 'planning', 'completed', 'blocked', 'archived'];
 
 interface LivingMapProps {
   onNodeClick: (nodeId: string | null) => void;
@@ -168,45 +150,55 @@ const LivingMap: React.FC<LivingMapProps> = ({
     setIsLoading(true);
 
     try {
-      const nodesToProcess = rawApiData.nodes || [];
-      const edgesToProcess = rawApiData.edges || [];
-      const nodeIdsToRender = new Set(nodesToProcess.map(n => n.id));
+      // Use memoization for expensive graph data processing
+      const processApiData = () => {
+        const nodesToProcess = rawApiData.nodes || [];
+        const edgesToProcess = rawApiData.edges || [];
+        const nodeIdsToRender = new Set(nodesToProcess.map(n => n.id));
+        
+        // Optimize node type counting with a single pass
+        const counts: Record<string, number> = {};
+        nodesToProcess.forEach(node => {
+          counts[node.type] = (counts[node.type] || 0) + 1;
+        });
+        
+        // Process nodes in one pass
+        const nodes = nodesToProcess.map(node => ({
+          id: node.id,
+          label: node.label,
+          color: nodeStyles[node.type]?.color || '#999',
+          size: nodeStyles[node.type]?.baseSize || 10,
+          x: node.position?.x ?? Math.random() * 1000, 
+          y: node.position?.y ?? Math.random() * 1000,
+          entityType: node.type,
+          originalApiData: node
+        }));
+
+        // Process edges in one pass
+        const edges: any[] = [];
+        (edgesToProcess || []).forEach(edge => {
+          if (nodeIdsToRender.has(edge.source) && nodeIdsToRender.has(edge.target)) {
+            edges.push({
+              id: edge.id,
+              source: edge.source,
+              target: edge.target,
+              label: edge.label || undefined,
+              color: '#ccc',
+              size: 1,
+              originalApiData: edge
+            });
+          }
+        });
+
+        return { nodes, edges, counts, hasMoreData: nodesToProcess.length >= PAGE_SIZE };
+      };
+
+      // Process the data
+      const { nodes, edges, counts, hasMoreData } = processApiData();
       
-      // Update node type counts
-      const counts: Record<string, number> = {};
-      nodesToProcess.forEach(node => {
-        counts[node.type] = (counts[node.type] || 0) + 1;
-      });
+      // Update state with processed data
       setNodeCounts(counts);
-
-      const nodes = nodesToProcess.map(node => ({
-        id: node.id,
-        label: node.label,
-        color: nodeStyles[node.type]?.color || '#999',
-        size: nodeStyles[node.type]?.baseSize || 10,
-        x: node.position?.x ?? Math.random() * 1000, 
-        y: node.position?.y ?? Math.random() * 1000,
-        entityType: node.type,
-        originalApiData: node
-      }));
-
-      const edges: any[] = [];
-      (edgesToProcess || []).forEach(edge => {
-        if (nodeIdsToRender.has(edge.source) && nodeIdsToRender.has(edge.target)) {
-          edges.push({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            label: edge.label || undefined,
-            color: '#ccc',
-            size: 1,
-            originalApiData: edge
-          });
-        }
-      });
-
-      // Determine if there might be more data to load
-      setHasMoreData(nodesToProcess.length >= PAGE_SIZE);
+      setHasMoreData(hasMoreData);
 
       // Update or replace the graph data
       if (currentPage > 1) {
@@ -214,11 +206,10 @@ const LivingMap: React.FC<LivingMapProps> = ({
         setSigmaGraphData(prevData => {
           if (!prevData) return { nodes, edges };
           
-          // Combine existing and new nodes, removing duplicates
+          // Optimize merging of existing and new data
           const existingNodeIds = new Set(prevData.nodes.map(n => n.id));
           const newNodes = nodes.filter(node => !existingNodeIds.has(node.id));
           
-          // Combine existing and new edges, removing duplicates
           const existingEdgeIds = new Set(prevData.edges.map(e => e.id));
           const newEdges = edges.filter(edge => !existingEdgeIds.has(edge.id));
           
@@ -244,7 +235,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
     } finally {
       if (isMounted.current) setIsLoading(false);
     }
-  }, [rawApiData, onMapLoad, currentPage]);
+  }, [rawApiData, onMapLoad, currentPage, nodeStyles]);
 
   // Data Fetching Logic - Enhanced with filters and pagination
   const fetchMapData = useCallback(async (filterOptions: MapFilters, viewportData?: Viewport, page: number = 1) => {
@@ -366,24 +357,34 @@ const LivingMap: React.FC<LivingMapProps> = ({
     setSearchResults([]);
   }, [sigmaGraphData, updateFilters]);
 
-  // Enhanced search with type filtering
-  useEffect(() => {
+  const handleSearch = useCallback(() => {
+    if (searchResults.length) {
+      focusOnNode(searchResults[0].id);
+    }
+  }, [searchResults, focusOnNode]);
+
+  // Enhanced search with type filtering - using useMemo for better performance
+  useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-    const matches: SearchResult[] = [];
-    sigmaGraphData?.nodes.forEach((node) => {
-      if (node.label?.toLowerCase().includes(query)) {
-        matches.push({ 
-          id: node.id, 
-          label: node.label || node.id,
-          type: node.entityType
-        });
-      }
-    });
-    setSearchResults(matches.slice(0, 8));
+    
+    // Only perform filtering when we have both query and data
+    if (sigmaGraphData?.nodes) {
+      const matches: SearchResult[] = [];
+      sigmaGraphData.nodes.forEach((node) => {
+        if (node.label?.toLowerCase().includes(query)) {
+          matches.push({ 
+            id: node.id, 
+            label: node.label || node.id,
+            type: node.entityType
+          });
+        }
+      });
+      setSearchResults(matches.slice(0, 8));
+    }
   }, [searchQuery, sigmaGraphData]);
 
   // Filter Panel State
@@ -460,260 +461,33 @@ const LivingMap: React.FC<LivingMapProps> = ({
 
       {/* Enhanced Filter Panel */}
       {isFilterPanelOpen && (
-        <Box
-          position="absolute"
-          top="55px"
-          right="15px"
-          bg="white"
-          p={4}
-          borderRadius="md"
-          boxShadow="md"
-          zIndex={4}
-          borderWidth="1px"
-          borderColor="gray.200"
-          minWidth="250px"
-          _dark={{
-            bg: '#363636',
-            borderColor: 'gray.600',
-            color: 'gray.200',
-          }}
-        >
-          <VStack spacing={3} align="stretch">
-            <Text fontWeight="bold">Map Filters</Text>
-            
-            {/* Node Type Filter */}
-            <FormControl size="sm">
-              <FormLabel fontSize="sm">Node Types</FormLabel>
-              {Object.values(MapNodeTypeEnum).map(type => (
-                <Box key={type} display="inline-block" mr={2} mb={2}>
-                  <Badge 
-                    colorScheme={filters.types.includes(type) ? 'blue' : 'gray'} 
-                    cursor="pointer"
-                    onClick={() => {
-                      const newTypes = filters.types.includes(type)
-                        ? filters.types.filter(t => t !== type)
-                        : [...filters.types, type];
-                      updateFilters({ types: newTypes });
-                    }}
-                    px={2}
-                    py={1}
-                  >
-                    {type} {nodeCounts[type] ? `(${nodeCounts[type]})` : ''}
-                  </Badge>
-                </Box>
-              ))}
-            </FormControl>
-            
-            {/* Status Filter */}
-            <FormControl size="sm">
-              <FormLabel fontSize="sm">Status Filter</FormLabel>
-              {AVAILABLE_STATUSES.map(status => (
-                <Box key={status} display="inline-block" mr={2} mb={2}>
-                  <Badge 
-                    colorScheme={filters.statuses.includes(status) ? 'green' : 'gray'} 
-                    cursor="pointer"
-                    onClick={() => {
-                      const newStatuses = filters.statuses.includes(status)
-                        ? filters.statuses.filter(s => s !== status)
-                        : [...filters.statuses, status];
-                      updateFilters({ statuses: newStatuses });
-                    }}
-                    px={2}
-                    py={1}
-                  >
-                    {status}
-                  </Badge>
-                </Box>
-              ))}
-            </FormControl>
-            
-            {/* Depth Filter */}
-            <FormControl size="sm">
-              <FormLabel fontSize="sm">Relationship Depth</FormLabel>
-              <Select 
-                size="sm" 
-                value={filters.depth} 
-                onChange={(e) => updateFilters({ depth: parseInt(e.target.value) })}
-              >
-                <option value={1}>Direct connections (1 level)</option>
-                <option value={2}>Extended network (2 levels)</option>
-              </Select>
-            </FormControl>
-            
-            {/* Team Clustering */}
-            <FormControl size="sm" display="flex" alignItems="center">
-              <FormLabel fontSize="sm" mb="0">
-                Cluster team members
-              </FormLabel>
-              <Switch 
-                isChecked={filters.clusterTeams} 
-                onChange={(e) => updateFilters({ clusterTeams: e.target.checked })}
-              />
-            </FormControl>
-            
-            {/* Reset Filter Button */}
-            <IconButton
-              aria-label="Reset filters"
-              icon={<FiRefreshCw />}
-              size="sm"
-              onClick={() => updateFilters({
-                types: Object.values(MapNodeTypeEnum),
-                statuses: ['active', 'planning'],
-                depth: 1,
-                clusterTeams: true,
-                centerNodeId: null
-              })}
-            />
-            
-            {/* Stats */}
-            <Box fontSize="xs" mt={2} pt={2} borderTopWidth="1px" borderColor="gray.200">
-              <Text>Showing {sigmaGraphData?.nodes.length || 0} nodes, {sigmaGraphData?.edges.length || 0} connections</Text>
-              {hasMoreData && (
-                <Text 
-                  color="blue.500" 
-                  cursor="pointer" 
-                  onClick={loadMoreData}
-                  _dark={{ color: 'blue.300' }}
-                >
-                  Load more data...
-                </Text>
-              )}
-            </Box>
-          </VStack>
-        </Box>
+        <MapFilterPanel
+          filters={filters}
+          updateFilters={updateFilters}
+          nodeCounts={nodeCounts}
+          nodeCount={sigmaGraphData?.nodes.length || 0}
+          edgeCount={sigmaGraphData?.edges.length || 0}
+          hasMoreData={hasMoreData}
+          loadMoreData={loadMoreData}
+        />
       )}
 
       {/* Search Bar */}
-      <HStack
-        position="absolute"
-        top="15px"
-        left="15px"
-        zIndex={4}
-        bg="surface.500"
-        p={1}
-        borderRadius="md"
-        shadow="sm"
-        borderWidth="1px"
-        borderColor="primary.300"
-        _dark={{
-          bg: '#363636',
-          borderColor: 'primary.600',
-        }}
-      >
-        <Input
-          size="sm"
-          placeholder="Search node..."
-          value={searchQuery}
-          onChange={(e)=>setSearchQuery(e.target.value)}
-          onKeyDown={(e)=>{
-            if (e.key === 'Enter' && searchResults.length) {
-              focusOnNode(searchResults[0].id);
-            }
-          }}
-          width="160px"
-          variant="outline"
-          bg="surface.500"
-          color="#262626"
-          _dark={{
-            bg: '#363636',
-            color: 'secondary.400',
-          }}
-        />
-        <IconButton
-          aria-label="Search"
-          icon={<FiSearch />}
-          size="sm"
-          variant="ghost"
-          color="#262626"
-          _dark={{
-            color: 'secondary.400',
-          }}
-          onClick={() => {
-            if (searchResults.length) {
-              focusOnNode(searchResults[0].id);
-            }
-          }}
-        />
-      </HStack>
+      <MapSearchBar
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onSearch={handleSearch}
+      />
 
       {/* Search Suggestions Dropdown */}
-      {searchResults.length > 0 && (
-        <Box
-          position="absolute"
-          top="50px"
-          left="15px"
-          zIndex={5}
-          bg="surface.500"
-          borderWidth="1px"
-          borderColor="primary.300"
-          borderRadius="md"
-          shadow="sm"
-          maxHeight="220px"
-          overflowY="auto"
-          width="220px"
-          _dark={{
-            bg: '#363636',
-            borderColor: 'primary.600',
-          }}
-        >
-          <List spacing={0}>
-            {searchResults.map((node) => (
-              <ListItem
-                key={node.id}
-                px={3}
-                py={2}
-                _hover={{ bg: 'secondary.400' }}
-                cursor="pointer"
-                color="#262626"
-                _dark={{
-                  _hover: { bg: '#464646' },
-                  color: 'secondary.400',
-                }}
-                onClick={() => focusOnNode(node.id)}
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Text>{node.label}</Text>
-                {node.type && (
-                  <Badge 
-                    size="sm" 
-                    colorScheme={
-                      node.type === MapNodeTypeEnum.USER ? 'green' :
-                      node.type === MapNodeTypeEnum.TEAM ? 'blue' : 
-                      node.type === MapNodeTypeEnum.PROJECT ? 'purple' : 
-                      node.type === MapNodeTypeEnum.GOAL ? 'orange' : 'gray'
-                    }
-                  >
-                    {node.type}
-                  </Badge>
-                )}
-              </ListItem>
-            ))}
-          </List>
-        </Box>
-      )}
+      <SearchResultsList
+        results={searchResults}
+        onResultClick={focusOnNode}
+        visible={searchResults.length > 0}
+      />
 
       {/* Loading Indicator Overlay */}
-      {isLoading && (
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          bottom={0}
-          bg="rgba(241, 242, 234, 0.7)"
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          zIndex={10}
-          _dark={{
-            bg: "rgba(38, 38, 38, 0.7)"
-          }}
-        >
-          <Spinner size="xl" color="#262626" _dark={{ color: "secondary.400" }} />
-        </Box>
-      )}
+      <MapLoadingOverlay isLoading={isLoading} />
     </Box>
   );
 };

@@ -5,36 +5,28 @@ import {
   Spinner,
   Alert,
   AlertIcon,
-  CloseButton,
-  Heading,
-  HStack,
-  Text,
-  Icon,
   useColorModeValue,
-  Fade,
-  Button,
-  Badge,
-  Tooltip,
+  Fade
 } from '@chakra-ui/react';
-import { 
-  MdOutlinePerson, 
-  MdOutlineGroup, 
-  MdOutlineFolder, 
-  MdOutlineFlag,
-  MdOutlineBook,
-  MdOutlineBusinessCenter,
-  MdOutlineQuestionMark
-} from 'react-icons/md';
 import { useApiClient } from '../../hooks/useApiClient';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
+
+// Import entity panels
 import UserPanel from './entity-panels/UserPanel';
 import TeamPanel from './entity-panels/TeamPanel';
 import ProjectPanel from './entity-panels/ProjectPanel';
 import GoalPanel from './entity-panels/GoalPanel';
 import EntityDetails from './EntityDetails';
+
+// Import common components
 import RelationshipList from './RelationshipList';
 import ActivityTimeline from './ActivityTimeline';
 import ActionButtons from './ActionButtons';
+
+// Import extracted components
+import PanelHeader from './header/PanelHeader';
+import PanelTabs, { PanelTabType } from './tabs/PanelTabs';
+import EntitySuggestions, { EntitySuggestion } from './suggestions/EntitySuggestions';
 
 interface ContextPanelProps {
   selectedNode: MapNode | null;
@@ -56,45 +48,13 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
   const [relationships, setRelationships] = useState<any[]>([]);
   const [isRelationshipsLoading, setIsRelationshipsLoading] = useState<boolean>(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<EntitySuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'related'>('details');
+  const [activeTab, setActiveTab] = useState<PanelTabType>('details');
   const apiClient = useApiClient();
 
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
-
-  // Get node icon based on type
-  const getNodeIcon = (type: MapNodeTypeEnum | undefined) => {
-    switch (type) {
-      case MapNodeTypeEnum.USER:
-        return MdOutlinePerson;
-      case MapNodeTypeEnum.TEAM:
-        return MdOutlineGroup;
-      case MapNodeTypeEnum.PROJECT:
-        return MdOutlineFolder;
-      case MapNodeTypeEnum.GOAL:
-        return MdOutlineFlag;
-      case MapNodeTypeEnum.KNOWLEDGE_ASSET:
-        return MdOutlineBook;
-      case MapNodeTypeEnum.DEPARTMENT:
-        return MdOutlineBusinessCenter;
-      case MapNodeTypeEnum.TEAM_CLUSTER:
-        return MdOutlineGroup;
-      default:
-        return MdOutlineQuestionMark;
-    }
-  };
-
-  // Get type label
-  const getTypeLabel = (type: MapNodeTypeEnum | undefined): string => {
-    if (!type) return 'Unknown';
-    // Convert snake_case to Title Case (e.g., "knowledge_asset" to "Knowledge Asset")
-    return type
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
 
   // Fetch entity data
   useEffect(() => {
@@ -330,6 +290,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
       // For example, if action is "Edit", you would open an edit modal
     }
   }, []);
+
+  const handleSuggestionClick = useCallback((suggestionId: string, label: string) => {
+    // This would navigate to the suggested entity
+    console.log('Navigate to suggestion:', suggestionId);
+    alert(`Navigation to ${label} would happen here`);
+  }, []);
   
   // Set up event listeners
   useEffect(() => {
@@ -416,41 +382,6 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     return null;
   }
 
-  // Render suggestions component
-  const renderEntitySuggestions = () => {
-    if (!suggestions || suggestions.length === 0) return null;
-    
-    return (
-      <Box mt={4} p={3} borderWidth="1px" borderRadius="md" borderColor={borderColor}>
-        <Heading size="xs" mb={3}>Suggested Connections</Heading>
-        <HStack spacing={2} flexWrap="wrap">
-          {suggestions.map(suggestion => (
-            <Badge 
-              key={suggestion.id}
-              px={2} py={1} 
-              borderRadius="full"
-              variant="subtle"
-              colorScheme="blue"
-              cursor="pointer"
-              onClick={() => {
-                // This would navigate to the suggested entity
-                console.log('Navigate to suggestion:', suggestion);
-                alert(`Navigation to ${suggestion.label} would happen here`);
-              }}
-            >
-              {suggestion.label}
-              {suggestion.reason && (
-                <Tooltip label={suggestion.reason} hasArrow placement="top">
-                  <Icon as={MdOutlineQuestionMark} ml={1} boxSize={3} />
-                </Tooltip>
-              )}
-            </Badge>
-          ))}
-        </HStack>
-      </Box>
-    );
-  };
-
   return (
     <Fade in={true}>
       <Box
@@ -464,55 +395,17 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         overflow="hidden"
       >
         {/* Header */}
-        <HStack 
-          p={4} 
-          borderBottom="1px solid" 
-          borderColor={borderColor} 
-          justifyContent="space-between"
-        >
-          <HStack>
-            <Icon as={getNodeIcon(selectedNode.type)} boxSize={5} />
-            <VStack align="flex-start" spacing={0}>
-              <Heading size="sm">{selectedNode.label}</Heading>
-              <Text color="gray.500" fontSize="sm">{getTypeLabel(selectedNode.type)}</Text>
-            </VStack>
-          </HStack>
-          <CloseButton onClick={onClose} />
-        </HStack>
+        <PanelHeader 
+          label={selectedNode.label}
+          type={selectedNode.type}
+          onClose={onClose}
+        />
 
         {/* Tab navigation */}
-        <HStack 
-          borderBottom="1px solid" 
-          borderColor={borderColor} 
-          px={4}
-          py={2}
-          spacing={4}
-        >
-          <Button 
-            variant={activeTab === 'details' ? 'solid' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('details')}
-            colorScheme={activeTab === 'details' ? 'blue' : undefined}
-          >
-            Details
-          </Button>
-          <Button 
-            variant={activeTab === 'related' ? 'solid' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('related')}
-            colorScheme={activeTab === 'related' ? 'blue' : undefined}
-          >
-            Relationships
-          </Button>
-          <Button 
-            variant={activeTab === 'activity' ? 'solid' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('activity')}
-            colorScheme={activeTab === 'activity' ? 'blue' : undefined}
-          >
-            Activity
-          </Button>
-        </HStack>
+        <PanelTabs 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+        />
 
         {/* Panel Content */}
         <Box flex="1" overflowY="auto" p={4}>
@@ -522,7 +415,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
               {renderEntityPanel()}
               
               {/* Suggestions only shown in details tab */}
-              {renderEntitySuggestions()}
+              <EntitySuggestions 
+                suggestions={suggestions}
+                onSuggestionClick={handleSuggestionClick}
+              />
 
               {/* Action Buttons */}
               <ActionButtons entityType={selectedNode.type} entityId={selectedNode.id} />

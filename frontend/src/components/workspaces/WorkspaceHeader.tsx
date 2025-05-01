@@ -1,5 +1,6 @@
-import { FC } from 'react';
+import React, { FC } from 'react';
 import { WorkspaceType } from '../../models/workspace/Workspace';
+import { BsPeople, BsKanban, BsBook, BsPerson, BsFileText, BsCalendar } from 'react-icons/bs';
 
 interface WorkspaceHeaderProps {
   title: string;
@@ -7,65 +8,83 @@ interface WorkspaceHeaderProps {
   workspaceType: WorkspaceType;
 }
 
-/**
- * Component for rendering the workspace header with title, description, and type
- */
-const WorkspaceHeader: FC<WorkspaceHeaderProps> = ({ title, description, workspaceType }) => {
-  // Get the appropriate icon based on workspace type
+const WorkspaceHeader: FC<WorkspaceHeaderProps> = ({ 
+  title, 
+  description, 
+  workspaceType 
+}) => {
+  // Get the appropriate icon for the workspace type
   const getWorkspaceIcon = () => {
     switch (workspaceType) {
       case WorkspaceType.TEAM:
-        return '👥';
+        return <BsPeople className="workspace-icon" />;
       case WorkspaceType.PROJECT:
-        return '📋';
+        return <BsKanban className="workspace-icon" />;
       case WorkspaceType.RESEARCH:
-        return '🔬';
+        return <BsBook className="workspace-icon" />;
       case WorkspaceType.PERSONAL:
-        return '👤';
+        return <BsPerson className="workspace-icon" />;
+      case WorkspaceType.DOCUMENT:
+        return <BsFileText className="workspace-icon" />;
+      case WorkspaceType.MEETING:
+        return <BsCalendar className="workspace-icon" />;
       default:
-        return '📁';
+        return <BsPeople className="workspace-icon" />;
     }
   };
-  
-  // Get the display name of the workspace type
-  const getWorkspaceTypeName = () => {
+
+  // Get color class based on workspace type
+  const getColorClass = () => {
+    switch (workspaceType) {
+      case WorkspaceType.TEAM:
+        return 'workspace-header-team';
+      case WorkspaceType.PROJECT:
+        return 'workspace-header-project';
+      case WorkspaceType.RESEARCH:
+        return 'workspace-header-research';
+      case WorkspaceType.PERSONAL:
+        return 'workspace-header-personal';
+      case WorkspaceType.DOCUMENT:
+        return 'workspace-header-document';
+      case WorkspaceType.MEETING:
+        return 'workspace-header-meeting';
+      default:
+        return 'workspace-header-team';
+    }
+  };
+
+  // Get type label
+  const getTypeLabel = () => {
     switch (workspaceType) {
       case WorkspaceType.TEAM:
         return 'Team Workspace';
       case WorkspaceType.PROJECT:
-        return 'Project Hub';
+        return 'Project Workspace';
       case WorkspaceType.RESEARCH:
-        return 'Research Space';
+        return 'Research Workspace';
       case WorkspaceType.PERSONAL:
-        return 'Personal Space';
+        return 'Personal Workspace';
+      case WorkspaceType.DOCUMENT:
+        return 'Document Collaboration';
+      case WorkspaceType.MEETING:
+        return 'Meeting Workspace';
       default:
         return 'Workspace';
     }
   };
-  
+
   return (
-    <header className="workspace-header">
-      <div className="workspace-header-container">
+    <header className={`workspace-header ${getColorClass()}`}>
+      <div className="workspace-header-content">
         <div className="workspace-header-icon">
           {getWorkspaceIcon()}
         </div>
-        
-        <div className="workspace-header-content">
-          <div className="workspace-header-title-row">
-            <h1 className="workspace-header-title">{title}</h1>
-            <span className="workspace-header-type">{getWorkspaceTypeName()}</span>
-          </div>
-          
-          <p className="workspace-header-description">{description}</p>
+        <div className="workspace-header-text">
+          <h1 className="workspace-title">{title}</h1>
+          <p className="workspace-description">{description}</p>
         </div>
-        
-        <div className="workspace-header-actions">
-          <button className="workspace-header-button">
-            <span className="icon">⚙️</span> Settings
-          </button>
-          <button className="workspace-header-button primary">
-            <span className="icon">✏️</span> Edit
-          </button>
+        <div className="workspace-type-badge">
+          {getTypeLabel()}
         </div>
       </div>
     </header>
