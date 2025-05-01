@@ -2,7 +2,7 @@
  * MapSearchBar.tsx
  * Search component for the LivingMap
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { 
   HStack,
   Input,
@@ -24,6 +24,7 @@ interface MapSearchBarProps {
   onSearch: () => void;
 }
 
+// Add an ID for the search input to connect to the search results list
 const MapSearchBar: React.FC<MapSearchBarProps> = ({
   searchQuery,
   setSearchQuery,
@@ -64,6 +65,11 @@ const MapSearchBar: React.FC<MapSearchBarProps> = ({
           bg: '#363636',
           color: 'secondary.400',
         }}
+        aria-label="Search for nodes"
+        aria-autocomplete="list"
+        aria-controls="search-results-list"
+        role="searchbox"
+        id="search-input"
       />
       <IconButton
         aria-label="Search"
@@ -80,4 +86,5 @@ const MapSearchBar: React.FC<MapSearchBarProps> = ({
   );
 };
 
-export default MapSearchBar;
+// Use React.memo to prevent unnecessary re-renders
+export default memo(MapSearchBar);

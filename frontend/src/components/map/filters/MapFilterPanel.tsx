@@ -2,7 +2,7 @@
  * MapFilterPanel.tsx
  * Filter controls for the LivingMap
  */
-import React from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import {
   Box,
   VStack,
@@ -48,6 +48,87 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
   hasMoreData,
   loadMoreData
 }) => {
+  // Memoize the type filter handlers to prevent recreating them on every render
+  const handleTypeFilterChange = useCallback((type: MapNodeTypeEnum) => {
+    const newTypes = filters.types.includes(type)
+      ? filters.types.filter(t => t !== type)
+      : [...filters.types, type];
+    updateFilters({ types: newTypes });
+  }, [filters.types, updateFilters]);
+
+  // Memoize the status filter handlers to prevent recreating them on every render
+  const handleStatusFilterChange = useCallback((status: string) => {
+    const newStatuses = filters.statuses.includes(status)
+      ? filters.statuses.filter(s => s !== status)
+      : [...filters.statuses, status];
+    updateFilters({ statuses: newStatuses });
+  }, [filters.statuses, updateFilters]);
+
+  // Memoize reset handler
+  const handleReset = useCallback(() => {
+    updateFilters({
+      types: Object.values(MapNodeTypeEnum),
+      statuses: ['active', 'planning'],
+      depth: 1,
+      clusterTeams: true,
+      centerNodeId: null
+    });
+  }, [updateFilters]);
+
+  // Memoize node type badges for better rendering performance with accessibility
+  const nodeTypeBadges = useMemo(() => {
+    return Object.values(MapNodeTypeEnum).map(type => (
+      <Box key={type} display="inline-block" mr={2} mb={2}>
+        <Badge 
+          colorScheme={filters.types.includes(type) ? 'blue' : 'gray'} 
+          cursor="pointer"
+          onClick={() => handleTypeFilterChange(type)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              handleTypeFilterChange(type);
+              e.preventDefault();
+            }
+          }}
+          px={2}
+          py={1}
+          role="checkbox"
+          aria-checked={filters.types.includes(type)}
+          tabIndex={0}
+          aria-label={`Filter by ${type} nodes: ${nodeCounts[type] || 0} available`}
+        >
+          {type} {nodeCounts[type] ? `(${nodeCounts[type]})` : ''}
+        </Badge>
+      </Box>
+    ));
+  }, [filters.types, nodeCounts, handleTypeFilterChange]);
+
+  // Memoize status badges for better rendering performance with accessibility
+  const statusBadges = useMemo(() => {
+    return AVAILABLE_STATUSES.map(status => (
+      <Box key={status} display="inline-block" mr={2} mb={2}>
+        <Badge 
+          colorScheme={filters.statuses.includes(status) ? 'green' : 'gray'} 
+          cursor="pointer"
+          onClick={() => handleStatusFilterChange(status)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              handleStatusFilterChange(status);
+              e.preventDefault();
+            }
+          }}
+          px={2}
+          py={1}
+          role="checkbox"
+          aria-checked={filters.statuses.includes(status)}
+          tabIndex={0}
+          aria-label={`Filter by ${status} status`}
+        >
+          {status}
+        </Badge>
+      </Box>
+    ));
+  }, [filters.statuses, handleStatusFilterChange]);
+
   return (
     <Box
       position="absolute"
@@ -61,6 +142,10 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
       borderWidth="1px"
       borderColor="gray.200"
       minWidth="250px"
+      role="dialog"
+      id="filter-panel"
+      aria-label="Map filters"
+      aria-modal="true"
       _dark={{
         bg: '#363636',
         borderColor: 'gray.600',
@@ -68,61 +153,33 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
       }}
     >
       <VStack spacing={3} align="stretch">
-        <Text fontWeight="bold">Map Filters</Text>
+        <Text fontWeight="bold" as="h3" id="filter-heading">Map Filters</Text>
         
         {/* Node Type Filter */}
-        <FormControl size="sm">
-          <FormLabel fontSize="sm">Node Types</FormLabel>
-          {Object.values(MapNodeTypeEnum).map(type => (
-            <Box key={type} display="inline-block" mr={2} mb={2}>
-              <Badge 
-                colorScheme={filters.types.includes(type) ? 'blue' : 'gray'} 
-                cursor="pointer"
-                onClick={() => {
-                  const newTypes = filters.types.includes(type)
-                    ? filters.types.filter(t => t !== type)
-                    : [...filters.types, type];
-                  updateFilters({ types: newTypes });
-                }}
-                px={2}
-                py={1}
-              >
-                {type} {nodeCounts[type] ? `(${nodeCounts[type]})` : ''}
-              </Badge>
-            </Box>
-          ))}
+        <FormControl size="sm" aria-labelledby="filter-heading node-type-label">
+          <FormLabel fontSize="sm" id="node-type-label">Node Types</FormLabel>
+          <Box role="group" aria-labelledby="node-type-label">
+            {nodeTypeBadges}
+          </Box>
         </FormControl>
         
         {/* Status Filter */}
-        <FormControl size="sm">
-          <FormLabel fontSize="sm">Status Filter</FormLabel>
-          {AVAILABLE_STATUSES.map(status => (
-            <Box key={status} display="inline-block" mr={2} mb={2}>
-              <Badge 
-                colorScheme={filters.statuses.includes(status) ? 'green' : 'gray'} 
-                cursor="pointer"
-                onClick={() => {
-                  const newStatuses = filters.statuses.includes(status)
-                    ? filters.statuses.filter(s => s !== status)
-                    : [...filters.statuses, status];
-                  updateFilters({ statuses: newStatuses });
-                }}
-                px={2}
-                py={1}
-              >
-                {status}
-              </Badge>
-            </Box>
-          ))}
+        <FormControl size="sm" aria-labelledby="filter-heading status-label">
+          <FormLabel fontSize="sm" id="status-label">Status Filter</FormLabel>
+          <Box role="group" aria-labelledby="status-label">
+            {statusBadges}
+          </Box>
         </FormControl>
         
         {/* Depth Filter */}
-        <FormControl size="sm">
-          <FormLabel fontSize="sm">Relationship Depth</FormLabel>
+        <FormControl size="sm" aria-labelledby="filter-heading">
+          <FormLabel fontSize="sm" htmlFor="depth-select">Relationship Depth</FormLabel>
           <Select 
             size="sm" 
+            id="depth-select"
             value={filters.depth} 
             onChange={(e) => updateFilters({ depth: parseInt(e.target.value) })}
+            aria-label="Select relationship depth"
           >
             <option value={1}>Direct connections (1 level)</option>
             <option value={2}>Extended network (2 levels)</option>
@@ -130,28 +187,24 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
         </FormControl>
         
         {/* Team Clustering */}
-        <FormControl size="sm" display="flex" alignItems="center">
-          <FormLabel fontSize="sm" mb="0">
+        <FormControl size="sm" display="flex" alignItems="center" aria-labelledby="filter-heading">
+          <FormLabel fontSize="sm" mb="0" htmlFor="cluster-switch">
             Cluster team members
           </FormLabel>
           <Switch 
+            id="cluster-switch"
             isChecked={filters.clusterTeams} 
             onChange={(e) => updateFilters({ clusterTeams: e.target.checked })}
+            aria-label="Toggle team clustering"
           />
         </FormControl>
         
         {/* Reset Filter Button */}
         <IconButton
-          aria-label="Reset filters"
+          aria-label="Reset all filters to default values"
           icon={<FiRefreshCw />}
           size="sm"
-          onClick={() => updateFilters({
-            types: Object.values(MapNodeTypeEnum),
-            statuses: ['active', 'planning'],
-            depth: 1,
-            clusterTeams: true,
-            centerNodeId: null
-          })}
+          onClick={handleReset}
         />
         
         {/* Stats */}
@@ -173,4 +226,5 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
   );
 };
 
-export default MapFilterPanel;
+// Use React.memo to prevent unnecessary re-renders
+export default memo(MapFilterPanel);

@@ -11,10 +11,10 @@ import {
   useColorModeValue,
 } from '@chakra-ui/react';
 import { MapNode } from '../../../types/map';
-import { User } from '../../../types/user';
+import { UserEntity } from '../../../types/entities';
 
 interface UserPanelProps {
-  data: User;
+  data: UserEntity;
   selectedNode: MapNode;
 }
 

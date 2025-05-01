@@ -2,7 +2,7 @@
  * MapLoadingOverlay.tsx
  * Loading indicator overlay for the LivingMap
  */
-import React from 'react';
+import React, { memo } from 'react';
 import { Box, Spinner } from '@chakra-ui/react';
 
 interface MapLoadingOverlayProps {
@@ -33,4 +33,5 @@ const MapLoadingOverlay: React.FC<MapLoadingOverlayProps> = ({ isLoading }) => {
   );
 };
 
-export default MapLoadingOverlay;
+// Use React.memo to prevent unnecessary re-renders when props don't change
+export default memo(MapLoadingOverlay);

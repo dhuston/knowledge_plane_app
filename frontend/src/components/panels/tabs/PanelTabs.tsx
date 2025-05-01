@@ -25,12 +25,18 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
       px={4}
       py={2}
       spacing={4}
+      role="tablist"
+      aria-label="Panel sections"
     >
       <Button 
         variant={activeTab === 'details' ? 'solid' : 'ghost'} 
         size="sm"
         onClick={() => onTabChange('details')}
         colorScheme={activeTab === 'details' ? 'blue' : undefined}
+        role="tab"
+        id="tab-details"
+        aria-selected={activeTab === 'details'}
+        aria-controls="panel-details"
       >
         Details
       </Button>
@@ -39,6 +45,10 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
         size="sm"
         onClick={() => onTabChange('related')}
         colorScheme={activeTab === 'related' ? 'blue' : undefined}
+        role="tab"
+        id="tab-related"
+        aria-selected={activeTab === 'related'}
+        aria-controls="panel-related"
       >
         Relationships
       </Button>
@@ -47,6 +57,10 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
         size="sm"
         onClick={() => onTabChange('activity')}
         colorScheme={activeTab === 'activity' ? 'blue' : undefined}
+        role="tab"
+        id="tab-activity"
+        aria-selected={activeTab === 'activity'}
+        aria-controls="panel-activity"
       >
         Activity
       </Button>

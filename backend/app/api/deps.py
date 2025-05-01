@@ -69,3 +69,26 @@ def get_current_active_superuser(
             detail="The user doesn't have enough privileges"
         )
     return current_user
+
+
+def get_current_user_tenant_id(
+    current_user: Annotated[models.User, Depends(get_current_user)]
+) -> int:
+    """
+    Get the tenant ID for the current user.
+    
+    Args:
+        current_user: Current user from token
+        
+    Returns:
+        int: Tenant ID for the user
+        
+    Raises:
+        HTTPException: If user has no tenant ID
+    """
+    if not current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User has no tenant association"
+        )
+    return current_user.tenant_id

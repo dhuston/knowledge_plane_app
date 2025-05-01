@@ -36,6 +36,49 @@ interface Viewport {
   angle: number;
 }
 
+// Define sigma graph data types
+interface SigmaNode {
+  id: string;
+  label: string;
+  color: string;
+  size: number;
+  x: number;
+  y: number;
+  entityType: MapNodeTypeEnum;
+  originalApiData: MapNode;
+}
+
+interface SigmaEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  color: string;
+  size: number;
+  originalApiData: any; // Will be replaced with proper type once API is typed
+}
+
+interface SigmaGraphData {
+  nodes: SigmaNode[];
+  edges: SigmaEdge[];
+}
+
+// Define delta update types
+interface DeltaUpdate {
+  added?: {
+    nodes?: MapNode[];
+    edges?: any[]; // Will be replaced with proper type once API is typed
+  };
+  removed?: {
+    nodeIds?: string[];
+    edgeIds?: string[];
+  };
+  updated?: {
+    nodes?: MapNode[];
+    edges?: any[]; // Will be replaced with proper type once API is typed
+  };
+}
+
 interface LivingMapProps {
   onNodeClick: (nodeId: string | null) => void;
   isClustered?: boolean;
@@ -88,15 +131,19 @@ const LivingMap: React.FC<LivingMapProps> = ({
   const isMounted = useRef(true);
   const lastDeltaUpdateRef = useRef<number>(0);
   const lastViewportFetchRef = useRef<number>(0);
+  // Define a type for our debounced function
+  type DebouncedFetchFn = {
+    (filters: MapFilters, viewportData: Viewport): void;
+    cancel: () => void;
+  };
+  
+  const debouncedFetchMapDataRef = useRef<DebouncedFetchFn | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rawApiData, setRawApiData] = useState<MapData | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [sigmaGraphData, setSigmaGraphData] = useState<{
-    nodes: any[];
-    edges: any[];
-  } | null>(null);
+  const [sigmaGraphData, setSigmaGraphData] = useState<SigmaGraphData | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, ratio: 1, angle: 0 });
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
@@ -117,31 +164,49 @@ const LivingMap: React.FC<LivingMapProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const PAGE_SIZE = 250; // Maximum nodes per page
 
+  // Create a debounced fetch function that stays stable between renders
+  const debouncedFetchMapData = useMemo(
+    () => {
+      const debouncedFn = debounce(
+        (filters: MapFilters, viewportData: Viewport) => {
+          fetchMapData(filters, viewportData);
+        },
+        300 // 300ms debounce time
+      );
+      
+      // Store in ref for cleanup access without circular dependency
+      debouncedFetchMapDataRef.current = debouncedFn;
+      return debouncedFn;
+    }, 
+    [fetchMapData]
+  );
+
   // Cleanup effect
   useEffect(() => {
     isMounted.current = true;
-    return () => { isMounted.current = false; };
+    return () => { 
+      isMounted.current = false;
+      // Cancel any pending debounced operations on unmount
+      if (debouncedFetchMapDataRef.current && debouncedFetchMapDataRef.current.cancel) {
+        debouncedFetchMapDataRef.current.cancel(); 
+      }
+    };
   }, []);
 
-  // Handle viewport changes
+  // Handle viewport changes with proper debounce
   const handleViewportChange = useCallback((newViewport: Viewport) => {
     setViewport(newViewport);
     // Update zoom level for LOD renderer
     setZoomLevel(1 / newViewport.ratio);
     
-    // Viewport-based data fetching (if supported by backend)
-    const now = Date.now();
-    if (now - lastViewportFetchRef.current > 2000) { // Throttle to every 2 seconds
-      lastViewportFetchRef.current = now;
-      
-      // Only fetch new data if the camera has moved significantly
-      if (Math.abs(newViewport.ratio - viewport.ratio) > 0.3 ||
-          Math.abs(newViewport.x - viewport.x) > 200 ||
-          Math.abs(newViewport.y - viewport.y) > 200) {
-        fetchMapData(filters, newViewport);
-      }
+    // Only fetch new data if the camera has moved significantly
+    if (Math.abs(newViewport.ratio - viewport.ratio) > 0.3 ||
+        Math.abs(newViewport.x - viewport.x) > 200 ||
+        Math.abs(newViewport.y - viewport.y) > 200) {
+      // Use debounced function to prevent excessive API calls
+      debouncedFetchMapData(filters, newViewport);
     }
-  }, [viewport, filters]);
+  }, [viewport, filters, debouncedFetchMapData]);
 
   // Effect for Processing API Data for Sigma
   useEffect(() => {
@@ -162,10 +227,10 @@ const LivingMap: React.FC<LivingMapProps> = ({
           counts[node.type] = (counts[node.type] || 0) + 1;
         });
         
-        // Process nodes in one pass
-        const nodes = nodesToProcess.map(node => ({
+        // Process nodes in one pass with proper typing
+        const nodes: SigmaNode[] = nodesToProcess.map(node => ({
           id: node.id,
-          label: node.label,
+          label: node.label || node.id, // Ensure we have a label
           color: nodeStyles[node.type]?.color || '#999',
           size: nodeStyles[node.type]?.baseSize || 10,
           x: node.position?.x ?? Math.random() * 1000, 
@@ -174,8 +239,8 @@ const LivingMap: React.FC<LivingMapProps> = ({
           originalApiData: node
         }));
 
-        // Process edges in one pass
-        const edges: any[] = [];
+        // Process edges in one pass with proper typing
+        const edges: SigmaEdge[] = [];
         (edgesToProcess || []).forEach(edge => {
           if (nodeIdsToRender.has(edge.source) && nodeIdsToRender.has(edge.target)) {
             edges.push({
@@ -193,7 +258,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
         return { nodes, edges, counts, hasMoreData: nodesToProcess.length >= PAGE_SIZE };
       };
 
-      // Process the data
+      // Process the data with proper typing
       const { nodes, edges, counts, hasMoreData } = processApiData();
       
       // Update state with processed data
@@ -328,13 +393,25 @@ const LivingMap: React.FC<LivingMapProps> = ({
   }, [fetchMapData, viewport]);
 
   // Delta Update Logic (simplified stub for now)
-  const applyDeltaUpdates = useCallback((deltaData: any) => {
+  const applyDeltaUpdates = useCallback((deltaData: DeltaUpdate) => {
     // Placeholder for delta update functionality
     // Will be implemented when needed
-  }, []);
+    if (!deltaData || !sigmaGraphData) return;
+    
+    // Example implementation structure with proper typing:
+    // if (deltaData.added?.nodes) {
+    //   // Process added nodes
+    // }
+    // if (deltaData.removed?.nodeIds) {
+    //   // Process removed nodes
+    // }
+    // if (deltaData.updated?.nodes) {
+    //   // Process updated nodes
+    // }
+  }, [sigmaGraphData]);
 
   // Delta handler calls the adapted applyDeltaUpdates
-  const handleDeltaUpdate = useCallback((deltaData: any) => {
+  const handleDeltaUpdate = useCallback((deltaData: DeltaUpdate) => {
     const now = Date.now();
     if (now - lastDeltaUpdateRef.current < 1000) {
       // Throttle frequent updates
@@ -342,16 +419,16 @@ const LivingMap: React.FC<LivingMapProps> = ({
       lastDeltaUpdateRef.current = now;
       applyDeltaUpdates(deltaData);
     }
-  }, [applyDeltaUpdates]);
+  }, [applyDeltaUpdates, lastDeltaUpdateRef]);
 
   // Connect to delta stream
   useDeltaStream(handleDeltaUpdate);
 
-  // Search Logic - enhanced with node types
+  // Search Logic - enhanced with node types and proper type checking
   const focusOnNode = useCallback((nodeId: string) => {
     const node = sigmaGraphData?.nodes.find(n => n.id === nodeId);
-    if (node && node.x !== undefined && node.y !== undefined) {
-      // Focus the camera on this node
+    if (node) {
+      // Focus the camera on this node - no need to check x/y since they're required by SigmaNode type
       updateFilters({ centerNodeId: nodeId });
     }
     setSearchResults([]);
@@ -364,7 +441,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
   }, [searchResults, focusOnNode]);
 
   // Enhanced search with type filtering - using useMemo for better performance
-  useMemo(() => {
+  useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
     if (query.length < 2) {
       setSearchResults([]);
@@ -373,17 +450,25 @@ const LivingMap: React.FC<LivingMapProps> = ({
     
     // Only perform filtering when we have both query and data
     if (sigmaGraphData?.nodes) {
-      const matches: SearchResult[] = [];
-      sigmaGraphData.nodes.forEach((node) => {
-        if (node.label?.toLowerCase().includes(query)) {
-          matches.push({ 
-            id: node.id, 
-            label: node.label || node.id,
-            type: node.entityType
-          });
-        }
-      });
-      setSearchResults(matches.slice(0, 8));
+      // Use useMemo to memoize the search results calculation
+      const getFilteredResults = () => {
+        const matches: SearchResult[] = [];
+        sigmaGraphData.nodes.forEach((node) => {
+          if (node.label?.toLowerCase().includes(query)) {
+            matches.push({ 
+              id: node.id, 
+              label: node.label || node.id,
+              type: node.entityType
+            });
+          }
+        });
+        return matches.slice(0, 8);
+      };
+      
+      // Memoize the expensive filtering operation
+      const results = useMemo(getFilteredResults, [query, sigmaGraphData.nodes]);
+      
+      setSearchResults(results);
     }
   }, [searchQuery, sigmaGraphData]);
 
@@ -416,15 +501,32 @@ const LivingMap: React.FC<LivingMapProps> = ({
             <CameraController onViewportChange={handleViewportChange} />
             
             <SigmaGraphLoader
-              nodes={sigmaGraphData.nodes.map(node => node.originalApiData)}
-              edges={sigmaGraphData.edges.map(edge => ({
-                source: edge.source,
-                target: edge.target,
-                type: edge.type
-              }))}
-              onSigmaNodeClick={(node) => onNodeClick(node?.id || null)}
-              onStageClick={() => onNodeClick(null)}
-              onNodeHover={() => {}} // We'll implement this when needed
+              nodes={useMemo(() => 
+                sigmaGraphData.nodes.map(node => node.originalApiData), 
+                [sigmaGraphData.nodes]
+              )}
+              edges={useMemo(() => 
+                sigmaGraphData.edges.map(edge => ({
+                  source: edge.source,
+                  target: edge.target,
+                  type: edge.type
+                })), 
+                [sigmaGraphData.edges]
+              )}
+              onSigmaNodeClick={useCallback(
+                (node: MapNode | null) => onNodeClick(node?.id || null), 
+                [onNodeClick]
+              )}
+              onStageClick={useCallback(
+                () => onNodeClick(null), 
+                [onNodeClick]
+              )}
+              onNodeHover={useCallback(
+                (_node: MapNode | null) => {
+                  // We'll implement this when needed
+                }, 
+                []
+              )}
               zoomLevel={zoomLevel}
             />
             
@@ -447,7 +549,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
 
       {/* Filter Toggle Button */}
       <IconButton
-        aria-label="Toggle Filters"
+        aria-label="Toggle Filters Panel"
         icon={<FaFilter />}
         size="sm"
         position="absolute"
@@ -457,6 +559,9 @@ const LivingMap: React.FC<LivingMapProps> = ({
         onClick={onFilterPanelToggle}
         colorScheme={isFilterPanelOpen ? 'blue' : 'gray'}
         variant={isFilterPanelOpen ? 'solid' : 'outline'}
+        aria-expanded={isFilterPanelOpen}
+        aria-controls="filter-panel"
+        aria-haspopup="dialog"
       />
 
       {/* Enhanced Filter Panel */}

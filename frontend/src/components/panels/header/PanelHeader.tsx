@@ -74,7 +74,10 @@ const PanelHeader: React.FC<PanelHeaderProps> = ({
           <Text color="gray.500" fontSize="sm">{getTypeLabel(type)}</Text>
         </VStack>
       </HStack>
-      <CloseButton onClick={onClose} />
+      <CloseButton 
+        onClick={onClose} 
+        aria-label="Close panel"
+      />
     </HStack>
   );
 };

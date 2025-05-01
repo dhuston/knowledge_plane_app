@@ -28,6 +28,19 @@ import PanelHeader from './header/PanelHeader';
 import PanelTabs, { PanelTabType } from './tabs/PanelTabs';
 import EntitySuggestions, { EntitySuggestion } from './suggestions/EntitySuggestions';
 
+// Import entity types from shared types file
+import {
+  EntityDataType,
+  Relationship,
+  Activity,
+  isUserEntity,
+  isTeamEntity,
+  isProjectEntity,
+  isGoalEntity,
+  isDepartmentEntity,
+  isKnowledgeAssetEntity
+} from '../../types/entities';
+
 interface ContextPanelProps {
   selectedNode: MapNode | null;
   onClose: () => void;
@@ -41,12 +54,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   projectOverlaps = {},
   getProjectNameById = () => undefined
 }) => {
-  const [entityData, setEntityData] = useState<any | null>(null);
+  const [entityData, setEntityData] = useState<EntityDataType | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [activityHistory, setActivityHistory] = useState<any[]>([]);
+  const [activityHistory, setActivityHistory] = useState<Activity[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
-  const [relationships, setRelationships] = useState<any[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [isRelationshipsLoading, setIsRelationshipsLoading] = useState<boolean>(false);
   const [suggestions, setSuggestions] = useState<EntitySuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState<boolean>(false);
@@ -96,7 +109,8 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             throw new Error(`No API endpoint for type: ${selectedNode.type}`);
         }
 
-        const response = await apiClient.get(apiUrl);
+        // Add proper typing to the API response
+        const response = await apiClient.get<EntityDataType>(apiUrl);
         setEntityData(response.data);
       } catch (err: any) {
         console.error(`Error fetching ${selectedNode.type} data:`, err);
@@ -119,10 +133,11 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         // For now, we'll use the relationships from the node data if available
         // In the future, this would be a separate API call
         if (selectedNode.data && selectedNode.data.relationships) {
-          setRelationships(selectedNode.data.relationships);
+          // Cast the relationships to the proper type
+          setRelationships(selectedNode.data.relationships as Relationship[]);
         } else {
           // Placeholder for future API call
-          // const response = await apiClient.get(`/${selectedNode.type}s/${selectedNode.id}/relationships`);
+          // const response = await apiClient.get<Relationship[]>(`/${selectedNode.type}s/${selectedNode.id}/relationships`);
           // setRelationships(response.data || []);
           setRelationships([]);
         }
@@ -149,8 +164,8 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         // const response = await apiClient.get(`/activities?entityType=${selectedNode.type}&entityId=${selectedNode.id}`);
         // setActivityHistory(response.data || []);
         
-        // Enhanced mock data with more activities to demonstrate timeline
-        const mockActivities = [
+        // Enhanced mock data with more activities to demonstrate timeline - now properly typed
+        const mockActivities: Activity[] = [
           { 
             id: '1', 
             type: 'update', 
@@ -310,34 +325,41 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     };
   }, [handleNodeNavigation, handleEntityAction]);
 
-  // Render the appropriate panel based on entity type
+  // Render the appropriate panel based on entity type using type guards
   const renderEntityPanel = () => {
     if (!selectedNode || !entityData) return null;
 
-    switch (selectedNode.type) {
-      case MapNodeTypeEnum.USER:
-        return <UserPanel data={entityData} selectedNode={selectedNode} />;
-      case MapNodeTypeEnum.TEAM:
-        return <TeamPanel data={entityData} selectedNode={selectedNode} />;
-      case MapNodeTypeEnum.PROJECT:
-        return (
-          <ProjectPanel 
-            data={entityData} 
-            selectedNode={selectedNode}
-            projectOverlaps={projectOverlaps}
-            getProjectNameById={getProjectNameById}
-          />
-        );
-      case MapNodeTypeEnum.GOAL:
-        return <GoalPanel data={entityData} selectedNode={selectedNode} />;
-      default:
-        return (
-          <EntityDetails 
-            data={entityData}
-            selectedNode={selectedNode}
-          />
-        );
+    // Using type guards to ensure proper typing
+    if (isUserEntity(entityData) && selectedNode.type === MapNodeTypeEnum.USER) {
+      return <UserPanel data={entityData} selectedNode={selectedNode} />;
+    } 
+    
+    if (isTeamEntity(entityData) && selectedNode.type === MapNodeTypeEnum.TEAM) {
+      return <TeamPanel data={entityData} selectedNode={selectedNode} />;
     }
+    
+    if (isProjectEntity(entityData) && selectedNode.type === MapNodeTypeEnum.PROJECT) {
+      return (
+        <ProjectPanel 
+          data={entityData} 
+          selectedNode={selectedNode}
+          projectOverlaps={projectOverlaps}
+          getProjectNameById={getProjectNameById}
+        />
+      );
+    }
+    
+    if (isGoalEntity(entityData) && selectedNode.type === MapNodeTypeEnum.GOAL) {
+      return <GoalPanel data={entityData} selectedNode={selectedNode} />;
+    }
+    
+    // Default fallback for other entity types
+    return (
+      <EntityDetails 
+        data={entityData}
+        selectedNode={selectedNode}
+      />
+    );
   };
 
   // Render loading state
@@ -382,6 +404,33 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     return null;
   }
 
+  // Reference for focus management
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
+  // Focus the panel when it opens
+  React.useEffect(() => {
+    if (selectedNode && panelRef.current) {
+      // Focus the panel or the first focusable element inside it
+      panelRef.current.focus();
+
+      // Set up focus trap inside panel
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose();
+          e.preventDefault();
+        }
+      };
+
+      // Add keyboard listener
+      document.addEventListener('keydown', handleKeyDown);
+      
+      // Clean up
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [selectedNode, onClose]);
+
   return (
     <Fade in={true}>
       <Box
@@ -393,6 +442,15 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         display="flex"
         flexDirection="column"
         overflow="hidden"
+        ref={panelRef}
+        tabIndex={-1} // Make focusable but not in tab order
+        role="region"
+        aria-label={`Details for ${selectedNode?.label || 'selected entity'}`}
+        // Add focus styling but make it subtle
+        _focus={{ 
+          outline: "none", 
+          boxShadow: "none"
+        }}
       >
         {/* Header */}
         <PanelHeader 
@@ -408,9 +466,20 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         />
 
         {/* Panel Content */}
-        <Box flex="1" overflowY="auto" p={4}>
+        <Box 
+          flex="1" 
+          overflowY="auto" 
+          p={4}
+          role="tabpanel"
+          id={`panel-${activeTab}`}
+          aria-labelledby={`tab-${activeTab}`}
+        >
           {activeTab === 'details' && (
-            <VStack spacing={6} align="stretch">
+            <VStack 
+              spacing={6} 
+              align="stretch"
+              id="panel-details"
+            >
               {/* Entity-specific details */}
               {renderEntityPanel()}
               
@@ -426,7 +495,11 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           )}
           
           {activeTab === 'related' && (
-            <VStack spacing={6} align="stretch">
+            <VStack 
+              spacing={6} 
+              align="stretch"
+              id="panel-related"
+            >
               <RelationshipList 
                 relationships={relationships} 
                 isLoading={isRelationshipsLoading} 
@@ -436,7 +509,11 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           )}
           
           {activeTab === 'activity' && (
-            <VStack spacing={6} align="stretch">
+            <VStack 
+              spacing={6} 
+              align="stretch"
+              id="panel-activity"
+            >
               <ActivityTimeline 
                 activities={activityHistory} 
                 isLoading={isActivityLoading} 

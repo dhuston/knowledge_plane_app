@@ -60,11 +60,11 @@ register_tenant_events()
 # For development, we'll allow all origins since we're having CORS issues
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add CORS middleware with a wildcard origin for development
+# Add CORS middleware with explicit frontend origin to support credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now
-    allow_credentials=False,  # Must be False when using wildcard origin
+    allow_origins=["http://localhost:5173"],  # Frontend dev server
+    allow_credentials=True,  # Enable credentials (cookies, auth headers)
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
@@ -110,17 +110,12 @@ async def cors_test():
     """Test endpoint for CORS configuration"""
     logger.info("CORS test endpoint accessed")
     
-    # Create a response with explicit CORS headers
+    # Create a response with status info
     response = JSONResponse({"status": "ok", "cors": "enabled"})
     
-    # Add explicit CORS headers for debugging
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    
+    # Let the middleware handle CORS headers
     return response
     
-@app.options("/api/v1/auth/dev-login")
 @app.get("/api/v1/auth/dev-login")
 async def dev_login(request: Request):
     """Development-only endpoint that returns mock tokens directly without OAuth redirect"""
@@ -130,14 +125,6 @@ async def dev_login(request: Request):
     if not getattr(settings, "DISABLE_OAUTH", False):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Not found")
-        
-    # Handle preflight OPTIONS request
-    if request.method == "OPTIONS":
-        response = JSONResponse({})
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-        return response
         
     # Generate mock tokens
     from app.core.security import create_access_token
@@ -167,11 +154,7 @@ async def dev_login(request: Request):
         "token_type": "bearer"
     })
     
-    # Add CORS headers
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-    
+    # Let the middleware handle CORS headers
     return response
     
 @app.options("/api/v1/users/mock-me", status_code=200)

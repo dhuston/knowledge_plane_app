@@ -2,7 +2,7 @@
  * SearchResultsList.tsx
  * Displays search results for the LivingMap
  */
-import React from 'react';
+import React, { memo } from 'react';
 import { 
   Box, 
   List, 
@@ -26,6 +26,24 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
 }) => {
   if (!visible || results.length === 0) return null;
   
+  // Memoize the color mapping function to avoid recalculation
+  const getColorScheme = (type: MapNodeTypeEnum | undefined) => {
+    if (!type) return 'gray';
+    
+    switch (type) {
+      case MapNodeTypeEnum.USER:
+        return 'green';
+      case MapNodeTypeEnum.TEAM:
+        return 'blue';
+      case MapNodeTypeEnum.PROJECT:
+        return 'purple';
+      case MapNodeTypeEnum.GOAL:
+        return 'orange';
+      default:
+        return 'gray';
+    }
+  };
+  
   return (
     <Box
       position="absolute"
@@ -40,13 +58,16 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
       maxHeight="220px"
       overflowY="auto"
       width="220px"
+      role="listbox"
+      id="search-results-list"
+      aria-label="Search results"
       _dark={{
         bg: '#363636',
         borderColor: 'primary.600',
       }}
     >
       <List spacing={0}>
-        {results.map((node) => (
+        {results.map((node, index) => (
           <ListItem
             key={node.id}
             px={3}
@@ -54,6 +75,28 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
             _hover={{ bg: 'secondary.400' }}
             cursor="pointer"
             color="#262626"
+            role="option"
+            aria-selected={false}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              // Add keyboard navigation
+              if (e.key === 'Enter' || e.key === ' ') {
+                onResultClick(node.id);
+                e.preventDefault();
+              } else if (e.key === 'ArrowDown' && index < results.length - 1) {
+                // Focus on next item
+                (e.target.nextSibling as HTMLElement)?.focus();
+                e.preventDefault();
+              } else if (e.key === 'ArrowUp' && index > 0) {
+                // Focus on previous item
+                (e.target.previousSibling as HTMLElement)?.focus();
+                e.preventDefault();
+              } else if (e.key === 'Escape') {
+                // Close dropdown (by clearing results)
+                document.getElementById('search-input')?.focus();
+                e.preventDefault();
+              }
+            }}
             _dark={{
               _hover: { bg: '#464646' },
               color: 'secondary.400',
@@ -67,12 +110,8 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
             {node.type && (
               <Badge 
                 size="sm" 
-                colorScheme={
-                  node.type === MapNodeTypeEnum.USER ? 'green' :
-                  node.type === MapNodeTypeEnum.TEAM ? 'blue' : 
-                  node.type === MapNodeTypeEnum.PROJECT ? 'purple' : 
-                  node.type === MapNodeTypeEnum.GOAL ? 'orange' : 'gray'
-                }
+                colorScheme={getColorScheme(node.type)}
+                aria-label={`Node type: ${node.type}`}
               >
                 {node.type}
               </Badge>
@@ -84,4 +123,5 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
   );
 };
 
-export default SearchResultsList;
+// Use React.memo for performance optimization
+export default memo(SearchResultsList);

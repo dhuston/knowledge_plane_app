@@ -23,13 +23,7 @@ import {
   FiMoreHorizontal
 } from 'react-icons/fi';
 
-interface Activity {
-  id: string;
-  type: string;
-  message: string;
-  timestamp: string;
-  user: string;
-}
+import { Activity } from '../../types/entities';
 
 interface ActivityTimelineProps {
   activities: Activity[];

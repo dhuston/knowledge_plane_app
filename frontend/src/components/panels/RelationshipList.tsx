@@ -16,8 +16,10 @@ import {
 import { MapNodeTypeEnum, MapEdgeTypeEnum } from '../../types/map';
 import { FiArrowRight, FiUsers, FiUser, FiTarget, FiFolder, FiFlag } from 'react-icons/fi';
 
+import { Relationship } from '../../types/entities';
+
 interface RelationshipListProps {
-  relationships: any[];
+  relationships: Relationship[];
   isLoading: boolean;
   entityType: MapNodeTypeEnum;
 }

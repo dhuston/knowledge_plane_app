@@ -8,6 +8,9 @@ export interface UserBase {
   title?: string | null;
   avatar_url?: string;
   online_status?: boolean;
+  description?: string;
+  department?: string;
+  skills?: string[];
 }
 
 // Interface for creating a user (matches backend UserCreate)
@@ -25,7 +28,7 @@ export interface UserUpdate extends UserBase {
 // Interface for reading user data (matches backend UserRead)
 export interface User extends UserBase {
   id: string; // UUID as string
-  tenant_id: string;
+  tenant_id?: string;
   created_at: string; // ISO date string
   updated_at?: string | null;
   last_login_at?: string | null;
@@ -33,6 +36,7 @@ export interface User extends UserBase {
   manager_id?: string | null;
   auth_provider?: string | null;
   auth_provider_id?: string | null;
+  status?: string;
 }
 
 // --- Add Basic User Type ---
@@ -40,3 +44,20 @@ export interface UserReadBasic {
   id: string; // UUID as string
   name?: string | null; // Also include name for display
 } 
+
+// Enhanced entity types matching our context panel entity types
+export interface UserEntity {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  status?: string;
+  email: string;
+  title?: string;
+  department?: string;
+  avatar_url?: string;
+  team_id?: string;
+  manager_id?: string;
+  skills?: string[];
+}
