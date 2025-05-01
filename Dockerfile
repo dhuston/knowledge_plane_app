@@ -1,25 +1,54 @@
-# For more information, please refer to https://aka.ms/vscode-docker-python
-FROM python:3-slim
+# Multi-stage build: Builder stage
+FROM python:3.12.2-slim as builder
 
-EXPOSE 8000
-
-# Keeps Python from generating .pyc files in the container
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
-
-# Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
-# Install pip requirements
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install requirements first (for better layer caching)
 COPY requirements.txt .
-RUN python -m pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-WORKDIR /app
-COPY . /app
+# Final stage
+FROM python:3.12.2-slim
 
-# Creates a non-root user with an explicit UID and adds permission to access the /app folder
-# For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
-RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV APP_HOME=/app
+
+WORKDIR ${APP_HOME}
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    libpq-dev \
+    ca-certificates \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder stage
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY . ${APP_HOME}
+
+# Expose port
+EXPOSE 8000
+
+# Create a non-root user
+RUN adduser --uid 5678 --disabled-password --gecos "" appuser && \
+    chown -R appuser:appuser ${APP_HOME}
+
+# Switch to non-root user
 USER appuser
 
-# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "uvicorn.workers.UvicornWorker", "knowledgeplan-backend.app/main:app"]
+# Run the application
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "uvicorn.workers.UvicornWorker", "backend.app.main:app"]

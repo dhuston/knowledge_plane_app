@@ -13,11 +13,17 @@ This repository contains the code for KnowledgePlane AI, an adaptive organizatio
 
 ## Frontend Development
 
-See the [Frontend README](./knowledgeplan-frontend/README.md) and the [Onboarding Guide](./docs/onboarding.md) for setup and development instructions.
+See the [Frontend README](./frontend/README.md) and the [Onboarding Guide](./docs/onboarding.md) for setup and development instructions.
 
 ## Backend Development
 
-*(Details TBD - To be added when backend services are created)*
+The primary backend implementation uses Python and FastAPI. See the [Backend README](./backend/README.md) for setup and development instructions.
+
+## Project Structure
+
+- `/frontend/` - React/TypeScript frontend application
+- `/backend/` - Python/FastAPI backend service
+- `/docs/` - Project documentation
 
 ## Documentation Structure
 

@@ -21,14 +21,14 @@ Key technical choices and decisions are documented in:
 
 1. **Prerequisites:** Ensure you have Node.js (v18+) and npm installed.
 2. **Clone:** Clone the repository.
-3. **Navigate:** `cd knowledgeplan-frontend`
+3. **Navigate:** `cd frontend`
 4. **Install Dependencies:** `npm install`
 5. **Run Dev Server:** `npm run dev` (App will be available at <http://localhost:5173>)
 6. **Run Tests:** `npm test`
 
 ## 4. Codebase Structure
 
-* `knowledgeplan-frontend/`: Contains the React frontend code.
+* `frontend/`: Contains the React frontend code.
   * `src/`: Main source code.
     * `main.tsx`: Application entry point, theme setup.
     * `App.tsx`: Root component, routing setup.
