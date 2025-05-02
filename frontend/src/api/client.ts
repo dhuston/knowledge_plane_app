@@ -1,16 +1,31 @@
 // src/api/client.ts
 
-// Get backend API base URL
-const API_BASE_URL = window.location.protocol === 'https:' 
+// Get backend API base URL from environment variable with fallback
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (window.location.protocol === 'https:' 
   ? "https://localhost:8001/api/v1" 
-  : "http://localhost:8001/api/v1"; // Match backend prefix
+  : "http://localhost:8001/api/v1");
 
-// Simple API client using fetch
-
+/**
+ * API client for making HTTP requests to the backend
+ */
 export const apiClient = {
+    /**
+     * Make a GET request to the API
+     * @param endpoint - API endpoint path (without base URL)
+     * @param options - Optional fetch options
+     * @returns Promise with the response data
+     */
     async get<T>(endpoint: string, options?: RequestInit): Promise<T> {
         return await request<T>(endpoint, { ...options, method: 'GET' });
     },
+    
+    /**
+     * Make a POST request to the API
+     * @param endpoint - API endpoint path (without base URL)
+     * @param body - Request body to send as JSON
+     * @param options - Optional fetch options
+     * @returns Promise with the response data
+     */
     async post<T>(endpoint: string, body: unknown, options?: RequestInit): Promise<T> {
         return await request<T>(endpoint, { 
             ...options, 
@@ -19,9 +34,59 @@ export const apiClient = {
             headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) }
         });
     },
-    // Add put, delete methods as needed
+    
+    /**
+     * Make a PUT request to the API
+     * @param endpoint - API endpoint path (without base URL)
+     * @param body - Request body to send as JSON
+     * @param options - Optional fetch options
+     * @returns Promise with the response data
+     */
+    async put<T>(endpoint: string, body: unknown, options?: RequestInit): Promise<T> {
+        return await request<T>(endpoint, {
+            ...options,
+            method: 'PUT',
+            body: JSON.stringify(body),
+            headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) }
+        });
+    },
+    
+    /**
+     * Make a DELETE request to the API
+     * @param endpoint - API endpoint path (without base URL)
+     * @param options - Optional fetch options
+     * @returns Promise with the response data
+     */
+    async delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
+        return await request<T>(endpoint, {
+            ...options,
+            method: 'DELETE'
+        });
+    },
+    
+    /**
+     * Make a PATCH request to the API
+     * @param endpoint - API endpoint path (without base URL)
+     * @param body - Request body to send as JSON
+     * @param options - Optional fetch options
+     * @returns Promise with the response data
+     */
+    async patch<T>(endpoint: string, body: unknown, options?: RequestInit): Promise<T> {
+        return await request<T>(endpoint, {
+            ...options,
+            method: 'PATCH',
+            body: JSON.stringify(body),
+            headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) }
+        });
+    }
 };
 
+/**
+ * Main request function that handles authentication and response processing
+ * @param endpoint - API endpoint path
+ * @param options - Request options
+ * @returns Promise with the response data
+ */
 async function request<T>(endpoint: string, options: RequestInit): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers = new Headers(options.headers || {});
@@ -38,7 +103,6 @@ async function request<T>(endpoint: string, options: RequestInit): Promise<T> {
         credentials: 'include', // Include credentials for CORS requests to support cookies
     };
     
-    console.log(`API Request to: ${url}`);
     const response = await fetch(url, config);
     
     if (!response.ok) {

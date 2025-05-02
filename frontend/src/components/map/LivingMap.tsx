@@ -392,23 +392,99 @@ const LivingMap: React.FC<LivingMapProps> = ({
     });
   }, [fetchMapData, viewport]);
 
-  // Delta Update Logic (simplified stub for now)
+  // Delta Update Logic - fully implemented for real-time updates
   const applyDeltaUpdates = useCallback((deltaData: DeltaUpdate) => {
-    // Placeholder for delta update functionality
-    // Will be implemented when needed
     if (!deltaData || !sigmaGraphData) return;
     
-    // Example implementation structure with proper typing:
-    // if (deltaData.added?.nodes) {
-    //   // Process added nodes
-    // }
-    // if (deltaData.removed?.nodeIds) {
-    //   // Process removed nodes
-    // }
-    // if (deltaData.updated?.nodes) {
-    //   // Process updated nodes
-    // }
-  }, [sigmaGraphData]);
+    // Create new graph data with updates
+    const updatedNodes = [...sigmaGraphData.nodes];
+    const updatedEdges = [...sigmaGraphData.edges];
+    let hasChanges = false;
+    
+    // Add new nodes
+    if (deltaData.added?.nodes && deltaData.added.nodes.length > 0) {
+      const newNodes = deltaData.added.nodes.map(node => ({
+        id: node.id,
+        label: node.label || node.id,
+        color: nodeStyles[node.type]?.color || '#999',
+        size: nodeStyles[node.type]?.baseSize || 10,
+        x: node.position?.x ?? Math.random() * 1000, 
+        y: node.position?.y ?? Math.random() * 1000,
+        entityType: node.type,
+        originalApiData: node
+      }));
+      updatedNodes.push(...newNodes);
+      hasChanges = true;
+    }
+    
+    // Remove nodes
+    if (deltaData.removed?.nodeIds && deltaData.removed.nodeIds.length > 0) {
+      const nodeIdsToRemove = new Set(deltaData.removed.nodeIds);
+      const filteredNodes = updatedNodes.filter(node => !nodeIdsToRemove.has(node.id));
+      if (filteredNodes.length !== updatedNodes.length) {
+        updatedNodes.length = 0;
+        updatedNodes.push(...filteredNodes);
+        hasChanges = true;
+      }
+    }
+    
+    // Update existing nodes
+    if (deltaData.updated?.nodes && deltaData.updated.nodes.length > 0) {
+      const nodeMap = new Map(updatedNodes.map(node => [node.id, node]));
+      deltaData.updated.nodes.forEach(updatedNode => {
+        const existingNode = nodeMap.get(updatedNode.id);
+        if (existingNode) {
+          // Update node properties
+          existingNode.label = updatedNode.label || existingNode.label;
+          existingNode.color = nodeStyles[updatedNode.type]?.color || existingNode.color;
+          if (updatedNode.position) {
+            existingNode.x = updatedNode.position.x;
+            existingNode.y = updatedNode.position.y;
+          }
+          existingNode.originalApiData = updatedNode;
+          hasChanges = true;
+        }
+      });
+    }
+    
+    // Handle edges - add new edges
+    if (deltaData.added?.edges && deltaData.added.edges.length > 0) {
+      const newEdges = deltaData.added.edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label || undefined,
+        color: '#ccc',
+        size: 1,
+        originalApiData: edge
+      }));
+      updatedEdges.push(...newEdges);
+      hasChanges = true;
+    }
+    
+    // Remove edges
+    if (deltaData.removed?.edgeIds && deltaData.removed.edgeIds.length > 0) {
+      const edgeIdsToRemove = new Set(deltaData.removed.edgeIds);
+      const filteredEdges = updatedEdges.filter(edge => !edgeIdsToRemove.has(edge.id));
+      if (filteredEdges.length !== updatedEdges.length) {
+        updatedEdges.length = 0;
+        updatedEdges.push(...filteredEdges);
+        hasChanges = true;
+      }
+    }
+    
+    // Only update state if there were actual changes
+    if (hasChanges) {
+      setSigmaGraphData({ nodes: updatedNodes, edges: updatedEdges });
+      
+      // Update node counts
+      const newCounts: Record<string, number> = {};
+      updatedNodes.forEach(node => {
+        newCounts[node.entityType] = (newCounts[node.entityType] || 0) + 1;
+      });
+      setNodeCounts(newCounts);
+    }
+  }, [sigmaGraphData, nodeStyles]);
 
   // Delta handler calls the adapted applyDeltaUpdates
   const handleDeltaUpdate = useCallback((deltaData: DeltaUpdate) => {

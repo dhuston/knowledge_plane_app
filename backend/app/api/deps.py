@@ -92,3 +92,7 @@ def get_current_user_tenant_id(
             detail="User has no tenant association"
         )
     return current_user.tenant_id
+
+# Alias for get_current_user_tenant_id to maintain backwards compatibility
+# This ensures existing code using get_tenant_id continues to work
+get_tenant_id = get_current_user_tenant_id

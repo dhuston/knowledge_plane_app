@@ -8,6 +8,7 @@ import {
   useColorModeValue,
   Fade
 } from '@chakra-ui/react';
+import { useFeatureFlags } from '../../utils/featureFlags';
 import { useApiClient } from '../../hooks/useApiClient';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
 
@@ -27,6 +28,8 @@ import ActionButtons from './ActionButtons';
 import PanelHeader from './header/PanelHeader';
 import PanelTabs, { PanelTabType } from './tabs/PanelTabs';
 import EntitySuggestions, { EntitySuggestion } from './suggestions/EntitySuggestions';
+import BreadcrumbNav, { NavHistoryItem } from './header/BreadcrumbNav';
+import RecentlyViewedEntities from './suggestions/RecentlyViewedEntities';
 
 // Import entity types from shared types file
 import {
@@ -64,7 +67,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const [suggestions, setSuggestions] = useState<EntitySuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<PanelTabType>('details');
+  const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([]);
+  const [previousNodes, setPreviousNodes] = useState<Map<string, EntityDataType>>(new Map());
   const apiClient = useApiClient();
+  const { flags } = useFeatureFlags();
 
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
@@ -109,9 +115,49 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             throw new Error(`No API endpoint for type: ${selectedNode.type}`);
         }
 
-        // Add proper typing to the API response
-        const response = await apiClient.get<EntityDataType>(apiUrl);
-        setEntityData(response.data);
+        // Check if we already have cached data for this node
+        if (previousNodes.has(selectedNode.id)) {
+          setEntityData(previousNodes.get(selectedNode.id)!);
+          setIsLoading(false);
+        } else {
+          // Fetch from API if not cached
+          const response = await apiClient.get<EntityDataType>(apiUrl);
+          setEntityData(response.data);
+          
+          // Cache the result for future use
+          setPreviousNodes(prev => {
+            const updated = new Map(prev);
+            updated.set(selectedNode.id, response.data);
+            return updated;
+          });
+        }
+        
+        // Update navigation history
+        setNavHistory(prev => {
+          // Check if this node is already in the history (for back navigation)
+          const existingIndex = prev.findIndex(item => item.nodeId === selectedNode.id);
+          
+          if (existingIndex >= 0) {
+            // Node exists in history - trim to this point (back navigation)
+            return prev.slice(0, existingIndex + 1);
+          } else {
+            // Add new node to history
+            const newHistory = [...prev];
+            
+            // Limit history length to prevent excessive growth
+            if (newHistory.length > 20) {
+              newHistory.shift();
+            }
+            
+            newHistory.push({
+              nodeId: selectedNode.id,
+              nodeType: selectedNode.type,
+              label: selectedNode.label
+            });
+            
+            return newHistory;
+          }
+        });
       } catch (err: any) {
         console.error(`Error fetching ${selectedNode.type} data:`, err);
         setError(err.message || `Failed to load ${selectedNode.type} details`);
@@ -121,7 +167,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     };
 
     fetchEntityData();
-  }, [selectedNode, apiClient]);
+  }, [selectedNode, apiClient, previousNodes]);
 
   // Fetch relationships data when entity data is loaded
   useEffect(() => {
@@ -282,20 +328,35 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     fetchSuggestions();
   }, [selectedNode, entityData, apiClient]);
   
+  // Handle breadcrumb navigation
+  const handleBreadcrumbNavigation = useCallback((item: NavHistoryItem) => {
+    // Create a synthetic MapNode to pass to onNodeClick
+    const syntheticNode = {
+      id: item.nodeId,
+      type: item.nodeType,
+      label: item.label,
+      data: {} // The data will be loaded from the cache
+    };
+    
+    // Navigate to the selected node
+    onNodeClick(item.nodeId);
+    
+    // Note: We don't need to update navHistory here as that will
+    // happen automatically when the selectedNode changes
+  }, [onNodeClick]);
+
   // Event handlers for navigation and action events
   const handleNodeNavigation = useCallback((e: Event) => {
     const event = e as CustomEvent;
     if (event.detail && event.detail.nodeId) {
       console.log('Navigate to node:', event.detail);
-      // Here you would typically:
-      // 1. Fetch the node data
-      // 2. Update the selected node
-      // 3. You could also emit an event for the parent component to handle
       
-      // For now, just log it
-      alert(`Navigation to node ${event.detail.label} (${event.detail.nodeId}) would happen here`);
+      // Navigate to the node
+      onNodeClick(event.detail.nodeId);
+      
+      // Navigation history is updated in the useEffect that depends on selectedNode
     }
-  }, []);
+  }, [onNodeClick]);
   
   const handleEntityAction = useCallback((e: Event) => {
     const event = e as CustomEvent;
@@ -307,10 +368,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   }, []);
 
   const handleSuggestionClick = useCallback((suggestionId: string, label: string) => {
-    // This would navigate to the suggested entity
+    // Navigate to the suggested entity
     console.log('Navigate to suggestion:', suggestionId);
-    alert(`Navigation to ${label} would happen here`);
-  }, []);
+    onNodeClick(suggestionId);
+  }, [onNodeClick]);
   
   // Set up event listeners
   useEffect(() => {
@@ -453,11 +514,25 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         }}
       >
         {/* Header */}
-        <PanelHeader 
-          label={selectedNode.label}
-          type={selectedNode.type}
-          onClose={onClose}
-        />
+        <Box>
+          <PanelHeader 
+            label={selectedNode.label}
+            type={selectedNode.type}
+            onClose={onClose}
+          />
+          
+          {/* Navigation breadcrumb - only show if we have navigation history */}
+          {navHistory.length > 1 && (
+            <Box px={4} py={2} borderBottomWidth="1px" borderColor={borderColor}>
+              <BreadcrumbNav 
+                history={navHistory}
+                onNavigate={handleBreadcrumbNavigation}
+                maxDisplayed={4}
+                fontSize="xs"
+              />
+            </Box>
+          )}
+        </Box>
 
         {/* Tab navigation */}
         <PanelTabs 
@@ -488,6 +563,16 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                 suggestions={suggestions}
                 onSuggestionClick={handleSuggestionClick}
               />
+              
+              {/* Recently viewed entities - only shown when we have navigation history */}
+              {navHistory.length > 1 && (
+                <RecentlyViewedEntities 
+                  items={navHistory} 
+                  onEntityClick={handleBreadcrumbNavigation}
+                  maxItems={4}
+                  currentEntityId={selectedNode.id}
+                />
+              )}
 
               {/* Action Buttons */}
               <ActionButtons entityType={selectedNode.type} entityId={selectedNode.id} />

@@ -16,6 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { FiRefreshCw } from 'react-icons/fi';
 import { MapNodeTypeEnum } from '../../../types/map';
+import { useFeatureFlags } from '../../../utils/featureFlags';
 
 // Define filter options
 export interface MapFilters {
@@ -48,6 +49,8 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
   hasMoreData,
   loadMoreData
 }) => {
+  // Use feature flags to control feature visibility
+  const { flags } = useFeatureFlags();
   // Memoize the type filter handlers to prevent recreating them on every render
   const handleTypeFilterChange = useCallback((type: MapNodeTypeEnum) => {
     const newTypes = filters.types.includes(type)
@@ -186,18 +189,21 @@ const MapFilterPanel: React.FC<MapFilterPanelProps> = ({
           </Select>
         </FormControl>
         
-        {/* Team Clustering */}
-        <FormControl size="sm" display="flex" alignItems="center" aria-labelledby="filter-heading">
-          <FormLabel fontSize="sm" mb="0" htmlFor="cluster-switch">
-            Cluster team members
-          </FormLabel>
-          <Switch 
-            id="cluster-switch"
-            isChecked={filters.clusterTeams} 
-            onChange={(e) => updateFilters({ clusterTeams: e.target.checked })}
-            aria-label="Toggle team clustering"
-          />
-        </FormControl>
+        {/* Team Clustering - only show if feature flag is enabled */}
+        {flags.enableTeamClustering && (
+          <FormControl size="sm" display="flex" alignItems="center" aria-labelledby="filter-heading">
+            <FormLabel fontSize="sm" mb="0" htmlFor="cluster-switch">
+              Cluster team members
+            </FormLabel>
+            <Switch 
+              id="cluster-switch"
+              isChecked={filters.clusterTeams} 
+              onChange={(e) => updateFilters({ clusterTeams: e.target.checked })}
+              aria-label="Toggle team clustering"
+              colorScheme="blue"
+            />
+          </FormControl>
+        )}
         
         {/* Reset Filter Button */}
         <IconButton

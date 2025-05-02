@@ -497,16 +497,20 @@ class IntegrationManager:
         Raises:
             IntegrationError: If no processor found
         """
-        # This is a simplified implementation - in a real system, we'd have a proper processor registry
-        # For now, return a default processor that's suitable for all entity types
-        from app.integrations.default_processor import DefaultProcessor
+        from app.integrations.processor_registry import processor_registry
         
         # Cache processor instances by integration_type and entity_type
         cache_key = f"{integration_type}:{entity_type}"
         if cache_key in self._processors:
             return self._processors[cache_key]
         
-        processor = DefaultProcessor(db=self._db, tenant_id=self._tenant_id)
+        # First try to get a processor based on entity type
+        processor = processor_registry.get_processor_for_entity(entity_type, self._db, self._tenant_id)
+        
+        # If that fails, try based on integration type
+        if not processor:
+            processor = processor_registry.get_processor_for_integration(integration_type, self._db, self._tenant_id)
+        
         self._processors[cache_key] = processor
         return processor
     

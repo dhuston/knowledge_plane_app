@@ -35,7 +35,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
   // Function to set authentication state
   const setAuthenticated = (value: boolean) => {
-    console.log(`[AuthContext] Setting authenticated: ${value}`);
     setIsAuthenticated(value);
     if (!value) {
       setUser(null);
@@ -45,7 +44,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
 
   // Function to handle token storage
   const setToken = (accessToken: string | null, refreshToken: string | null) => {
-    console.log(`[AuthContext] Setting tokens: ${!!accessToken}, ${!!refreshToken}`);
     if (accessToken) {
       localStorage.setItem('knowledge_plane_token', accessToken);
       if (refreshToken) {
@@ -71,7 +69,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       localStorage.removeItem('knowledge_plane_refresh_token');
       setAuthenticated(false);
     } catch (error) {
-      console.error("Logout failed:", error);
       // Even if the backend call fails, clear the frontend state
       localStorage.removeItem('knowledge_plane_token');
       localStorage.removeItem('knowledge_plane_refresh_token');
@@ -79,9 +76,9 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
   };
 
-  // Effect to check session status and fetch user on initial load
+  // Effect to check authentication and fetch user data
   useEffect(() => {
-    const checkAuthState = async () => {
+    const checkAuthAndFetchUser = async () => {
       setIsLoading(true);
       
       // Check if token exists in localStorage
@@ -108,7 +105,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           setIsAuthenticated(false);
         }
       } catch (error) {
-        console.warn("[AuthContext] Session check failed, user is not authenticated");
         setIsAuthenticated(false);
         // Clear invalid token
         localStorage.removeItem('knowledge_plane_token');
@@ -117,46 +113,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       }
     };
     
-    checkAuthState();
-  }, []); // Run only on initial load
-
-  // Effect to fetch user data when authentication state changes
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (isAuthenticated && !user) {
-        setIsLoading(true);
-        
-        // Get token from localStorage
-        const token = localStorage.getItem('knowledge_plane_token');
-        if (!token) {
-          setIsAuthenticated(false);
-          setIsLoading(false);
-          return;
-        }
-        
-        try {
-          const response = await axios.get<User>(`${API_BASE_URL}/users/me`, {
-            withCredentials: true,
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          });
-          
-          if (response.status === 200) {
-            setUser(response.data);
-          }
-        } catch (error) {
-          console.error("[AuthContext] Failed to fetch user data:", error);
-          setIsAuthenticated(false);
-          localStorage.removeItem('knowledge_plane_token');
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-    
-    fetchUser();
-  }, [isAuthenticated, user]);
+    checkAuthAndFetchUser();
+  }, [isAuthenticated]); // Runs on initial load and when auth state changes
 
   // Get current token from storage
   const token = localStorage.getItem('knowledge_plane_token');
@@ -170,12 +128,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     setToken,
     token
   };
-  
-  console.log("[AuthContext] Providing context value:", { 
-    isAuthenticated, 
-    user: !!user, 
-    isLoading 
-  });
 
   return (
     <AuthContext.Provider value={contextValue}>

@@ -3,6 +3,7 @@ import ReconnectingWebSocket from 'reconnecting-websocket';
 import { useEffect, useRef } from 'react';
 import { debounce } from 'lodash';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../utils/featureFlags';
 
 // Minimal subset of delta message shape – extend as needed
 interface DeltaData {
@@ -32,6 +33,8 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
   const token = localStorage.getItem('knowledge_plane_token');
   // Store the WebSocket connection in a ref to persist across renders
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
+  // Use feature flags to control delta stream
+  const { flags } = useFeatureFlags();
   
   // Create a debounced version of the onMessage callback to prevent
   // excessive updates (2-second debounce)
@@ -42,6 +45,12 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
   ).current;
 
   useEffect(() => {
+    // Skip connection if feature flag is disabled
+    if (!flags.enableDeltaStream) {
+      console.log('Delta stream disabled by feature flag');
+      return;
+    }
+    
     // Configuration for the WebSocket with better reconnection parameters
     const wsOptions = {
       reconnectInterval: 2000, // Start with 2 second reconnect interval
@@ -93,7 +102,7 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
         wsRef.current = null;
       }
     };
-  }, [debouncedOnMessage, token]); // Recreate connection when token changes
+  }, [debouncedOnMessage, token, flags.enableDeltaStream]); // Recreate connection when token or feature flag changes
   
   // Add subscription functionality for notifications
   const subscribe = (dataType: string, callback: (data: any, operation: string) => void): DeltaStreamSubscriber => {
