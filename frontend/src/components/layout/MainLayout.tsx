@@ -22,7 +22,6 @@ import {
   Tooltip,
 } from "@chakra-ui/react";
 import { FiMap } from 'react-icons/fi';
-import { FaCogs, FaSync } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import WebGLMap from '../map/WebGLMap';
 import MapWithAnalytics from '../map/MapWithAnalytics';
@@ -37,8 +36,6 @@ import MyTeamTile from '../tiles/MyTeamTile';
 import EntityActionButton from '../actions/EntityActionButton';
 import HighlightedText, { HighlightedTextSegment } from '../text/HighlightedText';
 import { useFeatureFlags } from '../../utils/featureFlags';
-import IntegrationsPanel from '../integrations/IntegrationsPanel';
-import FeatureFlagsPanel from '../admin/FeatureFlagsPanel';
 import { HierarchyNavigator } from '../hierarchy/HierarchyNavigator';
 
 // Different workspace view types
@@ -60,9 +57,6 @@ export default function MainLayout() {
   const [activeView, setActiveView] = useState<'myWork' | 'explore'>('myWork');
   // Feature flag state
   const { flags } = useFeatureFlags();
-  // Integration and admin panels
-  const [showIntegrationsPanel, setShowIntegrationsPanel] = useState(false);
-  const [showFeatureFlagsPanel, setShowFeatureFlagsPanel] = useState(false);
   // Placeholder until overlaps feature re-implemented
   const projectOverlaps: Record<string, string[]> = {};
   const [isMapLoading, setIsMapLoading] = useState(true);
@@ -455,58 +449,7 @@ export default function MainLayout() {
           {/* Daily briefing panel removed as it's now integrated in the main view */}
         </Portal>
 
-        {/* Tool buttons - positioned left of the EntityActionButton */}
-        <Box position="fixed" bottom="24px" right="80px" zIndex="100">
-          <HStack spacing={3}>
-            {/* Integrations Button - Only shown if flag is enabled */}
-            {flags.enableIntegrations && (
-              <Tooltip label="Data Integrations">
-                <IconButton
-                  icon={<FaSync />}
-                  aria-label="Integrations"
-                  colorScheme={showIntegrationsPanel ? "blue" : "gray"}
-                  onClick={() => setShowIntegrationsPanel(!showIntegrationsPanel)}
-                  size="md"
-                  shadow="md"
-                />
-              </Tooltip>
-            )}
-            
-            {/* Feature Flags Toggle Button - Admin Only */}
-            <Tooltip label="Feature Settings">
-              <IconButton
-                icon={<FaCogs />}
-                aria-label="Feature Settings"
-                colorScheme={showFeatureFlagsPanel ? "blue" : "gray"}
-                onClick={() => setShowFeatureFlagsPanel(!showFeatureFlagsPanel)}
-                size="md"
-                shadow="md"
-              />
-            </Tooltip>
-          </HStack>
-        </Box>
 
-        {/* Show Feature Flags Panel when enabled */}
-        {showFeatureFlagsPanel && (
-          <Portal>
-            <Box 
-              position="fixed" 
-              top="80px" 
-              right="30px" 
-              zIndex="1000"
-              width="350px"
-              maxHeight="calc(100vh - 120px)"
-              overflow="auto"
-            >
-              <FeatureFlagsPanel />
-            </Box>
-          </Portal>
-        )}
-
-        {/* Show Integrations Panel when enabled */}
-        {showIntegrationsPanel && flags.enableIntegrations && (
-          <IntegrationsPanel />
-        )}
 
         {/* Entity Action Button for creating and linking entities */}
         <EntityActionButton

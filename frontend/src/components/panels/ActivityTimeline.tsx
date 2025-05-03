@@ -314,7 +314,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   
   // Apply sorting to filtered activities
   const sortedActivities = useMemo(() => {
-    let sorted = [...filteredActivities];
+    const sorted = [...filteredActivities];
     
     switch (filter.sortBy) {
       case 'newest':

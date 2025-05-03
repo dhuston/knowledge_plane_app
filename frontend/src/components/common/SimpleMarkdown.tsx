@@ -278,7 +278,7 @@ const SimpleMarkdown: React.FC<SimpleMarkdownProps> = ({
     // Table parsing variables
     let inTable = false;
     let tableRows: string[][] = [];
-    let currentRow: string[] = [];
+    const currentRow: string[] = [];
     
     // Code block parsing variables
     let inCodeBlock = false;

@@ -66,12 +66,12 @@ export function WorkspaceDashboard({ initialLayout = 'standard' }: WorkspaceDash
           </GridItem>
           
           {/* Daily Briefing - Left column on larger screens */}
-          <GridItem colSpan={{ base: 12, lg: 6 }} p={4} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
+          <GridItem colSpan={{ base: 12, lg: 6 }} p={3} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
             <DailyBriefing />
           </GridItem>
           
           {/* Team Activity - Right column on larger screens */}
-          <GridItem colSpan={{ base: 12, lg: 6 }} p={4} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
+          <GridItem colSpan={{ base: 12, lg: 6 }} p={3} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
             <TeamActivity />
           </GridItem>
           

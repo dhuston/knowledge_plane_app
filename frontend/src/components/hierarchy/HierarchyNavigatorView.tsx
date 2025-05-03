@@ -14,7 +14,7 @@ import {
   AlertIcon,
   useColorModeValue,
 } from '@chakra-ui/react';
-import { FiSearch, FiHome, FiChevronUp } from 'react-icons/fi';
+import { FiSearch, FiChevronUp, FiChevronDown, FiTarget, FiCompass } from 'react-icons/fi';
 
 // Import components and types
 import { UserPositionCard } from './UserPositionCard';
@@ -74,18 +74,17 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
       aria-label="Organization hierarchy navigator"
       role="navigation"
     >
-      {/* Top section with search */}
-      <Box width="100%">
-        <Tooltip label="Search organization" placement="right">
+      {/* Top section with search - simplified */}
+      <Box width="100%" mt={1}>
+        <Tooltip label="Search organization hierarchy" placement="right" openDelay={300} hasArrow gutter={10} animation="scale">
           <IconButton
-            icon={<FiSearch />}
+            icon={<FiSearch size="1.2rem" />}
             aria-label="Search organization"
             size="md"
             width="44px"
             height="44px"
             variant="ghost"
-            borderRadius="6px"
-            mb={4}
+            borderRadius="6px" 
             onClick={onSearchToggle}
             _hover={{ bg: hoverBgColor }}
             color={isSearchOpen ? activeColor : undefined}
@@ -93,7 +92,16 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
         </Tooltip>
       </Box>
       
-      {/* User position card at top */}
+      {/* Visual divider */}
+      <Box 
+        width="40px" 
+        height="1px" 
+        bg="gray.300" 
+        my={2} 
+        _dark={{ bg: "gray.600" }} 
+      />
+      
+      {/* User position card simplified */}
       <UserPositionCard />
       
       {/* Loading indicator */}
@@ -121,8 +129,17 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
         </Tooltip>
       )}
       
+      {/* Visual divider before hierarchy items */}
+      <Box 
+        width="40px" 
+        height="1px" 
+        bg="gray.300" 
+        my={2} 
+        _dark={{ bg: "gray.600" }} 
+      />
+      
       {/* Main navigation items */}
-      <VStack spacing={2} width="100%" flex="1" mt={4} mb={4} overflowY="auto">
+      <VStack spacing={2} width="100%" flex="1" mb={4} overflowY="auto">
         {Array.isArray(hierarchyItems) && hierarchyItems.map((unit: OrganizationalUnitEntity) => {
           // Skip rendering if unit is null/undefined or missing required properties
           if (!unit || !unit.id) return null;
@@ -139,27 +156,22 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
         })}
       </VStack>
       
-      {/* Bottom navigation actions */}
+      {/* Visual divider before navigation actions */}
+      <Box 
+        width="40px" 
+        height="1px" 
+        bg="gray.300" 
+        mt={1}
+        mb={2}
+        _dark={{ bg: "gray.600" }} 
+      />
+      
+      {/* Simplified navigation controls */}
       <VStack spacing={2} width="100%" mb={2}>
-        {/* Navigate to home/root */}
-        <Tooltip label="Navigate to organization root" placement="right">
+        {/* Navigate up in hierarchy */}
+        <Tooltip label="Navigate up in hierarchy" placement="right" openDelay={300} hasArrow gutter={10} animation="scale">
           <IconButton
-            icon={<FiHome />}
-            aria-label="Navigate to organization root"
-            size="md"
-            width="44px"
-            height="44px"
-            variant="ghost"
-            borderRadius="6px"
-            onClick={onNavigateToRoot}
-            _hover={{ bg: hoverBgColor }}
-          />
-        </Tooltip>
-        
-        {/* Navigate to top of hierarchy */}
-        <Tooltip label="Navigate up" placement="right">
-          <IconButton
-            icon={<FiChevronUp />}
+            icon={<FiChevronUp size="1.2rem" />}
             aria-label="Navigate up the hierarchy"
             size="md"
             width="44px"
@@ -167,6 +179,21 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
             variant="ghost"
             borderRadius="6px"
             onClick={onNavigateUp}
+            _hover={{ bg: hoverBgColor }}
+          />
+        </Tooltip>
+        
+        {/* Navigate to organization root */}
+        <Tooltip label="Go to organization root" placement="right" openDelay={300} hasArrow gutter={10} animation="scale">
+          <IconButton
+            icon={<FiCompass size="1.2rem" />}
+            aria-label="Navigate to organization root"
+            size="md"
+            width="44px"
+            height="44px"
+            variant="ghost"
+            borderRadius="6px"
+            onClick={onNavigateToRoot}
             _hover={{ bg: hoverBgColor }}
           />
         </Tooltip>

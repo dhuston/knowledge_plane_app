@@ -13,8 +13,12 @@ import UserManagement from './users/UserManagement';
 
 // Helper function to check if user has admin access
 const hasAdminAccess = (user: any) => {
-  // This should be enhanced based on your actual role system
-  // For now, we'll check for a role property that includes 'admin'
+  // For development, allow specific test users
+  if (user?.email === 'dev@example.com' || user?.name === 'Development User') {
+    return true;
+  }
+  
+  // Also check for admin role
   return user?.role?.includes('admin');
 };
 

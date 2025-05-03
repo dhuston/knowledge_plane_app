@@ -65,20 +65,20 @@ export function DailyBriefing() {
   
   return (
     <Box>
-      <Heading size="md" mb={4}>Daily Briefing</Heading>
+      <Heading size="md" mb={2}>Daily Briefing</Heading>
       
       {events.length === 0 ? (
-        <Box p={4} bg={cardBg} borderRadius="md" textAlign="center">
-          <CalendarIcon boxSize={10} color={accentColor} mb={3} />
+        <Box p={3} bg={cardBg} borderRadius="md" textAlign="center">
+          <CalendarIcon boxSize={8} color={accentColor} mb={2} />
           <Text>No events scheduled for today</Text>
         </Box>
       ) : (
-        <VStack spacing={4} align="stretch">
+        <VStack spacing={3} align="stretch">
           {/* Today's Schedule */}
           <Box>
-            <Heading size="sm" mb={3} color={accentColor}>
+            <Heading size="sm" mb={2} color={accentColor}>
               <Flex align="center">
-                <CalendarIcon mr={2} />
+                <CalendarIcon mr={1} />
                 Today's Schedule
               </Flex>
             </Heading>
@@ -120,7 +120,7 @@ export function DailyBriefing() {
           
           {/* Meeting Preparation */}
           <Box data-testid="meeting-preparation">
-            <Heading size="sm" mb={3} color={accentColor}>
+            <Heading size="sm" mb={2} color={accentColor}>
               AI-Powered Meeting Prep
             </Heading>
             

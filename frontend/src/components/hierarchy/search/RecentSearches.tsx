@@ -11,7 +11,7 @@ import {
   Icon,
   useColorModeValue,
 } from '@chakra-ui/react';
-import { FiUser, FiUsers, FiBriefcase, FiGrid, FiHome, FiClock } from 'react-icons/fi';
+import { FiUser, FiUsers, FiBriefcase, FiGrid, FiCompass, FiClock } from 'react-icons/fi';
 
 import { OrganizationalUnitEntity, OrganizationalUnitTypeEnum } from '../../../types/hierarchy';
 
@@ -27,7 +27,7 @@ interface RecentSearchesProps {
 const getUnitIcon = (type: OrganizationalUnitTypeEnum) => {
   switch (type) {
     case OrganizationalUnitTypeEnum.ORGANIZATION:
-      return FiHome;
+      return FiCompass;
     case OrganizationalUnitTypeEnum.DIVISION:
       return FiGrid;
     case OrganizationalUnitTypeEnum.DEPARTMENT:

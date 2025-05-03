@@ -177,16 +177,16 @@ export function TeamActivity() {
   
   return (
     <Box>
-      <Heading size="md" mb={4}>Team Activity</Heading>
+      <Heading size="md" mb={2}>Team Activity</Heading>
       
       {/* Team Metrics Section */}
-      <Box mb={6}>
-        <HStack spacing={8} justify="center">
+      <Box mb={3}>
+        <HStack spacing={6} justify="center">
           {metrics.map((metric, index) => (
             <Box key={index} textAlign="center">
               <CircularProgress 
                 value={(metric.value / metric.target) * 100} 
-                size="80px" 
+                size="70px" 
                 color="blue.400"
                 thickness="8px"
               >
@@ -194,8 +194,8 @@ export function TeamActivity() {
                   {metric.value}/{metric.target}
                 </CircularProgressLabel>
               </CircularProgress>
-              <Text mt={2} fontWeight="medium">{metric.name}</Text>
-              <Text fontSize="sm" color={subtleText}>
+              <Text mt={1} fontWeight="medium" fontSize="sm">{metric.name}</Text>
+              <Text fontSize="xs" color={subtleText}>
                 {metric.value} of {metric.target} {metric.unit}
               </Text>
             </Box>
@@ -203,16 +203,16 @@ export function TeamActivity() {
         </HStack>
       </Box>
       
-      <Divider mb={4} />
+      <Divider mb={2} />
       
       {/* Recent Activity Feed */}
       <Box>
-        <Heading size="sm" mb={3}>Recent Activity</Heading>
+        <Heading size="sm" mb={2}>Recent Activity</Heading>
         
         <VStack 
-          spacing={4} 
+          spacing={3} 
           align="stretch" 
-          maxH="250px" 
+          maxH="220px" 
           overflowY="auto" 
           pr={2}
           css={{
@@ -231,7 +231,7 @@ export function TeamActivity() {
           {activities.map(activity => (
             <Box 
               key={activity.id} 
-              p={3} 
+              p={2} 
               bg={cardBg} 
               borderRadius="md" 
               borderWidth="1px" 

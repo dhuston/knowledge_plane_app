@@ -17,7 +17,7 @@ import {
   Wrap,
   WrapItem,
 } from '@chakra-ui/react';
-import { FiUser, FiMail, FiBriefcase, FiMapPin } from 'react-icons/fi';
+import { FiUser, FiMail, FiUsers, FiMapPin } from 'react-icons/fi';
 
 import { OrganizationalUnitEntity, isOrgUserEntity } from '../../../types/hierarchy';
 import { useHierarchy } from '../state/HierarchyContext';
@@ -69,7 +69,7 @@ export const UserPopover: React.FC<UserPopoverProps> = ({ unit }) => {
         
         {teamName && (
           <HStack spacing={1} fontSize="xs">
-            <Icon as={FiBriefcase} boxSize="10px" />
+            <Icon as={FiUsers} boxSize="10px" />
             <Text>{teamName}</Text>
           </HStack>
         )}

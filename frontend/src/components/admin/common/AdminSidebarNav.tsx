@@ -7,8 +7,11 @@ import {
   Flex,
   HStack,
   Divider,
-  useColorModeValue
+  useColorModeValue,
+  Button
 } from '@chakra-ui/react';
+import { Link as RouterLink } from 'react-router-dom';
+import { FiHome } from 'react-icons/fi';
 
 interface NavItem {
   id: string;
@@ -28,13 +31,14 @@ const AdminSidebarNav: React.FC<AdminSidebarNavProps> = ({
   onItemClick 
 }) => {
   // Theme colors
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const activeColor = useColorModeValue('blue.500', 'blue.300');
-  const activeBgColor = useColorModeValue('blue.50', 'blue.900');
-  const hoverBgColor = useColorModeValue('gray.100', 'gray.700');
-  const textColor = useColorModeValue('gray.800', 'white');
-  const iconColor = useColorModeValue('gray.500', 'gray.400');
+  const bgColor = useColorModeValue('surface.500', '#262626'); // Use the same colors as the app
+  const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
+  const activeColor = useColorModeValue('primary.500', 'primary.300'); // Airbnb coral : Light coral
+  const activeBgColor = useColorModeValue('primary.50', 'primary.900'); // Very light coral : Very dark coral
+  const hoverBgColor = useColorModeValue('secondary.500', 'gray.700'); // Light background hover
+  const textColor = useColorModeValue('#484848', 'secondary.400'); // Airbnb dark gray : Off-white/cream
+  const iconColor = useColorModeValue('primary.500', 'primary.400'); // Airbnb coral : Light coral
+  const secondaryTextColor = useColorModeValue('#717171', 'gray.400'); // Medium gray
   
   return (
     <Box
@@ -45,12 +49,13 @@ const AdminSidebarNav: React.FC<AdminSidebarNavProps> = ({
       h="full"
       py={4}
       overflowY="auto"
+      boxShadow="sm"
     >
       <VStack spacing={2} align="start" w="full">
         <Text 
           fontSize="sm" 
           fontWeight="medium" 
-          color="gray.500" 
+          color={secondaryTextColor}
           px={4} 
           mb={2}
         >
@@ -78,7 +83,7 @@ const AdminSidebarNav: React.FC<AdminSidebarNavProps> = ({
             <HStack spacing={3}>
               <Box 
                 color={activeItemId === item.id ? activeColor : iconColor}
-                _groupHover={{ color: activeItemId === item.id ? activeColor : iconColor }}
+                _groupHover={{ color: activeItemId === item.id ? activeColor : activeColor }}
               >
                 {item.icon}
               </Box>
@@ -91,11 +96,26 @@ const AdminSidebarNav: React.FC<AdminSidebarNavProps> = ({
         
         <Divider my={4} borderColor={borderColor} />
         
-        <Box px={4} py={2}>
-          <Text fontSize="xs" color="gray.500">
-            Version 0.1.0
-          </Text>
-        </Box>
+        {/* Back to App Button */}
+        <Flex
+          w="full"
+          px={4}
+          py={3}
+          align="center"
+        >
+          <Button
+            as={RouterLink}
+            to="/workspace"
+            variant="outline"
+            size="sm"
+            leftIcon={<FiHome />}
+            width="full"
+            colorScheme="primary"
+          >
+            Back to App
+          </Button>
+        </Flex>
+        
       </VStack>
     </Box>
   );

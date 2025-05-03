@@ -30,6 +30,7 @@ import {
     FiClock,
     FiUsers,
     FiBell,
+    FiGrid,
 } from 'react-icons/fi';
 import { useLocation, Link } from 'react-router-dom';
 import { User } from '../../context/AuthContext';
@@ -171,7 +172,7 @@ const Header: React.FC<HeaderProps> = ({
                                         </MenuItem>
                                         <MenuItem icon={<FiSettings />} command="⌘,">Settings</MenuItem>
                                         <MenuItem 
-                                          icon={<FiSettings />} 
+                                          icon={<FiGrid />} 
                                           as={Link} 
                                           to="/admin"
                                         >

@@ -31,8 +31,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   const { breadcrumbs, isRefreshing, refreshData } = useAdmin();
   
   // Theme colors
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const bgColor = useColorModeValue('surface.500', '#262626'); // White : Button color
+  const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
+  const containerBg = useColorModeValue('secondary.400', '#262626'); // Off-white/cream : Button color
+  const textColor = useColorModeValue('#484848', 'secondary.400'); // Airbnb dark gray : Off-white/cream
+  const secondaryTextColor = useColorModeValue('#717171', 'gray.400'); // Medium gray
   
   // Handle refresh action
   const handleRefresh = async () => {
@@ -45,7 +48,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   
   return (
     <Box 
-      bg={useColorModeValue('gray.50', 'gray.900')}
+      bg={containerBg}
       minH="calc(100vh - 60px)"
       p={{ base: 4, md: 8 }}
     >
@@ -63,13 +66,14 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
         >
           <Box>
             {/* Title */}
-            {title && <Heading size="lg" mb={2}>{title}</Heading>}
+            {title && <Heading size="lg" mb={2} color={textColor}>{title}</Heading>}
             
             {/* Breadcrumb navigation */}
             <Breadcrumb 
               fontSize="sm" 
-              color="gray.500"
+              color={secondaryTextColor}
               aria-label="breadcrumb-navigation"
+              separator=">"
             >
               {breadcrumbs.map((crumb, index) => (
                 <BreadcrumbItem key={`${crumb.label}-${index}`}>
@@ -95,6 +99,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                   variant="outline"
                   isLoading={isRefreshing}
                   onClick={handleRefresh}
+                  colorScheme="primary"
                 />
               </Tooltip>
             )}
@@ -105,10 +110,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
         <Box
           bg={bgColor}
           borderRadius="lg"
-          boxShadow="sm"
+          boxShadow="md"
           p={{ base: 4, md: 6 }}
           borderWidth="1px"
           borderColor={borderColor}
+          layerStyle="card"
         >
           {children}
         </Box>

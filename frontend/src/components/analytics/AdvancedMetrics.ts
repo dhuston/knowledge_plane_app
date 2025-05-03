@@ -145,7 +145,7 @@ export function detectCommunitiesLouvain(
   totalEdges /= 2; // For undirected graph
   
   // Initialize: each node in its own community
-  let communities: Record<string, string> = {};
+  const communities: Record<string, string> = {};
   nodeIds.forEach(id => {
     communities[id] = id;
   });

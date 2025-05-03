@@ -11,7 +11,7 @@ import {
   Badge,
   useDisclosure,
 } from '@chakra-ui/react';
-import { FiUser, FiUsers, FiBriefcase, FiHome, FiGrid } from 'react-icons/fi';
+import { FiUser, FiUsers, FiBriefcase, FiHome, FiGrid, FiCompass } from 'react-icons/fi';
 import { OrganizationalUnitEntity, OrganizationalUnitTypeEnum, ConnectionStrengthEnum } from '../../types/hierarchy';
 import { motion } from 'framer-motion';
 
@@ -31,7 +31,7 @@ interface HierarchyItemProps {
 const getUnitIcon = (type: OrganizationalUnitTypeEnum) => {
   switch (type) {
     case OrganizationalUnitTypeEnum.ORGANIZATION:
-      return FiHome;
+      return FiCompass;
     case OrganizationalUnitTypeEnum.DIVISION:
       return FiGrid;
     case OrganizationalUnitTypeEnum.DEPARTMENT:
@@ -103,6 +103,10 @@ export const HierarchyItem: React.FC<HierarchyItemProps> = ({
         label={unit.name}
         placement="right"
         isDisabled={isPopoverOpen}
+        openDelay={300}
+        hasArrow
+        gutter={10}
+        animation="scale"
       >
         <Box
           as={motion.div}

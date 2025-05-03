@@ -36,7 +36,8 @@ import {
   Button,
   Textarea,
   FormHelperText,
-  Skeleton
+  Skeleton,
+  Icon
 } from '@chakra-ui/react';
 import { FiSearch, FiInfo, FiCalendar, FiSettings } from 'react-icons/fi';
 import { useFeatureFlags, FeatureFlags } from '../../../utils/featureFlags';

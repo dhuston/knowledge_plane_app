@@ -15,8 +15,8 @@ vi.mock('reconnecting-websocket', () => {
 });
 
 describe('useDeltaStream', () => {
-  let mockUrl = 'wss://example.com/stream';
-  let mockOnMessage = vi.fn();
+  const mockUrl = 'wss://example.com/stream';
+  const mockOnMessage = vi.fn();
   
   // Get the mock ReconnectingWebSocket constructor
   const MockReconnectingWebSocket = vi.mocked(await import('reconnecting-websocket')).default;

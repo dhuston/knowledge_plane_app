@@ -11,9 +11,10 @@ import {
   useColorModeValue,
   IconButton,
   VStack,
-  Flex
+  Flex,
+  Icon
 } from '@chakra-ui/react';
-import { FiUser, FiBriefcase } from 'react-icons/fi';
+import { FiUser, FiUsers, FiTarget } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { useHierarchy } from './state/HierarchyContext';
 
@@ -55,8 +56,12 @@ export const UserPositionCard: React.FC = () => {
     >
       <VStack spacing={1}>
         <Tooltip 
-          label={`${user?.name || 'Your profile'}`}
+          label={`Your current position: ${user?.name || 'You'}`}
           placement="right"
+          openDelay={300}
+          hasArrow
+          gutter={10}
+          animation="scale"
         >
           <Box
             position="relative"
@@ -80,6 +85,7 @@ export const UserPositionCard: React.FC = () => {
                 name={user.name}
                 border="2px solid"
                 borderColor={avatarBorderColor}
+                opacity="0.9"
               />
             ) : (
               <Avatar 
@@ -89,20 +95,26 @@ export const UserPositionCard: React.FC = () => {
                 color={roleIconColor}
                 border="2px solid"
                 borderColor={avatarBorderColor}
+                opacity="0.9"
               />
             )}
             
-            {/* Online status indicator */}
+            {/* Location indicator badge - shows this is your position */}
             <Badge 
               position="absolute"
               bottom="-1px"
               right="-1px"
               borderRadius="full"
               bg={statusColor}
-              boxSize="8px"
+              boxSize="16px"
               border="1px solid"
               borderColor={useColorModeValue('white', 'gray.800')}
-            />
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Icon as={FiTarget} fontSize="8px" color="white" />
+            </Badge>
           </Box>
         </Tooltip>
         
@@ -111,11 +123,15 @@ export const UserPositionCard: React.FC = () => {
           <Tooltip 
             label={units[userTeamId]?.name || 'Your team'}
             placement="right"
+            openDelay={300}
+            hasArrow
+            gutter={10}
+            animation="scale"
           >
             <IconButton
-              icon={<FiBriefcase size="1rem" />}
-              size="xs"
-              variant="subtle"
+              icon={<FiUsers size="1rem" />}
+              size="sm" 
+              variant="ghost"
               aria-label="Your team"
               borderRadius="md"
               onClick={handleTeamClick}

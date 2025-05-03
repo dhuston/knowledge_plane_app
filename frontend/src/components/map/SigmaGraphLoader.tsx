@@ -238,7 +238,7 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
     // Optimize layout based on graph size
     const nodeCount = graph.order; // Number of nodes in graph
     let iterations = 150;
-    let settings = {
+    const settings = {
       slowDown: 5,
       gravity: 1.5,
       barnesHutOptimize: true,

@@ -15,7 +15,7 @@ import {
   Flex,
   Progress,
 } from '@chakra-ui/react';
-import { FiBriefcase, FiTarget } from 'react-icons/fi';
+import { FiCompass, FiTarget } from 'react-icons/fi';
 
 import { 
   OrganizationalUnitEntity, 
@@ -63,7 +63,7 @@ export const OrganizationPopover: React.FC<OrganizationPopoverProps> = ({ unit }
       
       {/* Departments count */}
       <HStack spacing={1}>
-        <Icon as={FiBriefcase} boxSize="12px" />
+        <Icon as={FiCompass} boxSize="12px" />
         <Text fontSize="sm">
           {departmentsCount} {departmentsCount === 1 ? 'Department' : 'Departments'}
         </Text>
