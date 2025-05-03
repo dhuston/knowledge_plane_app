@@ -134,7 +134,7 @@ async def dev_login(request: Request):
     
     # Create mock IDs
     mock_user_id = "11111111-1111-1111-1111-111111111111"
-    mock_tenant_id = "33333333-3333-3333-3333-333333333333"
+    mock_tenant_id = "d3667ea1-079a-434e-84d2-60e84757b5d5"  # Use our actual test tenant ID
     
     # Create tokens with tenant_id
     access_token = create_access_token(
@@ -191,9 +191,9 @@ async def mock_me(request: Request):
             "title": "Software Developer", 
             "avatar_url": None,
             "online_status": True,
-            "team_id": "22222222-2222-2222-2222-222222222222",
+            "team_id": "839b5261-9228-4955-bcb5-f52452f0cf2e",  # Research & Development team
             "manager_id": None,
-            "tenant_id": "33333333-3333-3333-3333-333333333333",
+            "tenant_id": "d3667ea1-079a-434e-84d2-60e84757b5d5",  # Use our actual test tenant ID
             "created_at": "2025-05-01T00:00:00Z",
             "updated_at": "2025-05-01T00:00:00Z"
         }

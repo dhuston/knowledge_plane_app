@@ -10,6 +10,7 @@ export interface FeatureFlags {
   enableSuggestions: boolean;
   enableActivityTimeline: boolean;
   enableTeamClustering: boolean;
+  enableHierarchyNavigator: boolean;
 }
 
 // Default flags - could be loaded from backend or localStorage
@@ -19,7 +20,8 @@ const defaultFlags: FeatureFlags = {
   enableAnalytics: true,
   enableSuggestions: true,
   enableActivityTimeline: true,
-  enableTeamClustering: true
+  enableTeamClustering: true,
+  enableHierarchyNavigator: true // Enable the new Organizational Hierarchy Navigator by default
 };
 
 /**

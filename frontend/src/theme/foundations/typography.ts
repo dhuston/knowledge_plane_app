@@ -8,27 +8,27 @@
  * - Text styles for common UI components
  */
 
-// Font family definitions - refined for better readability and enterprise feel
+// Font family definitions - Airbnb-inspired clean, approachable typography
 export const fontFamily = {
-  // System font stack with sans-serif fallbacks - using Inter as primary font for clean, modern look
-  sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'",
+  // System font stack with Airbnb-like font preferences
+  sans: "'Circular', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'",
 
-  // Alternate sans-serif for headings - slightly more distinctive
-  heading: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  // Heading font - same as body for consistency (Airbnb approach)
+  heading: "'Circular', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
 
-  // Monospace font stack for code and technical content - using JetBrains Mono for better readability
-  mono: "'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+  // Monospace font stack for code and technical content
+  mono: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace",
 
   // Serif font stack for specific content that needs a more formal look
   serif: "'Georgia', 'Times New Roman', serif",
 };
 
-// Font size system (rem-based for accessibility) - refined for better readability and hierarchy
+// Font size system (rem-based for accessibility) - clean, approachable sizing
 export const fontSize = {
   // Core sizes (mobile-first approach) - slightly adjusted for better visual rhythm
   '2xs': '0.625rem',   // 10px - for very small text like badges
   xs: '0.75rem',       // 12px
-  sm: '0.875rem',      // 14px
+  sm: '0.875rem',      // 14px - Airbnb uses this for most body text
   md: '1rem',          // 16px (base)
   lg: '1.125rem',      // 18px
   xl: '1.25rem',       // 20px
@@ -54,63 +54,63 @@ export const fontSize = {
   dataValue: '1.125rem',   // 18px - for chart values
 };
 
-// Font weight definitions
+// Font weight definitions - Airbnb uses a narrower range of weights for consistency
 export const fontWeight = {
   thin: 100,
   extralight: 200,
   light: 300,
-  normal: 400,
-  medium: 500,
-  semibold: 600,
-  bold: 700,
+  normal: 400,        // Regular body text
+  medium: 500,        // Emphasized text
+  semibold: 600,      // Subheadings
+  bold: 700,          // Headings - Airbnb typically uses this as max weight
   extrabold: 800,
   black: 900,
 };
 
-// Line height settings for different text contexts - refined for better readability
+// Line height settings for different text contexts - airy, readable spacing
 export const lineHeight = {
   none: 1,
   tight: 1.25,
   snug: 1.375,
-  normal: 1.5,
+  normal: 1.5,         // Default
   relaxed: 1.625,
   loose: 2,
 
   // Special cases for specific UI needs - adjusted for better readability
-  heading: 1.2,       // Slightly tighter for headings
-  subheading: 1.3,    // For subheadings
-  body: 1.6,          // Slightly more relaxed for better readability
-  code: 1.7,          // For code blocks
-  caption: 1.4,       // For captions and small text
-  data: 1.3,          // For data visualization
+  heading: 1.25,       // More breathing room for headings (Airbnb-style)
+  subheading: 1.35,    // For subheadings
+  body: 1.5,           // Airbnb-like body text line height
+  code: 1.7,           // For code blocks
+  caption: 1.5,        // For captions and small text
+  data: 1.4,           // For data visualization
 
   // Semantic line heights for specific UI elements
-  button: 1.4,        // For buttons
+  button: 1.5,        // For buttons
   input: 1.5,         // For form inputs
-  title: 1.15,        // For large titles (tighter)
-  display: 1.1,       // For very large display text (tightest)
+  title: 1.2,         // For large titles
+  display: 1.15,      // For very large display text
 };
 
-// Letter spacing (tracking) options - refined for better readability and visual appeal
+// Letter spacing (tracking) options - clean and legible
 export const letterSpacing = {
-  tightest: '-0.06em', // For very large display text
-  tighter: '-0.05em',
-  tight: '-0.025em',
-  normal: '0em',
-  wide: '0.025em',
-  wider: '0.05em',
-  widest: '0.1em',
+  tightest: '-0.03em', // For very large display text
+  tighter: '-0.025em',
+  tight: '-0.01em',
+  normal: '0em',       // Airbnb typically uses normal letter spacing
+  wide: '0.01em',
+  wider: '0.025em',
+  widest: '0.05em',
 
   // Special cases - adjusted for better visual harmony
-  heading: '-0.015em',    // Slightly tighter for headings
-  subheading: '-0.01em',  // For subheadings
-  body: '0.01em',         // Slightly wider for body text
-  button: '0.02em',       // For buttons
+  heading: '-0.01em',     // Very slightly tighter for headings
+  subheading: '0em',      // For subheadings
+  body: '0em',            // Normal spacing for body text (Airbnb approach)
+  button: '0.01em',       // For buttons
   caps: '0.05em',         // For all-caps text
-  title: '-0.03em',       // For large titles
-  display: '-0.04em',     // For very large display text
-  code: '0em',            // For code blocks (monospace)
-  caption: '0.01em',      // For captions and small text
+  title: '-0.01em',       // For large titles
+  display: '-0.02em',     // For very large display text
+  code: '0em',            // For code blocks
+  caption: '0em',         // For captions and small text
 };
 
 // Text transformation utilities
@@ -128,9 +128,9 @@ export const textDecoration = {
   noDecoration: 'none',
 };
 
-// Text styles for common components - refined for better visual hierarchy and readability
+// Text styles for common components - styled for clean, approachable look
 export const textStyles = {
-  // Headings - refined for better visual hierarchy
+  // Headings - refined for Airbnb-like hierarchy
   h1: {
     fontFamily: fontFamily.heading,
     fontSize: fontSize['5xl'],
@@ -138,7 +138,7 @@ export const textStyles = {
     lineHeight: lineHeight.title,
     letterSpacing: letterSpacing.title,
     marginBottom: '1.5rem',
-    color: 'var(--text-primary)',
+    color: '#484848', // Airbnb primary text color
   },
   h2: {
     fontFamily: fontFamily.heading,
@@ -147,7 +147,7 @@ export const textStyles = {
     lineHeight: lineHeight.heading,
     letterSpacing: letterSpacing.heading,
     marginBottom: '1.25rem',
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
   h3: {
     fontFamily: fontFamily.heading,
@@ -156,7 +156,7 @@ export const textStyles = {
     lineHeight: lineHeight.heading,
     letterSpacing: letterSpacing.heading,
     marginBottom: '1rem',
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
   h4: {
     fontFamily: fontFamily.heading,
@@ -165,7 +165,7 @@ export const textStyles = {
     lineHeight: lineHeight.subheading,
     letterSpacing: letterSpacing.subheading,
     marginBottom: '0.75rem',
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
   h5: {
     fontFamily: fontFamily.heading,
@@ -174,42 +174,42 @@ export const textStyles = {
     lineHeight: lineHeight.subheading,
     letterSpacing: letterSpacing.subheading,
     marginBottom: '0.5rem',
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
   h6: {
     fontFamily: fontFamily.heading,
     fontSize: fontSize.lg,
-    fontWeight: fontWeight.semibold,
+    fontWeight: fontWeight.medium,
     lineHeight: lineHeight.subheading,
     letterSpacing: letterSpacing.subheading,
     marginBottom: '0.5rem',
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
 
-  // Body text - refined for better readability
+  // Body text - clean and readable like Airbnb
   bodyLarge: {
     fontFamily: fontFamily.sans,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md, // 16px
     fontWeight: fontWeight.normal,
     lineHeight: lineHeight.body,
     letterSpacing: letterSpacing.body,
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
   bodyDefault: {
     fontFamily: fontFamily.sans,
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm, // 14px - Airbnb's typical body size
     fontWeight: fontWeight.normal,
     lineHeight: lineHeight.body,
     letterSpacing: letterSpacing.body,
-    color: 'var(--text-primary)',
+    color: '#484848',
   },
   bodySmall: {
     fontFamily: fontFamily.sans,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs, // 12px
     fontWeight: fontWeight.normal,
     lineHeight: lineHeight.body,
     letterSpacing: letterSpacing.body,
-    color: 'var(--text-secondary)',
+    color: '#717171', // Airbnb secondary text
   },
 
   // Special text styles for specific UI elements
@@ -219,7 +219,7 @@ export const textStyles = {
     fontWeight: fontWeight.normal,
     lineHeight: lineHeight.caption,
     letterSpacing: letterSpacing.caption,
-    color: 'var(--text-tertiary)',
+    color: '#717171',
   },
 
   code: {
@@ -228,9 +228,9 @@ export const textStyles = {
     fontWeight: fontWeight.normal,
     lineHeight: lineHeight.code,
     letterSpacing: letterSpacing.code,
-    backgroundColor: 'var(--bg-subtle)',
+    backgroundColor: '#F7F7F7', // Light background
     padding: '0.2em 0.4em',
-    borderRadius: '0.25em',
+    borderRadius: '4px',
   },
 
   // Special text styles
@@ -238,12 +238,12 @@ export const textStyles = {
     fontSize: fontSize.caption,
     fontWeight: fontWeight.normal,
     lineHeight: lineHeight.caption,
-    color: 'var(--text-secondary)',
+    color: '#717171',
   },
   button: {
     fontSize: fontSize.button,
-    fontWeight: fontWeight.medium,
-    lineHeight: lineHeight.normal,
+    fontWeight: fontWeight.medium, // Airbnb uses medium weight for buttons
+    lineHeight: lineHeight.button,
     letterSpacing: letterSpacing.button,
   },
   overline: {
@@ -263,12 +263,14 @@ export const textStyles = {
     fontWeight: fontWeight.medium,
     lineHeight: lineHeight.normal,
     marginBottom: '0.5rem',
+    color: '#484848',
   },
   link: {
-    color: 'var(--text-link)',
-    textDecoration: textDecoration.underline,
+    color: '#FF5A5F', // Airbnb link color (coral)
+    textDecoration: textDecoration.noDecoration, // Airbnb typically uses no underline
     _hover: {
-      color: 'var(--text-link-hover)',
+      color: '#E93844', // Darker on hover
+      textDecoration: textDecoration.underline, // Underline on hover
     },
   },
 };

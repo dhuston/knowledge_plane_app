@@ -48,7 +48,7 @@ const typography = {
   },
 };
 
-// Spacing system
+// Spacing system - updated for more generous Airbnb-like whitespace
 const space = {
   px: '1px',
   0.5: '0.125rem',
@@ -58,20 +58,20 @@ const space = {
   2.5: '0.625rem',
   3: '0.75rem',
   3.5: '0.875rem',
-  4: '1rem',
+  4: '1rem',      // 16px
   5: '1.25rem',
-  6: '1.5rem',
+  6: '1.5rem',    // 24px - Airbnb uses this as a common spacing unit
   7: '1.75rem',
-  8: '2rem',
+  8: '2rem',      // 32px - Airbnb uses this for section spacing
   9: '2.25rem',
-  10: '2.5rem',
-  12: '3rem',
+  10: '2.5rem',   // 40px
+  12: '3rem',     // 48px - Airbnb uses this for large vertical spacing
   14: '3.5rem',
-  16: '4rem',
-  20: '5rem',
-  24: '6rem',
+  16: '4rem',     // 64px
+  20: '5rem',     // 80px - Airbnb section spacing
+  24: '6rem',     // 96px
   28: '7rem',
-  32: '8rem',
+  32: '8rem',     // 128px - Very large spacing
   36: '9rem',
   40: '10rem',
   44: '11rem',
@@ -83,6 +83,12 @@ const space = {
   72: '18rem',
   80: '20rem',
   96: '24rem',
+  
+  // Semantic spacing for specific use cases
+  'card-padding': '24px',  // Consistent card padding like Airbnb
+  'section-y': '80px',     // Vertical section spacing
+  'container-x': '24px',   // Horizontal container padding on mobile
+  'container-x-md': '48px' // Horizontal container padding on tablets and up
 };
 
 // Theme configuration
@@ -321,27 +327,32 @@ const layout = {
   },
 };
 
-// Shadows - more subtle and modern
+// Shadows - Airbnb-inspired subtle, clean shadows
 const shadows = {
-  xs: '0 0 0 1px rgba(197, 212, 202, 0.1)', // Light mint green with transparency
-  sm: '0 1px 3px rgba(197, 212, 202, 0.1), 0 1px 2px rgba(197, 212, 202, 0.06)',
-  base: '0 1px 4px rgba(197, 212, 202, 0.15), 0 1px 2px rgba(197, 212, 202, 0.08)',
-  md: '0 4px 8px rgba(197, 212, 202, 0.15), 0 2px 4px rgba(197, 212, 202, 0.08)',
-  lg: '0 10px 20px rgba(197, 212, 202, 0.15), 0 3px 6px rgba(197, 212, 202, 0.08)',
-  xl: '0 20px 25px rgba(197, 212, 202, 0.15), 0 10px 10px rgba(197, 212, 202, 0.05)',
-  '2xl': '0 25px 50px rgba(197, 212, 202, 0.2)',
-  inner: 'inset 0 2px 4px rgba(197, 212, 202, 0.08)',
-  outline: '0 0 0 3px rgba(197, 212, 202, 0.5)', // Light mint green with transparency
-  'outline-primary': '0 0 0 3px rgba(197, 212, 202, 0.5)', // Light mint green with transparency
-  'outline-success': '0 0 0 3px rgba(34, 197, 94, 0.4)', // Success green with transparency
-  'outline-error': '0 0 0 3px rgba(176, 0, 32, 0.4)', // Deep red with transparency
-  'outline-warning': '0 0 0 3px rgba(245, 158, 11, 0.4)', // Warning amber with transparency
-  'card-hover': '0 8px 16px rgba(197, 212, 202, 0.15), 0 3px 6px rgba(197, 212, 202, 0.08)',
-  'card-focus': '0 0 0 3px rgba(197, 212, 202, 0.5), 0 4px 8px rgba(197, 212, 202, 0.15)',
+  xs: '0 0 0 1px rgba(0, 0, 0, 0.04)',
+  sm: '0 1px 2px rgba(0, 0, 0, 0.08)',
+  base: '0 2px 4px rgba(0, 0, 0, 0.12)',
+  md: '0 4px 8px rgba(0, 0, 0, 0.12)',
+  lg: '0 8px 16px rgba(0, 0, 0, 0.12)',  // Airbnb-style card shadow
+  xl: '0 12px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08)',
+  '2xl': '0 20px 32px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08)',
+  inner: 'inset 0 2px 4px rgba(0, 0, 0, 0.06)',
+  outline: '0 0 0 2px rgba(255, 90, 95, 0.3)',  // Coral (primary) outline for focus
+  'outline-primary': '0 0 0 2px rgba(255, 90, 95, 0.3)',  // Coral outline
+  'outline-success': '0 0 0 2px rgba(0, 195, 138, 0.3)',  // Success outline
+  'outline-error': '0 0 0 2px rgba(239, 68, 68, 0.3)',    // Error outline
+  'outline-warning': '0 0 0 2px rgba(245, 158, 11, 0.3)', // Warning outline
+  'card-hover': '0 8px 20px rgba(0, 0, 0, 0.12)',         // Airbnb-style hover shadow
+  'card-focus': '0 0 0 2px rgba(255, 90, 95, 0.3), 0 6px 12px rgba(0, 0, 0, 0.1)',
+  'elevation-1': '0 1px 2px rgba(0, 0, 0, 0.08)',        // Subtle elevation
+  'elevation-2': '0 3px 10px rgba(0, 0, 0, 0.1)',        // Medium elevation
+  'elevation-3': '0 8px 20px rgba(0, 0, 0, 0.12)',       // Heavy elevation like Airbnb
+  'dropdown': '0 2px 16px rgba(0, 0, 0, 0.12)',          // Airbnb dropdown shadow
+  'modal': '0 12px 28px rgba(0, 0, 0, 0.16)',            // Modal shadow
   none: 'none',
 };
 
-// Animation tokens
+// Animation tokens - smooth Airbnb-inspired transitions
 const transition = {
   property: {
     common: 'background-color, border-color, color, fill, stroke, opacity, box-shadow, transform',
@@ -349,20 +360,33 @@ const transition = {
     dimensions: 'width, height',
     position: 'left, right, top, bottom',
     background: 'background-color, background-image, background-position',
+    transform: 'transform',
+    filter: 'filter, backdrop-filter',
+    visibility: 'opacity, visibility',
   },
   easing: {
+    // Airbnb uses smoother, more natural easing curves
     'ease-in': 'cubic-bezier(0.4, 0, 1, 1)',
     'ease-out': 'cubic-bezier(0, 0, 0.2, 1)',
     'ease-in-out': 'cubic-bezier(0.4, 0, 0.2, 1)',
+    // New easing curves for more natural motion
+    'bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',   // Slight bounce effect
+    'soft': 'cubic-bezier(0.4, 0.6, 0.1, 1)',        // Soft acceleration/deceleration
+    'gentle': 'cubic-bezier(0.33, 0.66, 0.66, 1)',   // Gentle easing
+    'airbnb': 'cubic-bezier(0.2, 0.8, 0.2, 1)',      // Airbnb-style smooth motion
   },
   duration: {
     'ultra-fast': '50ms',
     faster: '100ms',
     fast: '150ms',
-    normal: '200ms',
+    normal: '200ms',       // Airbnb standard transition time
     slow: '300ms',
     slower: '400ms',
     'ultra-slow': '500ms',
+    'enter': '200ms',      // Enter animations
+    'leave': '150ms',      // Leave animations faster than enter (Airbnb behavior)
+    'hover': '120ms',      // Quick hover transitions
+    'expand': '250ms',     // Panel expansions
   },
 };
 

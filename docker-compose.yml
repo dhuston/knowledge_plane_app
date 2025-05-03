@@ -18,6 +18,7 @@ services:
       - ./backend/.env # Load environment variables
     environment:
       - RUNNING_IN_DOCKER=true
+      - OPENAI_API_KEY=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
     depends_on:
       db:
         condition: service_healthy # Wait for DB to be ready

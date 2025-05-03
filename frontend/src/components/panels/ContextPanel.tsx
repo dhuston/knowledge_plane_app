@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * ContextPanel.tsx
+ * Performance-optimized panel that displays details about selected nodes
+ */
+import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import {
   Box,
   VStack,
@@ -6,11 +10,27 @@ import {
   Alert,
   AlertIcon,
   useColorModeValue,
-  Fade
+  Fade,
+  SlideFade,
+  ScaleFade,
+  Collapse,
+  useDisclosure,
+  usePrefersReducedMotion,
+  Center,
+  Text
 } from '@chakra-ui/react';
+import { motion, AnimatePresence, keyframes } from 'framer-motion';
 import { useFeatureFlags } from '../../utils/featureFlags';
 import { useApiClient } from '../../hooks/useApiClient';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
+import { 
+  cacheEntity, 
+  getCachedEntity, 
+  useLazyLoad, 
+  useIsMounted, 
+  useDelayedExecution,
+  areEqual
+} from '../../utils/performance';
 
 // Import entity panels
 import UserPanel from './entity-panels/UserPanel';
@@ -23,11 +43,14 @@ import EntityDetails from './EntityDetails';
 import RelationshipList from './RelationshipList';
 import ActivityTimeline from './ActivityTimeline';
 import ActionButtons from './ActionButtons';
+import LazyPanel from '../common/LazyPanel';
+import AnimatedTransition from '../common/AnimatedTransition';
 
 // Import extracted components
 import PanelHeader from './header/PanelHeader';
 import PanelTabs, { PanelTabType } from './tabs/PanelTabs';
-import EntitySuggestions, { EntitySuggestion } from './suggestions/EntitySuggestions';
+import { EntitySuggestion } from './suggestions/EntitySuggestions';
+import EntitySuggestionsContainer from './suggestions/EntitySuggestionsContainer';
 import BreadcrumbNav, { NavHistoryItem } from './header/BreadcrumbNav';
 import RecentlyViewedEntities from './suggestions/RecentlyViewedEntities';
 
@@ -44,13 +67,90 @@ import {
   isKnowledgeAssetEntity
 } from '../../types/entities';
 
+// Lazily load heavier components
+const LazyEntitySuggestionsContainer = lazy(() => import('./suggestions/EntitySuggestionsContainer'));
+const LazyRecentlyViewedEntities = lazy(() => import('./suggestions/RecentlyViewedEntities'));
+
+// Constants for performance tuning
+const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
+const MAX_VISIBLE_RELATIONSHIPS = 50;
+const MAX_HISTORY_ITEMS = 20;
+
 interface ContextPanelProps {
   selectedNode: MapNode | null;
   onClose: () => void;
   projectOverlaps?: Record<string, string[]>;
   getProjectNameById?: (id: string) => string | undefined;
+  onNodeClick?: (nodeId: string | null) => void; // Optional callback for node clicks
 }
 
+// Cache for panel data at component level
+const panelCache = new Map<string, {
+  data: EntityDataType;
+  timestamp: number;
+}>();
+
+/**
+ * Loading fallback component
+ */
+const LoadingFallback = React.memo(() => {
+  const spinnerColor = useColorModeValue('blue.500', 'blue.300');
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const textColor = useColorModeValue('gray.600', 'gray.400');
+  
+  // Define loading animation using framer-motion
+  const pulseAnimation = {
+    animate: {
+      opacity: [0.6, 1, 0.6],
+      scale: [0.98, 1, 0.98],
+      transition: {
+        duration: 1.5,
+        ease: "easeInOut",
+        repeat: Infinity
+      }
+    }
+  };
+  
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  return (
+    <Center 
+      height="100%" 
+      width="100%" 
+      flexDirection="column" 
+      gap={4}
+      bg={bgColor}
+    >
+      {!prefersReducedMotion ? (
+        <>
+          <motion.div animate={pulseAnimation.animate}>
+            <Spinner 
+              size="md" 
+              color={spinnerColor} 
+              thickness="3px"
+            />
+          </motion.div>
+          <motion.div animate={pulseAnimation.animate}>
+            <Text fontSize="sm" color={textColor} fontStyle="italic">
+              Loading content...
+            </Text>
+          </motion.div>
+        </>
+      ) : (
+        <>
+          <Spinner size="md" color={spinnerColor} thickness="3px" />
+          <Text fontSize="sm" color={textColor} fontStyle="italic">
+            Loading content...
+          </Text>
+        </>
+      )}
+    </Center>
+  );
+});
+
+/**
+ * Main ContextPanel component
+ */
 const ContextPanel: React.FC<ContextPanelProps> = ({
   selectedNode,
   onClose,
@@ -64,25 +164,36 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [isRelationshipsLoading, setIsRelationshipsLoading] = useState<boolean>(false);
-  const [suggestions, setSuggestions] = useState<EntitySuggestion[]>([]);
-  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState<boolean>(false);
+  // Suggestions are now handled directly by the EntitySuggestionsContainer component
   const [activeTab, setActiveTab] = useState<PanelTabType>('details');
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([]);
   const [previousNodes, setPreviousNodes] = useState<Map<string, EntityDataType>>(new Map());
   const apiClient = useApiClient();
   const { flags } = useFeatureFlags();
+  const isMounted = useIsMounted();
+  
+  // Track which tabs have been viewed for optimization
+  const viewedTabsRef = useRef<Set<PanelTabType>>(new Set(['details']));
 
+  // Define memoized colors to prevent unnecessary recalculations
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  // Fetch entity data
+  // Memoize projectOverlaps to prevent unnecessary re-renders
+  const memoizedOverlaps = useMemo(() => projectOverlaps, [projectOverlaps]);
+  const memoizedGetProjectName = useCallback(getProjectNameById, [getProjectNameById]);
+  
+  // Delayed execution for non-critical UI elements
+  const shouldLoadSecondary = useDelayedExecution(300);
+  const shouldLoadTertiary = useDelayedExecution(800);
+
+  // Fetch entity data with caching
   useEffect(() => {
     if (!selectedNode) {
       setEntityData(null);
       setError(null);
       setActivityHistory([]);
       setRelationships([]);
-      setSuggestions([]);
       return;
     }
 
@@ -91,37 +202,75 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
       setError(null);
       
       try {
-        let apiUrl = '';
-        switch (selectedNode.type) {
-          case MapNodeTypeEnum.USER:
-            apiUrl = `/users/${selectedNode.id}`;
-            break;
-          case MapNodeTypeEnum.TEAM:
-            apiUrl = `/teams/${selectedNode.id}`;
-            break;
-          case MapNodeTypeEnum.PROJECT:
-            apiUrl = `/projects/${selectedNode.id}`;
-            break;
-          case MapNodeTypeEnum.GOAL:
-            apiUrl = `/goals/${selectedNode.id}`;
-            break;
-          case MapNodeTypeEnum.DEPARTMENT:
-            apiUrl = `/departments/${selectedNode.id}`;
-            break;
-          case MapNodeTypeEnum.KNOWLEDGE_ASSET:
-            apiUrl = `/knowledge-assets/${selectedNode.id}`;
-            break;
-          default:
-            throw new Error(`No API endpoint for type: ${selectedNode.type}`);
+        // Generate cache key
+        const cacheKey = `${selectedNode.type}:${selectedNode.id}`;
+        
+        // Check component-level cache for faster access
+        const panelCachedData = panelCache.get(cacheKey);
+        if (panelCachedData && (Date.now() - panelCachedData.timestamp < CACHE_EXPIRATION)) {
+          setEntityData(panelCachedData.data);
+          setIsLoading(false);
+          return;
         }
-
+        
+        // Check global cache
+        const cachedData = getCachedEntity(cacheKey);
+        if (cachedData) {
+          setEntityData(cachedData);
+          // Update component-level cache too
+          panelCache.set(cacheKey, {
+            data: cachedData,
+            timestamp: Date.now()
+          });
+          setIsLoading(false);
+          return;
+        }
+        
         // Check if we already have cached data for this node
         if (previousNodes.has(selectedNode.id)) {
-          setEntityData(previousNodes.get(selectedNode.id)!);
+          const nodeData = previousNodes.get(selectedNode.id)!;
+          setEntityData(nodeData);
+          
+          // Also update global cache
+          cacheEntity(cacheKey, nodeData);
+          
+          panelCache.set(cacheKey, {
+            data: nodeData,
+            timestamp: Date.now()
+          });
+          
           setIsLoading(false);
         } else {
+          // Determine API URL based on entity type
+          let apiUrl = '';
+          switch (selectedNode.type) {
+            case MapNodeTypeEnum.USER:
+              apiUrl = `/users/${selectedNode.id}`;
+              break;
+            case MapNodeTypeEnum.TEAM:
+              apiUrl = `/teams/${selectedNode.id}`;
+              break;
+            case MapNodeTypeEnum.PROJECT:
+              apiUrl = `/projects/${selectedNode.id}`;
+              break;
+            case MapNodeTypeEnum.GOAL:
+              apiUrl = `/goals/${selectedNode.id}`;
+              break;
+            case MapNodeTypeEnum.DEPARTMENT:
+              apiUrl = `/departments/${selectedNode.id}`;
+              break;
+            case MapNodeTypeEnum.KNOWLEDGE_ASSET:
+              apiUrl = `/knowledge-assets/${selectedNode.id}`;
+              break;
+            default:
+              throw new Error(`No API endpoint for type: ${selectedNode.type}`);
+          }
+
           // Fetch from API if not cached
           const response = await apiClient.get<EntityDataType>(apiUrl);
+          
+          if (!isMounted()) return;
+          
           setEntityData(response.data);
           
           // Cache the result for future use
@@ -129,6 +278,13 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             const updated = new Map(prev);
             updated.set(selectedNode.id, response.data);
             return updated;
+          });
+          
+          // Update both caches
+          cacheEntity(cacheKey, response.data);
+          panelCache.set(cacheKey, {
+            data: response.data,
+            timestamp: Date.now()
           });
         }
         
@@ -145,7 +301,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             const newHistory = [...prev];
             
             // Limit history length to prevent excessive growth
-            if (newHistory.length > 20) {
+            if (newHistory.length > MAX_HISTORY_ITEMS) {
               newHistory.shift();
             }
             
@@ -160,55 +316,113 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         });
       } catch (err: any) {
         console.error(`Error fetching ${selectedNode.type} data:`, err);
-        setError(err.message || `Failed to load ${selectedNode.type} details`);
+        if (isMounted()) {
+          setError(err.message || `Failed to load ${selectedNode.type} details`);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted()) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchEntityData();
-  }, [selectedNode, apiClient, previousNodes]);
+  }, [selectedNode, apiClient, previousNodes, isMounted]);
 
-  // Fetch relationships data when entity data is loaded
+  // Optimized fetch for relationships data
   useEffect(() => {
     if (!selectedNode || !entityData) return;
-
+    
+    // Only fetch relationships if related tab has been viewed or is active
+    if (!viewedTabsRef.current.has('related') && activeTab !== 'related') {
+      return;
+    }
+    
     const fetchRelationships = async () => {
       setIsRelationshipsLoading(true);
       try {
+        // Check cache first
+        const cacheKey = `relationships:${selectedNode.type}:${selectedNode.id}`;
+        const cachedRelations = getCachedEntity(cacheKey);
+        
+        if (cachedRelations) {
+          setRelationships(cachedRelations);
+          setIsRelationshipsLoading(false);
+          return;
+        }
+        
         // For now, we'll use the relationships from the node data if available
-        // In the future, this would be a separate API call
         if (selectedNode.data && selectedNode.data.relationships) {
           // Cast the relationships to the proper type
-          setRelationships(selectedNode.data.relationships as Relationship[]);
+          const relationships = selectedNode.data.relationships as Relationship[];
+          setRelationships(relationships);
+          
+          // Cache the result
+          cacheEntity(cacheKey, relationships);
         } else {
           // Placeholder for future API call
           // const response = await apiClient.get<Relationship[]>(`/${selectedNode.type}s/${selectedNode.id}/relationships`);
           // setRelationships(response.data || []);
           setRelationships([]);
+          
+          // Cache empty result too
+          cacheEntity(cacheKey, []);
         }
       } catch (err) {
         console.error('Error fetching relationships:', err);
         setRelationships([]);
       } finally {
-        setIsRelationshipsLoading(false);
+        if (isMounted()) {
+          setIsRelationshipsLoading(false);
+        }
       }
     };
 
     fetchRelationships();
-  }, [selectedNode, entityData, apiClient]);
+  }, [selectedNode, entityData, activeTab, apiClient, isMounted]);
 
-  // Fetch activity history when entity data is loaded
+  // Optimized fetch for activity history
   useEffect(() => {
-    if (!selectedNode || !entityData) return;
+    // Skip activity history if feature flag is disabled
+    // or if activity tab has never been viewed and isn't active
+    if (
+      !selectedNode || 
+      !entityData || 
+      !flags.enableActivityTimeline ||
+      (!viewedTabsRef.current.has('activity') && activeTab !== 'activity')
+    ) {
+      return;
+    }
 
     const fetchActivityHistory = async () => {
       setIsActivityLoading(true);
       try {
-        // Placeholder for future API call
-        // This would be a real API call in the future
-        // const response = await apiClient.get(`/activities?entityType=${selectedNode.type}&entityId=${selectedNode.id}`);
-        // setActivityHistory(response.data || []);
+        // Check cache first
+        const cacheKey = `activity:${selectedNode.type}:${selectedNode.id}`;
+        const cachedActivities = getCachedEntity(cacheKey);
+        
+        if (cachedActivities) {
+          setActivityHistory(cachedActivities);
+          setIsActivityLoading(false);
+          return;
+        }
+        
+        // Try to use real API if available
+        try {
+          const response = await apiClient.get(`/activities?entityType=${selectedNode.type.toLowerCase()}&entityId=${selectedNode.id}`);
+          if (response && response.data) {
+            setActivityHistory(response.data);
+            
+            // Cache the result
+            cacheEntity(cacheKey, response.data);
+            
+            setIsActivityLoading(false);
+            return;
+          } 
+        } catch (apiErr) {
+          // Silent fail and fall back to mock data
+          console.debug('API not available for activity history, using mock data');
+        }
         
         // Enhanced mock data with more activities to demonstrate timeline - now properly typed
         const mockActivities: Activity[] = [
@@ -266,67 +480,24 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         }
         
         setActivityHistory(mockActivities);
+        
+        // Cache the mock activities too
+        cacheEntity(cacheKey, mockActivities);
       } catch (err) {
         console.error('Error fetching activity history:', err);
         setActivityHistory([]);
       } finally {
-        setIsActivityLoading(false);
+        if (isMounted()) {
+          setIsActivityLoading(false);
+        }
       }
     };
 
     fetchActivityHistory();
-  }, [selectedNode, entityData, apiClient]);
+  }, [selectedNode, entityData, apiClient, flags.enableActivityTimeline, activeTab, isMounted]);
 
-  // Fetch entity suggestions when entity data is loaded
-  useEffect(() => {
-    if (!selectedNode || !entityData) return;
-
-    const fetchSuggestions = async () => {
-      setIsSuggestionsLoading(true);
-      try {
-        // Placeholder for future API call
-        // This would be a real API call in the future
-        // const response = await apiClient.get(`/${selectedNode.type}s/${selectedNode.id}/suggestions`);
-        // setSuggestions(response.data || []);
-        
-        // Enhanced mock data with sample suggestions
-        const mockSuggestions = [
-          {
-            id: 'sugg-1',
-            type: MapNodeTypeEnum.USER,
-            label: 'Emily Chen',
-            reason: 'Frequently collaborates on similar projects'
-          },
-          {
-            id: 'sugg-2',
-            type: MapNodeTypeEnum.PROJECT,
-            label: 'Q3 Platform Update',
-            reason: 'Aligned to same strategic goals'
-          },
-          {
-            id: 'sugg-3',
-            type: MapNodeTypeEnum.TEAM,
-            label: 'Research Team',
-            reason: 'Shares multiple team members'
-          }
-        ];
-        
-        // Only show suggestions for certain entity types
-        if (['USER', 'PROJECT', 'TEAM'].includes(selectedNode.type)) {
-          setSuggestions(mockSuggestions);
-        } else {
-          setSuggestions([]);
-        }
-      } catch (err) {
-        console.error('Error fetching suggestions:', err);
-        setSuggestions([]);
-      } finally {
-        setIsSuggestionsLoading(false);
-      }
-    };
-
-    fetchSuggestions();
-  }, [selectedNode, entityData, apiClient]);
+  // ML-based Entity suggestions are now handled directly by the EntitySuggestionsContainer component
+  // which uses the useEntitySuggestions hook internally
   
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigation = useCallback((item: NavHistoryItem) => {
@@ -338,21 +509,23 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
       data: {} // The data will be loaded from the cache
     };
     
-    // Navigate to the selected node
-    onNodeClick(item.nodeId);
+    // Navigate to the selected node - with null check
+    if (onNodeClick) {
+      onNodeClick(item.nodeId);
+    }
     
     // Note: We don't need to update navHistory here as that will
     // happen automatically when the selectedNode changes
   }, [onNodeClick]);
 
-  // Event handlers for navigation and action events
+  // Event handlers for navigation and action events (memoized)
   const handleNodeNavigation = useCallback((e: Event) => {
     const event = e as CustomEvent;
     if (event.detail && event.detail.nodeId) {
-      console.log('Navigate to node:', event.detail);
-      
-      // Navigate to the node
-      onNodeClick(event.detail.nodeId);
+      // Navigate to the node - with null check
+      if (onNodeClick) {
+        onNodeClick(event.detail.nodeId);
+      }
       
       // Navigation history is updated in the useEffect that depends on selectedNode
     }
@@ -360,18 +533,22 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   
   const handleEntityAction = useCallback((e: Event) => {
     const event = e as CustomEvent;
-    if (event.detail) {
-      console.log('Entity action triggered:', event.detail);
-      // Here you would perform the actual action
-      // For example, if action is "Edit", you would open an edit modal
-    }
+    // Here you would perform the actual action
+    // For example, if action is "Edit", you would open an edit modal
   }, []);
 
   const handleSuggestionClick = useCallback((suggestionId: string, label: string) => {
-    // Navigate to the suggested entity
-    console.log('Navigate to suggestion:', suggestionId);
-    onNodeClick(suggestionId);
+    // Navigate to the suggested entity - with null check
+    if (onNodeClick) {
+      onNodeClick(suggestionId);
+    }
   }, [onNodeClick]);
+  
+  // Track tab changes
+  const handleTabChange = useCallback((tab: PanelTabType) => {
+    setActiveTab(tab);
+    viewedTabsRef.current.add(tab);
+  }, []);
   
   // Set up event listeners
   useEffect(() => {
@@ -386,13 +563,19 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     };
   }, [handleNodeNavigation, handleEntityAction]);
 
-  // Render the appropriate panel based on entity type using type guards
-  const renderEntityPanel = () => {
+  // Render the appropriate panel based on entity type using memoization
+  const renderEntityPanel = useCallback(() => {
     if (!selectedNode || !entityData) return null;
 
-    // Using type guards to ensure proper typing
+    // Using type guards to ensure proper typing with memoization
     if (isUserEntity(entityData) && selectedNode.type === MapNodeTypeEnum.USER) {
-      return <UserPanel data={entityData} selectedNode={selectedNode} />;
+      return (
+        <React.Profiler id="UserPanel" onRender={(id, phase, actualDuration) => {
+          if (actualDuration > 10) console.debug(`Slow render (${actualDuration.toFixed(1)}ms): ${id}, ${phase}`);
+        }}>
+          <UserPanel data={entityData} selectedNode={selectedNode} />
+        </React.Profiler>
+      );
     } 
     
     if (isTeamEntity(entityData) && selectedNode.type === MapNodeTypeEnum.TEAM) {
@@ -404,8 +587,8 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         <ProjectPanel 
           data={entityData} 
           selectedNode={selectedNode}
-          projectOverlaps={projectOverlaps}
-          getProjectNameById={getProjectNameById}
+          projectOverlaps={memoizedOverlaps}
+          getProjectNameById={memoizedGetProjectName}
         />
       );
     }
@@ -421,42 +604,101 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         selectedNode={selectedNode}
       />
     );
+  }, [entityData, selectedNode, memoizedOverlaps, memoizedGetProjectName]);
+
+  // Define loading animation using framer-motion
+  const pulseAnimation = {
+    animate: {
+      opacity: [0.6, 1, 0.6],
+      scale: [0.98, 1, 0.98],
+      transition: {
+        duration: 1.5,
+        ease: "easeInOut",
+        repeat: Infinity
+      }
+    }
   };
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Render loading state
   if (isLoading) {
     return (
-      <Box 
-        width="100%" 
-        height="100%" 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="center"
-        bg={bgColor}
-        borderLeft="1px solid"
-        borderColor={borderColor}
-      >
-        <Spinner size="xl" />
-      </Box>
+      <ScaleFade in={true} initialScale={0.96}>
+        <Box 
+          width="100%" 
+          height="100%" 
+          display="flex" 
+          alignItems="center" 
+          justifyContent="center"
+          flexDirection="column"
+          gap={4}
+          bg={bgColor}
+          borderLeft="1px solid"
+          borderColor={borderColor}
+        >
+          {!prefersReducedMotion ? (
+            <>
+              <motion.div animate={pulseAnimation.animate}>
+                <Spinner 
+                  size="xl" 
+                  thickness="4px"
+                  speed="0.8s"
+                  color="blue.500" 
+                />
+              </motion.div>
+              <motion.div animate={pulseAnimation.animate}>
+                <Box fontSize="sm" color="gray.500" fontWeight="medium">
+                  Loading details...
+                </Box>
+              </motion.div>
+            </>
+          ) : (
+            <>
+              <Spinner 
+                size="xl" 
+                thickness="4px"
+                speed="0.8s"
+                color="blue.500" 
+              />
+              <Box fontSize="sm" color="gray.500" fontWeight="medium">
+                Loading details...
+              </Box>
+            </>
+          )}
+        </Box>
+      </ScaleFade>
     );
   }
 
   // Render error state
   if (error) {
     return (
-      <Box 
-        width="100%" 
-        height="100%"
-        p={4}
-        bg={bgColor}
-        borderLeft="1px solid"
-        borderColor={borderColor}
-      >
-        <Alert status="error">
-          <AlertIcon />
-          {error}
-        </Alert>
-      </Box>
+      <SlideFade in={true} offsetY={20}>
+        <Box 
+          width="100%" 
+          height="100%"
+          p={4}
+          bg={bgColor}
+          borderLeft="1px solid"
+          borderColor={borderColor}
+        >
+          <motion.div
+            initial={{ x: -5, opacity: 0.8 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 100 }}
+          >
+            <Alert 
+              status="error" 
+              variant="left-accent" 
+              borderRadius="md"
+              boxShadow="sm"
+            >
+              <AlertIcon />
+              {error}
+            </Alert>
+          </motion.div>
+        </Box>
+      </SlideFade>
     );
   }
 
@@ -466,10 +708,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   }
 
   // Reference for focus management
-  const panelRef = React.useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Focus the panel when it opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedNode && panelRef.current) {
       // Focus the panel or the first focusable element inside it
       panelRef.current.focus();
@@ -492,8 +734,74 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     }
   }, [selectedNode, onClose]);
 
+  // Define animations for entity transitions
+  const entityTransitionVariants = {
+    hidden: { opacity: 0, y: 10, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
+  };
+
+  // Animation variants for content sections
+  const contentVariants = {
+    hidden: { opacity: 0, y: 5 },
+    visible: (custom: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: { 
+        delay: custom * 0.1,
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    })
+  };
+  
+  // Track when the panel has fully loaded for smoother animations
+  const [isPanelMounted, setIsPanelMounted] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsPanelMounted(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Get entity-specific background accent color - memoized for performance
+  const getEntityAccentColor = useMemo(() => {
+    if (!selectedNode) return useColorModeValue('gray.50', 'gray.800');
+    
+    switch(selectedNode.type) {
+      case MapNodeTypeEnum.USER: return useColorModeValue('blue.50', 'blue.900');
+      case MapNodeTypeEnum.TEAM: return useColorModeValue('green.50', 'green.900');
+      case MapNodeTypeEnum.PROJECT: return useColorModeValue('purple.50', 'purple.900');
+      case MapNodeTypeEnum.GOAL: return useColorModeValue('orange.50', 'orange.900');
+      case MapNodeTypeEnum.DEPARTMENT: return useColorModeValue('cyan.50', 'cyan.900');
+      case MapNodeTypeEnum.KNOWLEDGE_ASSET: return useColorModeValue('yellow.50', 'yellow.900');
+      default: return useColorModeValue('gray.50', 'gray.800');
+    }
+  }, [selectedNode]);
+
+  // Track previous node for transitions
+  const prevNodeRef = useRef<MapNode | null>(null);
+  const isNewEntityType = prevNodeRef.current?.type !== selectedNode?.type;
+  
+  useEffect(() => {
+    prevNodeRef.current = selectedNode;
+  }, [selectedNode]);
+
+  // Track tab changes for animations
+  const [prevTab, setPrevTab] = useState<PanelTabType>(activeTab);
+  useEffect(() => {
+    setPrevTab(activeTab);
+  }, [activeTab]);
+  
+  // Optimized relationships rendering - limit to prevent slowdowns with large datasets
+  const optimizedRelationships = useMemo(() => {
+    return relationships.slice(0, MAX_VISIBLE_RELATIONSHIPS);
+  }, [relationships]);
+  
   return (
-    <Fade in={true}>
+    <ScaleFade 
+      in={true} 
+      initialScale={0.92}
+      transition={{ enter: { duration: 0.3, ease: "easeOut" } }}
+    >
       <Box
         width="100%"
         height="100%"
@@ -512,103 +820,209 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           outline: "none", 
           boxShadow: "none"
         }}
+        position="relative"
+        transition="background-color 0.3s ease-in-out"
       >
-        {/* Header */}
-        <Box>
-          <PanelHeader 
-            label={selectedNode.label}
-            type={selectedNode.type}
-            onClose={onClose}
-          />
-          
-          {/* Navigation breadcrumb - only show if we have navigation history */}
-          {navHistory.length > 1 && (
-            <Box px={4} py={2} borderBottomWidth="1px" borderColor={borderColor}>
-              <BreadcrumbNav 
-                history={navHistory}
-                onNavigate={handleBreadcrumbNavigation}
-                maxDisplayed={4}
-                fontSize="xs"
-              />
-            </Box>
-          )}
-        </Box>
-
-        {/* Tab navigation */}
-        <PanelTabs 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
+        {/* Entity type accent background */}
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          height="8px"
+          bg={getEntityAccentColor}
+          transition="background-color 0.5s ease"
+          opacity={0.7}
         />
+        
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <Box>
+            <PanelHeader 
+              label={selectedNode.label}
+              type={selectedNode.type}
+              onClose={onClose}
+            />
+            
+            {/* Navigation breadcrumb - only show if we have navigation history */}
+            {navHistory.length > 1 && (
+              <SlideFade in={true} offsetY={-10}>
+                <Box px={4} py={2} borderBottomWidth="1px" borderColor={borderColor}>
+                  <BreadcrumbNav 
+                    history={navHistory}
+                    onNavigate={handleBreadcrumbNavigation}
+                    maxDisplayed={4}
+                    fontSize="xs"
+                  />
+                </Box>
+              </SlideFade>
+            )}
+          </Box>
+        </motion.div>
 
-        {/* Panel Content */}
+        {/* Tab navigation with animation */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <PanelTabs 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange}
+          />
+        </motion.div>
+
+        {/* Panel Content - optimized with lazy loading */}
         <Box 
           flex="1" 
           overflowY="auto" 
           p={4}
-          role="tabpanel"
-          id={`panel-${activeTab}`}
-          aria-labelledby={`tab-${activeTab}`}
+          position="relative"
         >
-          {activeTab === 'details' && (
-            <VStack 
-              spacing={6} 
-              align="stretch"
-              id="panel-details"
+          <AnimatePresence mode="wait">
+            {/* Details Tab Content - lazy loaded */}
+            <LazyPanel
+              active={activeTab === 'details'}
+              tabId="details"
+              key="details-panel"
+              keepMounted={true}
             >
-              {/* Entity-specific details */}
-              {renderEntityPanel()}
-              
-              {/* Suggestions only shown in details tab */}
-              <EntitySuggestions 
-                suggestions={suggestions}
-                onSuggestionClick={handleSuggestionClick}
-              />
-              
-              {/* Recently viewed entities - only shown when we have navigation history */}
-              {navHistory.length > 1 && (
-                <RecentlyViewedEntities 
-                  items={navHistory} 
-                  onEntityClick={handleBreadcrumbNavigation}
-                  maxItems={4}
-                  currentEntityId={selectedNode.id}
-                />
-              )}
+              <motion.div
+                key={`details-${selectedNode.id}`}
+                initial="hidden"
+                animate={isPanelMounted ? "visible" : "hidden"}
+                exit="exit"
+                variants={entityTransitionVariants}
+              >
+                <VStack 
+                  spacing={6} 
+                  align="stretch"
+                  id="panel-details"
+                >
+                  {/* Entity-specific details */}
+                  <motion.div 
+                    variants={contentVariants}
+                    custom={0}
+                    key={`entity-panel-${selectedNode.id}`}
+                  >
+                    {renderEntityPanel()}
+                  </motion.div>
+                  
+                  {/* ML-based entity suggestions only shown in details tab if feature flag is enabled */}
+                  {flags.enableSuggestions && shouldLoadSecondary && (
+                    <motion.div variants={contentVariants} custom={1}>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <LazyEntitySuggestionsContainer
+                          entityId={selectedNode.id}
+                          onSuggestionClick={handleSuggestionClick}
+                          viewMode="compact"
+                          options={{
+                            maxResults: 8,
+                            excludeIds: navHistory.map(item => item.nodeId),
+                            refreshOnFeedback: true
+                          }}
+                        />
+                      </Suspense>
+                    </motion.div>
+                  )}
+                  
+                  {/* Recently viewed entities - only shown when we have navigation history */}
+                  {navHistory.length > 1 && shouldLoadTertiary && (
+                    <motion.div variants={contentVariants} custom={2}>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <LazyRecentlyViewedEntities 
+                          items={navHistory} 
+                          onEntityClick={handleBreadcrumbNavigation}
+                          maxItems={4}
+                          currentEntityId={selectedNode.id}
+                        />
+                      </Suspense>
+                    </motion.div>
+                  )}
 
-              {/* Action Buttons */}
-              <ActionButtons entityType={selectedNode.type} entityId={selectedNode.id} />
-            </VStack>
-          )}
-          
-          {activeTab === 'related' && (
-            <VStack 
-              spacing={6} 
-              align="stretch"
-              id="panel-related"
+                  {/* Action Buttons */}
+                  <motion.div 
+                    variants={contentVariants} 
+                    custom={3}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <ActionButtons 
+                      entityType={selectedNode.type} 
+                      entityId={selectedNode.id} 
+                    />
+                  </motion.div>
+                </VStack>
+              </motion.div>
+            </LazyPanel>
+            
+            {/* Related Tab Content - lazily loaded */}
+            <LazyPanel
+              active={activeTab === 'related'}
+              tabId="related"
+              key="related-panel"
             >
-              <RelationshipList 
-                relationships={relationships} 
-                isLoading={isRelationshipsLoading} 
-                entityType={selectedNode.type}
-              />
-            </VStack>
-          )}
-          
-          {activeTab === 'activity' && (
-            <VStack 
-              spacing={6} 
-              align="stretch"
-              id="panel-activity"
+              <motion.div
+                key={`related-${selectedNode.id}`}
+                initial="hidden"
+                animate="visible"
+                variants={contentVariants}
+                custom={0}
+              >
+                <VStack 
+                  spacing={6} 
+                  align="stretch"
+                  id="panel-related"
+                >
+                  <RelationshipList 
+                    relationships={optimizedRelationships} 
+                    isLoading={isRelationshipsLoading} 
+                    entityType={selectedNode.type}
+                  />
+                </VStack>
+              </motion.div>
+            </LazyPanel>
+            
+            {/* Activity Tab Content - lazily loaded */}
+            <LazyPanel
+              active={activeTab === 'activity'}
+              tabId="activity"
+              key="activity-panel"
             >
-              <ActivityTimeline 
-                activities={activityHistory} 
-                isLoading={isActivityLoading} 
-              />
-            </VStack>
-          )}
+              <motion.div
+                key={`activity-${selectedNode.id}`}
+                initial="hidden" 
+                animate="visible"
+                variants={contentVariants}
+                custom={0}
+              >
+                <VStack 
+                  spacing={6} 
+                  align="stretch"
+                  id="panel-activity"
+                >
+                  <ActivityTimeline 
+                    activities={activityHistory} 
+                    isLoading={isActivityLoading} 
+                  />
+                </VStack>
+              </motion.div>
+            </LazyPanel>
+          </AnimatePresence>
         </Box>
       </Box>
-    </Fade>
+    </ScaleFade>
   );
 };
 
-export default ContextPanel;
+// Use React.memo with custom comparison function for optimal re-rendering
+export default React.memo(ContextPanel, (prevProps, nextProps) => {
+  // Only re-render if the selected node has changed
+  if (!prevProps.selectedNode && !nextProps.selectedNode) return true;
+  if (!prevProps.selectedNode || !nextProps.selectedNode) return false;
+  return prevProps.selectedNode.id === nextProps.selectedNode.id;
+});

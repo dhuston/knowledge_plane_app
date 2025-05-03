@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
 import {
   Box,
   VStack,
@@ -24,8 +24,23 @@ import {
   MenuItem,
   Tag,
   TagLabel,
-  TagCloseButton,
+  Select,
+  Collapse,
+  Grid,
+  GridItem,
+  Progress,
+  Center,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
+  VisuallyHidden,
+  ScaleFade,
+  SlideFade,
+  usePrefersReducedMotion
 } from '@chakra-ui/react';
+import { motion, keyframes } from 'framer-motion';
 import { 
   FiArrowRight, 
   FiUsers, 
@@ -37,34 +52,109 @@ import {
   FiFilter, 
   FiChevronDown,
   FiBook,
-  FiBriefcase
+  FiBriefcase,
+  FiChevronRight,
+  FiSettings,
+  FiExternalLink,
+  FiList,
+  FiGrid,
+  FiMoreHorizontal,
+  FiPlus,
+  FiStar,
+  FiCalendar,
+  FiMessageSquare
 } from 'react-icons/fi';
 
 import { MapNodeTypeEnum, MapEdgeTypeEnum } from '../../types/map';
 import { Relationship } from '../../types/entities';
 
+// Extended relationship interface for internal use
+interface EnhancedRelationship extends Relationship {
+  nodeId?: string; // Connected node ID
+  nodeType?: MapNodeTypeEnum; // Type of the connected node
+  name?: string; // Alternative name
+  strength?: number; // Relationship strength (0-1)
+  lastInteraction?: string; // Last interaction date
+  frequency?: number; // Interaction frequency (0-1)
+  metadata?: Record<string, unknown>; // Additional metadata
+}
+
+// Props including optional callback handler for relationship selection
 interface RelationshipListProps {
   relationships: Relationship[];
   isLoading: boolean;
   entityType: MapNodeTypeEnum;
+  onSelectRelationship?: (relationship: EnhancedRelationship) => void;
 }
 
+// Sort options for relationships
+type SortOption = 'alphabetical' | 'recent' | 'strength' | 'frequency';
+
+// Group options for relationships
+type GroupOption = 'type' | 'nodeType' | 'status' | 'none';
+
+// View mode options
+type ViewMode = 'list' | 'grid' | 'compact';
+
+/**
+ * RelationshipList Component
+ * Displays and manages relationship data with filtering, sorting, and grouping capabilities
+ */
 const RelationshipList: React.FC<RelationshipListProps> = ({
   relationships,
   isLoading,
   entityType,
+  onSelectRelationship
 }) => {
+  // State for UI controls
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>('alphabetical');
+  const [groupBy, setGroupBy] = useState<GroupOption>('type');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   
+  // Refs for keyboard navigation
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Theme values
   const headerBg = useColorModeValue('gray.50', 'gray.700');
   const sectionBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
+  const selectedBg = useColorModeValue('blue.50', 'blue.900');
+  const iconBg = useColorModeValue('gray.100', 'gray.700');
+  const strongRelColor = useColorModeValue('blue.500', 'blue.300');
+  const weakRelColor = useColorModeValue('gray.300', 'gray.600');
+  
+  // Enhanced relationships with additional computed properties
+  const enhancedRelationships = useMemo((): EnhancedRelationship[] => {
+    return relationships.map(rel => {
+      // Extract actual node ID (assuming we're looking from source perspective)
+      const nodeId = rel.target || '';
+      const nodeType = rel.target_type || MapNodeTypeEnum.USER;
+      
+      // Generate random strength for demo (in real app, this would come from API)
+      const strength = Math.random();
+      const frequency = Math.random();
+      const lastInteraction = new Date(
+        Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
+      ).toISOString();
+      
+      return {
+        ...rel,
+        nodeId,
+        nodeType,
+        strength,
+        frequency,
+        lastInteraction
+      };
+    });
+  }, [relationships]);
   
   // Filter relationships based on search and type filters
   const filteredRelationships = useMemo(() => {
-    return relationships.filter(rel => {
+    return enhancedRelationships.filter(rel => {
       // Apply search filter
       const matchesSearch = !searchQuery || 
         (rel.label || rel.name || '')
@@ -77,44 +167,95 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
         
       return matchesSearch && matchesTypeFilter;
     });
-  }, [relationships, searchQuery, activeFilters]);
+  }, [enhancedRelationships, searchQuery, activeFilters]);
   
-  // Group relationships by type
-  const groupedRelationships = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    
-    filteredRelationships.forEach(rel => {
-      const type = rel.type || 'OTHER';
-      if (!groups[type]) {
-        groups[type] = [];
+  // Sort relationships based on selected option
+  const sortedRelationships = useMemo(() => {
+    return [...filteredRelationships].sort((a, b) => {
+      switch (sortBy) {
+        case 'alphabetical':
+          return (a.label || a.name || '').localeCompare(b.label || b.name || '');
+        case 'recent':
+          return new Date(b.lastInteraction || '').getTime() -
+                new Date(a.lastInteraction || '').getTime();
+        case 'strength':
+          return (b.strength || 0) - (a.strength || 0);
+        case 'frequency':
+          return (b.frequency || 0) - (a.frequency || 0);
+        default:
+          return 0;
       }
-      groups[type].push(rel);
+    });
+  }, [filteredRelationships, sortBy]);
+  
+  // Group relationships based on selected option
+  const groupedRelationships = useMemo(() => {
+    if (groupBy === 'none') {
+      return { 'All Relationships': sortedRelationships };
+    }
+    
+    const groups: Record<string, EnhancedRelationship[]> = {};
+    
+    sortedRelationships.forEach(rel => {
+      let key = 'OTHER';
+      
+      switch (groupBy) {
+        case 'type':
+          key = rel.type || 'OTHER';
+          break;
+        case 'nodeType':
+          key = rel.nodeType || 'UNKNOWN';
+          break;
+        case 'status':
+          key = (rel.metadata?.status as string) || 'Unknown';
+          break;
+        default:
+          key = 'All';
+      }
+      
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(rel);
     });
     
     return groups;
-  }, [filteredRelationships]);
+  }, [sortedRelationships, groupBy]);
+  
+  // Initialize expanded groups state when groups change
+  React.useEffect(() => {
+    const initialExpandedState: Record<string, boolean> = {};
+    Object.keys(groupedRelationships).forEach(group => {
+      // Expand by default if few groups or few relationships total
+      const shouldExpandByDefault = 
+        Object.keys(groupedRelationships).length <= 3 || 
+        sortedRelationships.length < 8;
+      
+      initialExpandedState[group] = expandedGroups[group] ?? shouldExpandByDefault;
+    });
+    setExpandedGroups(initialExpandedState);
+  }, [groupedRelationships, expandedGroups, sortedRelationships.length]);
+  
+  // Toggle group expansion
+  const toggleGroupExpansion = (groupKey: string) => {
+    setExpandedGroups({
+      ...expandedGroups,
+      [groupKey]: !expandedGroups[groupKey]
+    });
+  };
   
   // Get relationship type color
-  const getRelationshipColor = (type: MapEdgeTypeEnum): string => {
+  const getRelationshipColor = (type: MapEdgeTypeEnum | string): string => {
     switch (type) {
-      case MapEdgeTypeEnum.REPORTS_TO:
-        return 'pink';
-      case MapEdgeTypeEnum.MEMBER_OF:
-        return 'blue';
-      case MapEdgeTypeEnum.LEADS:
-        return 'red';
-      case MapEdgeTypeEnum.OWNS:
-        return 'purple';
-      case MapEdgeTypeEnum.PARTICIPATES_IN:
-        return 'cyan';
-      case MapEdgeTypeEnum.ALIGNED_TO:
-        return 'green';
-      case MapEdgeTypeEnum.PARENT_OF:
-        return 'orange';
-      case MapEdgeTypeEnum.RELATED_TO:
-        return 'gray';
-      default:
-        return 'gray';
+      case MapEdgeTypeEnum.REPORTS_TO: return 'pink';
+      case MapEdgeTypeEnum.MEMBER_OF: return 'blue';
+      case MapEdgeTypeEnum.LEADS: return 'red';
+      case MapEdgeTypeEnum.OWNS: return 'purple';
+      case MapEdgeTypeEnum.PARTICIPATES_IN: return 'cyan';
+      case MapEdgeTypeEnum.ALIGNED_TO: return 'green';
+      case MapEdgeTypeEnum.PARENT_OF: return 'orange';
+      case MapEdgeTypeEnum.RELATED_TO: return 'gray';
+      default: return 'gray';
     }
   };
   
@@ -128,38 +269,26 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
   };
   
   // Get icon for node type
-  const getNodeIcon = (type: MapNodeTypeEnum) => {
+  const getNodeIcon = (type: MapNodeTypeEnum | string) => {
     switch (type) {
-      case MapNodeTypeEnum.USER:
-        return FiUser;
-      case MapNodeTypeEnum.TEAM:
-        return FiUsers;
-      case MapNodeTypeEnum.PROJECT:
-        return FiFolder;
-      case MapNodeTypeEnum.GOAL:
-        return FiTarget;
-      case MapNodeTypeEnum.KNOWLEDGE_ASSET:
-        return FiBook;
-      case MapNodeTypeEnum.DEPARTMENT:
-        return FiBriefcase;
-      default:
-        return FiFlag;
+      case MapNodeTypeEnum.USER: return FiUser;
+      case MapNodeTypeEnum.TEAM: return FiUsers;
+      case MapNodeTypeEnum.PROJECT: return FiFolder;
+      case MapNodeTypeEnum.GOAL: return FiTarget;
+      case MapNodeTypeEnum.KNOWLEDGE_ASSET: return FiBook;
+      case MapNodeTypeEnum.DEPARTMENT: return FiBriefcase;
+      default: return FiFlag;
     }
   };
 
   // Get header text based on entity type
   const getHeaderText = (): string => {
     switch (entityType) {
-      case MapNodeTypeEnum.USER:
-        return 'Connections & Teams';
-      case MapNodeTypeEnum.TEAM:
-        return 'Members & Projects';
-      case MapNodeTypeEnum.PROJECT:
-        return 'Team & Contributors';
-      case MapNodeTypeEnum.GOAL:
-        return 'Aligned Projects';
-      default:
-        return 'Relationships';
+      case MapNodeTypeEnum.USER: return 'Connections & Teams';
+      case MapNodeTypeEnum.TEAM: return 'Members & Projects';
+      case MapNodeTypeEnum.PROJECT: return 'Team & Contributors';
+      case MapNodeTypeEnum.GOAL: return 'Aligned Projects';
+      default: return 'Relationships';
     }
   };
   
@@ -175,225 +304,783 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
   // Get available node types for filtering
   const availableNodeTypes = useMemo(() => {
     const types = new Set<string>();
-    relationships.forEach(rel => {
+    enhancedRelationships.forEach(rel => {
       if (rel.nodeType) types.add(rel.nodeType);
     });
     return Array.from(types);
-  }, [relationships]);
+  }, [enhancedRelationships]);
+  
+  // Handle relationship selection
+  const handleSelectRelationship = useCallback((rel: EnhancedRelationship) => {
+    // Call the passed callback if provided
+    if (onSelectRelationship) {
+      onSelectRelationship(rel);
+    } else {
+      // Default behavior: emit navigation event
+      const navigateEvent = new CustomEvent('navigate-to-node', {
+        detail: {
+          nodeId: rel.nodeId,
+          nodeType: rel.nodeType || 'UNKNOWN',
+          label: rel.label || rel.name || 'Unknown'
+        },
+        bubbles: true
+      });
+      document.dispatchEvent(navigateEvent);
+    }
+  }, [onSelectRelationship]);
+  
+  // Format date string for display
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, { 
+      month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+    });
+  };
+  
+  // Get visual strength indicator
+  const getStrengthIndicator = (strength?: number) => {
+    if (strength === undefined) return null;
+    
+    return (
+      <Tooltip label={`Relationship strength: ${Math.round((strength || 0) * 100)}%`} placement="top">
+        <Box width="100%" mt={1}>
+          <Progress 
+            value={(strength || 0) * 100} 
+            size="xs" 
+            colorScheme={strength > 0.7 ? "green" : strength > 0.3 ? "blue" : "gray"}
+            borderRadius="full"
+          />
+        </Box>
+      </Tooltip>
+    );
+  };
 
+  // Define pulse animation
+  const pulseAnimation = {
+    animate: {
+      scale: [0.97, 1, 0.97],
+      opacity: [0.6, 0.9, 0.6],
+      transition: {
+        duration: 1.5,
+        ease: "easeInOut",
+        repeat: Infinity,
+      }
+    }
+  };
+  
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.07
+      }
+    }
+  };
+  
+  const groupVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut" 
+      }
+    }
+  };
+  
+  const listItemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: i * 0.1,
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    })
+  };
+
+  // RENDERING COMPONENTS
+  
+  // Loading state with animated skeleton
   if (isLoading) {
+    const placeholderItems = [1, 2, 3];
+    
     return (
       <VStack spacing={4} align="stretch">
         <Box p={3} bg={headerBg} borderRadius="md">
           <Heading size="sm">{getHeaderText()}</Heading>
         </Box>
-        <Box textAlign="center" py={4}>
-          <Spinner size="md" />
-        </Box>
+        
+        <SlideFade in={true} offsetY={20}>
+          <VStack spacing={3} align="stretch">
+            {placeholderItems.map((item, index) => (
+              <motion.div
+                key={`skeleton-${index}`}
+                custom={index}
+                initial="hidden"
+                animate="visible"
+                variants={listItemVariants}
+              >
+                <Flex 
+                  p={4} 
+                  borderWidth="1px" 
+                  borderRadius="md" 
+                  alignItems="center"
+                  animate={prefersReducedMotion ? {} : pulseAnimation.animate}
+                  bg={sectionBg}
+                >
+                  <Box 
+                    borderRadius="full" 
+                    width="40px" 
+                    height="40px" 
+                    bg="gray.200" 
+                    mr={3}
+                    _dark={{ bg: "gray.700" }} 
+                  />
+                  <Box flex="1">
+                    <Box 
+                      height="12px" 
+                      width={`${Math.random() * 40 + 40}%`} 
+                      bg="gray.200" 
+                      _dark={{ bg: "gray.700" }}
+                      mb={2}
+                      borderRadius="md"
+                    />
+                    <Box 
+                      height="8px" 
+                      width={`${Math.random() * 30 + 20}%`}
+                      bg="gray.200"
+                      _dark={{ bg: "gray.700" }}
+                      borderRadius="md"
+                    />
+                  </Box>
+                </Flex>
+              </motion.div>
+            ))}
+          </VStack>
+        </SlideFade>
       </VStack>
     );
   }
 
+  // Empty state
   if (!relationships || relationships.length === 0) {
     return (
       <VStack spacing={4} align="stretch">
         <Box p={3} bg={headerBg} borderRadius="md">
           <Heading size="sm">{getHeaderText()}</Heading>
         </Box>
-        <Text color="gray.500" fontSize="sm" textAlign="center" py={2}>
-          No relationships found
-        </Text>
+        <ScaleFade in={true} initialScale={0.9}>
+          <Center 
+            p={6} 
+            borderWidth="1px" 
+            borderRadius="md" 
+            borderStyle="dashed"
+            transition="all 0.3s ease-in-out"
+            _hover={{ 
+              borderColor: 'blue.400',
+              boxShadow: 'sm'
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{
+                type: "spring",
+                stiffness: 260,
+                damping: 20,
+                delay: 0.1
+              }}
+            >
+              <VStack spacing={3}>
+                <motion.div
+                  animate={{ 
+                    y: [0, -5, 0],
+                    transition: { 
+                      repeat: Infinity, 
+                      repeatType: "reverse", 
+                      duration: 2,
+                      ease: "easeInOut"
+                    } 
+                  }}
+                >
+                  <Icon as={FiUsers} boxSize={10} color="gray.400" />
+                </motion.div>
+                <Text color="gray.500" fontSize="sm" textAlign="center">
+                  No relationships found
+                </Text>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Button 
+                    leftIcon={<FiPlus />} 
+                    size="sm" 
+                    variant="outline"
+                    colorScheme="blue"
+                    _hover={{
+                      transform: "translateY(-2px)",
+                      shadow: "md",
+                    }}
+                    transition="all 0.2s"
+                  >
+                    Add connection
+                  </Button>
+                </motion.div>
+              </VStack>
+            </motion.div>
+          </Center>
+        </ScaleFade>
       </VStack>
     );
   }
 
-  return (
-    <VStack spacing={4} align="stretch">
-      <Box p={3} bg={headerBg} borderRadius="md">
-        <Heading size="sm">{getHeaderText()}</Heading>
-      </Box>
-      
-      {/* Search and filter controls */}
-      <Box mb={2}>
-        <HStack spacing={2} mb={2}>
-          <InputGroup size="sm">
-            <InputLeftElement pointerEvents="none">
-              <FiSearch color="gray.300" />
-            </InputLeftElement>
-            <Input 
-              placeholder="Search relationships" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              borderRadius="md"
-            />
-          </InputGroup>
-          
-          <Menu closeOnSelect={false}>
-            <MenuButton
-              as={IconButton}
-              aria-label="Filter relationships"
-              icon={<FiFilter />}
-              variant="outline"
-              size="sm"
-              colorScheme={activeFilters.length > 0 ? "blue" : undefined}
-            />
-            <MenuList minWidth="180px">
-              <MenuItem closeOnSelect={false} fontWeight="bold">Filter by Type</MenuItem>
-              <Divider />
-              {availableNodeTypes.map(type => (
-                <MenuItem 
-                  key={type} 
-                  closeOnSelect={false}
-                  onClick={() => toggleFilter(type)}
-                  icon={
-                    <Icon 
-                      as={getNodeIcon(type as MapNodeTypeEnum)} 
-                      color={activeFilters.includes(type) ? "blue.500" : undefined}
-                    />
-                  }
+  // Render the grid view component
+  const renderGridView = (rels: EnhancedRelationship[], colorScheme: string) => (
+    <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={2} p={2}>
+      {rels.map((rel, idx) => {
+        const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
+        return (
+          <Box
+            key={`${rel.nodeId || ''}-${idx}`}
+            p={3}
+            borderWidth="1px"
+            borderRadius="md"
+            _hover={{ 
+              bg: hoverBg,
+              borderColor: `${colorScheme}.400`
+            }}
+            onClick={() => handleSelectRelationship(rel)}
+            role="button"
+            tabIndex={0}
+            aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleSelectRelationship(rel);
+              }
+            }}
+          >
+            <VStack spacing={2} align="center">
+              <Center 
+                p={2} 
+                borderRadius="full" 
+                bg={`${colorScheme}.50`} 
+                color={`${colorScheme}.500`}
+                boxSize="40px"
+                _dark={{ 
+                  bg: `${colorScheme}.900`, 
+                  color: `${colorScheme}.200` 
+                }}
+              >
+                <Icon as={getNodeIcon(nodeType)} boxSize={4} />
+              </Center>
+              
+              <Text fontSize="sm" fontWeight="medium" noOfLines={1} textAlign="center">
+                {rel.label || rel.name || 'Unknown'}
+              </Text>
+              
+              <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                {getRelationshipName(nodeType)}
+              </Text>
+              
+              {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
+            </VStack>
+          </Box>
+        );
+      })}
+    </SimpleGrid>
+  );
+
+  // Render the compact view component
+  const renderCompactView = (rels: EnhancedRelationship[], colorScheme: string) => (
+    <Box p={2}>
+      <Flex flexWrap="wrap" gap={2}>
+        {rels.map((rel, idx) => {
+          const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
+          return (
+            <Tag
+              key={`${rel.nodeId || ''}-${idx}`}
+              size="md"
+              borderRadius="full"
+              colorScheme={rel.strength && rel.strength > 0.6 ? colorScheme : undefined}
+              variant={rel.strength && rel.strength > 0.6 ? "subtle" : "outline"}
+              cursor="pointer"
+              onClick={() => handleSelectRelationship(rel)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleSelectRelationship(rel);
+                }
+              }}
+            >
+              <Icon 
+                as={getNodeIcon(nodeType)} 
+                mr={1} 
+                boxSize={3} 
+              />
+              <TagLabel noOfLines={1}>
+                {rel.label || rel.name || 'Unknown'}
+              </TagLabel>
+            </Tag>
+          );
+        })}
+      </Flex>
+    </Box>
+  );
+
+  // Render the list view component
+  const renderListView = (rels: EnhancedRelationship[], colorScheme: string) => (
+    <Box>
+      {rels.map((rel, idx) => {
+        const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
+        return (
+          <Box 
+            key={`${rel.nodeId || ''}-${idx}`}
+            borderTopWidth={idx > 0 ? "1px" : "0"}
+            borderColor={borderColor}
+          >
+            <Grid 
+              templateColumns="auto 1fr auto"
+              gap={3}
+              p={3}
+              alignItems="center"
+              _hover={{ bg: hoverBg }}
+              onClick={() => handleSelectRelationship(rel)}
+              cursor="pointer"
+              role="button"
+              tabIndex={0}
+              aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleSelectRelationship(rel);
+                }
+              }}
+              borderLeftWidth="3px"
+              borderLeftColor={rel.strength && rel.strength > 0.7 ? 
+                `${colorScheme}.500` : 
+                "transparent"
+              }
+              pl={rel.strength && rel.strength > 0.7 ? 2 : 3}
+            >
+              {/* Entity icon */}
+              <GridItem>
+                <Center 
+                  p={2} 
+                  borderRadius="full" 
+                  bg={`${colorScheme}.50`} 
+                  color={`${colorScheme}.500`}
+                  _dark={{ 
+                    bg: `${colorScheme}.900`, 
+                    color: `${colorScheme}.200` 
+                  }}
                 >
-                  <HStack justifyContent="space-between" width="100%">
-                    <Text>{getRelationshipName(type)}</Text>
-                    {activeFilters.includes(type) && (
-                      <Badge colorScheme="blue">✓</Badge>
+                  <Icon as={getNodeIcon(nodeType)} boxSize={4} />
+                </Center>
+              </GridItem>
+              
+              {/* Entity details */}
+              <GridItem>
+                <VStack align="start" spacing={1}>
+                  <Flex alignItems="center" width="100%">
+                    <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
+                      {rel.label || rel.name || 'Unknown'}
+                    </Text>
+                    
+                    {rel.strength && rel.strength > 0.8 && (
+                      <Tooltip label="Strong relationship">
+                        <Icon as={FiStar} boxSize={3} color="yellow.500" ml={1} />
+                      </Tooltip>
+                    )}
+                  </Flex>
+                  
+                  <HStack spacing={3}>
+                    <Text fontSize="xs" color="gray.500">
+                      {getRelationshipName(nodeType)}
+                    </Text>
+                    
+                    {rel.lastInteraction && (
+                      <HStack spacing={1}>
+                        <Icon as={FiCalendar} boxSize={3} color="gray.500" />
+                        <Text fontSize="xs" color="gray.500">
+                          {formatDate(rel.lastInteraction)}
+                        </Text>
+                      </HStack>
                     )}
                   </HStack>
-                </MenuItem>
-              ))}
-            </MenuList>
-          </Menu>
-        </HStack>
-        
-        {/* Active filters */}
-        {activeFilters.length > 0 && (
-          <Flex flexWrap="wrap" gap={2} mt={2}>
-            {activeFilters.map(filter => (
-              <Tag key={filter} size="sm" colorScheme="blue" borderRadius="full">
-                <TagLabel>{getRelationshipName(filter)}</TagLabel>
-                <TagCloseButton onClick={() => toggleFilter(filter)} />
-              </Tag>
-            ))}
-            {activeFilters.length > 1 && (
-              <Button 
-                size="xs" 
-                variant="link" 
-                onClick={() => setActiveFilters([])}
-              >
-                Clear all
-              </Button>
-            )}
-          </Flex>
-        )}
-      </Box>
-      
-      {/* Groups container */}
-      <Box 
-        borderWidth="1px"
-        borderRadius="md"
-        borderColor={borderColor}
-        bg={sectionBg}
-        overflow="hidden"
-      >
-        {Object.keys(groupedRelationships).length === 0 ? (
-          <Box p={4} textAlign="center">
-            <Text color="gray.500" fontSize="sm">No matches found</Text>
-          </Box>
-        ) : (
-          Object.entries(groupedRelationships).map(([type, rels], groupIndex) => (
-            <Box 
-              key={type} 
-              borderBottomWidth={groupIndex < Object.keys(groupedRelationships).length - 1 ? "1px" : "0"}
-              borderColor={borderColor}
-            >
-              {/* Group header */}
-              <HStack 
-                spacing={2} 
-                p={3}
-                bg={headerBg}
-                borderBottomWidth="1px"
-                borderColor={borderColor}
-              >
-                <Badge 
-                  colorScheme={getRelationshipColor(type as MapEdgeTypeEnum)}
-                  px={2} 
-                  py={1} 
-                  borderRadius="full"
-                  variant="solid"
-                >
-                  {getRelationshipName(type)}
-                </Badge>
-                <Text fontSize="xs" color="gray.500">
-                  ({rels.length})
-                </Text>
-              </HStack>
-              
-              {/* Relationship items */}
-              <SimpleGrid 
-                columns={{ base: 1, md: rels.length > 3 ? 2 : 1 }} 
-                spacing={0}
-                divider={<Divider />}
-              >
-                {rels.map((rel, idx) => {
-                  const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
-                  const colorScheme = getRelationshipColor(type as MapEdgeTypeEnum);
                   
-                  return (
-                    <HStack 
-                      key={`${rel.nodeId || ''}-${idx}`}
-                      p={3}
-                      spacing={3}
-                      _hover={{ bg: hoverBg }}
-                      position="relative"
-                    >
-                      <Box 
-                        p={2} 
-                        borderRadius="full" 
-                        bg={`${colorScheme}.50`} 
-                        color={`${colorScheme}.500`}
-                        _dark={{ 
-                          bg: `${colorScheme}.900`, 
-                          color: `${colorScheme}.200` 
-                        }}
+                  {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
+                </VStack>
+              </GridItem>
+              
+              {/* Action buttons */}
+              <GridItem>
+                <HStack spacing={1}>
+                  <Tooltip label="Send message" placement="top">
+                    <IconButton
+                      aria-label="Send message"
+                      icon={<FiMessageSquare />}
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Message action
+                      }}
+                    />
+                  </Tooltip>
+                  
+                  <Tooltip label={`View ${rel.label || rel.name || 'Unknown'}`} placement="top">
+                    <IconButton
+                      aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
+                      icon={<FiArrowRight />}
+                      size="sm"
+                      variant="ghost"
+                    />
+                  </Tooltip>
+                </HStack>
+              </GridItem>
+            </Grid>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+
+  // Main content rendering
+  return (
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <VStack spacing={4} align="stretch" ref={containerRef} role="region" aria-label={getHeaderText()}>
+        {/* Header with tabs for different views */}
+        <motion.div variants={groupVariants}>
+          <Tabs size="sm" colorScheme="blue" variant="line" isLazy>
+            <TabList borderBottomColor={borderColor}>
+              <Tab fontWeight="medium">All</Tab>
+              <Tab fontWeight="medium">Direct</Tab>
+              <Tab fontWeight="medium">Groups</Tab>
+            </TabList>
+        
+            <TabPanels pt={3}>
+              <TabPanel p={0}>
+                {/* Main content panel */}
+                <VStack spacing={4} align="stretch">
+                  {/* Search, sort, filter, and view controls */}
+                  <HStack spacing={2} mb={2}>
+                    <InputGroup size="sm" flex={1}>
+                      <InputLeftElement pointerEvents="none">
+                        <Icon as={FiSearch} color="gray.400" />
+                      </InputLeftElement>
+                      <Input 
+                        placeholder="Search relationships" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        borderRadius="md"
+                        aria-label="Search relationships"
+                      />
+                    </InputGroup>
+                    
+                    <Menu closeOnSelect={false}>
+                      <MenuButton
+                        as={IconButton}
+                        aria-label="Filter relationships"
+                        icon={<FiFilter />}
+                        variant="outline"
+                        size="sm"
+                        colorScheme={activeFilters.length > 0 ? "blue" : undefined}
+                      />
+                      <MenuList minWidth="180px" zIndex={10}>
+                        <MenuItem closeOnSelect={false} fontWeight="bold">Filter by Type</MenuItem>
+                        <Divider />
+                        {availableNodeTypes.map(type => (
+                          <MenuItem 
+                            key={type} 
+                            closeOnSelect={false}
+                            onClick={() => toggleFilter(type)}
+                            icon={
+                              <Icon 
+                                as={getNodeIcon(type as MapNodeTypeEnum)} 
+                                color={activeFilters.includes(type) ? "blue.500" : undefined}
+                              />
+                            }
+                          >
+                            <HStack justifyContent="space-between" width="100%">
+                              <Text>{getRelationshipName(type)}</Text>
+                              {activeFilters.includes(type) && (
+                                <Badge colorScheme="blue">✓</Badge>
+                              )}
+                            </HStack>
+                          </MenuItem>
+                        ))}
+                      </MenuList>
+                    </Menu>
+                    
+                    <Menu>
+                      <MenuButton
+                        as={IconButton}
+                        aria-label="View options"
+                        icon={viewMode === 'grid' ? <FiGrid /> : <FiList />}
+                        variant="outline"
+                        size="sm"
+                      />
+                      <MenuList minWidth="180px" zIndex={10}>
+                        <MenuItem 
+                          icon={<FiList />}
+                          onClick={() => setViewMode('list')}
+                          fontWeight={viewMode === 'list' ? "medium" : "normal"}
+                        >
+                          List view
+                        </MenuItem>
+                        <MenuItem 
+                          icon={<FiGrid />}
+                          onClick={() => setViewMode('grid')}
+                          fontWeight={viewMode === 'grid' ? "medium" : "normal"}
+                        >
+                          Grid view
+                        </MenuItem>
+                        <MenuItem 
+                          icon={<FiMoreHorizontal />}
+                          onClick={() => setViewMode('compact')}
+                          fontWeight={viewMode === 'compact' ? "medium" : "normal"}
+                        >
+                          Compact view
+                        </MenuItem>
+                        <Divider />
+                        <MenuItem icon={<FiSettings />}>Display options</MenuItem>
+                      </MenuList>
+                    </Menu>
+                  </HStack>
+                  
+                  {/* Second control row - Sort, Group */}
+                  <HStack spacing={2} mb={3}>
+                    <Box flex="1">
+                      <Select 
+                        size="xs" 
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as SortOption)}
+                        borderRadius="md"
+                        aria-label="Sort relationships"
                       >
-                        <Icon as={getNodeIcon(nodeType)} boxSize={4} />
+                        <option value="alphabetical">Sort: Alphabetical</option>
+                        <option value="recent">Sort: Recent first</option>
+                        <option value="strength">Sort: Strength</option>
+                        <option value="frequency">Sort: Interaction frequency</option>
+                      </Select>
+                    </Box>
+                    
+                    <Box flex="1">
+                      <Select 
+                        size="xs" 
+                        value={groupBy}
+                        onChange={(e) => setGroupBy(e.target.value as GroupOption)}
+                        borderRadius="md"
+                        aria-label="Group relationships"
+                      >
+                        <option value="type">Group: By relationship</option>
+                        <option value="nodeType">Group: By entity type</option>
+                        <option value="status">Group: By status</option>
+                        <option value="none">Group: None</option>
+                      </Select>
+                    </Box>
+                  </HStack>
+                  
+                  {/* Active filters */}
+                  {activeFilters.length > 0 && (
+                    <Flex flexWrap="wrap" gap={2} mb={3}>
+                      {activeFilters.map(filter => (
+                        <Tag key={filter} size="sm" colorScheme="blue" borderRadius="full">
+                          <TagLabel>{getRelationshipName(filter)}</TagLabel>
+                          <Button
+                            size="xs"
+                            variant="unstyled"
+                            onClick={() => toggleFilter(filter)}
+                            aria-label={`Remove ${getRelationshipName(filter)} filter`}
+                            ml={1}
+                            fontWeight="bold"
+                          >
+                            ×
+                          </Button>
+                        </Tag>
+                      ))}
+                      {activeFilters.length > 1 && (
+                        <Button 
+                          size="xs" 
+                          variant="link" 
+                          onClick={() => setActiveFilters([])}
+                          aria-label="Clear all filters"
+                        >
+                          Clear all
+                        </Button>
+                      )}
+                    </Flex>
+                  )}
+                  
+                  {/* Groups container */}
+                  <Box>
+                    {Object.keys(groupedRelationships).length === 0 ? (
+                      <Box p={4} textAlign="center" borderWidth="1px" borderRadius="md">
+                        <Text color="gray.500" fontSize="sm">No matches found</Text>
                       </Box>
-                      <VStack align="start" spacing={0} flex="1">
-                        <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
-                          {rel.label || rel.name || 'Unknown'}
-                        </Text>
-                        <Text fontSize="xs" color="gray.500">
-                          {getRelationshipName(nodeType)}
-                        </Text>
+                    ) : (
+                      <VStack spacing={3} align="stretch">
+                        {Object.entries(groupedRelationships).map(([group, rels], index) => {
+                          const isExpanded = expandedGroups[group] ?? true;
+                          const colorScheme = getRelationshipColor(group as MapEdgeTypeEnum);
+                          
+                          return (
+                            <motion.div
+                              key={group}
+                              variants={groupVariants}
+                              custom={index}
+                              whileHover={{ 
+                                scale: 1.01,
+                                transition: { duration: 0.2 }
+                              }}
+                            >
+                              <Box 
+                                borderWidth="1px"
+                                borderRadius="md"
+                                overflow="hidden"
+                                bg={sectionBg}
+                                role="region"
+                                transition="all 0.2s ease-in-out"
+                                _hover={{ boxShadow: "sm" }}
+                                aria-label={`${getRelationshipName(group)} relationships (${rels.length})`}
+                              >
+                                {/* Group header - clickable to expand/collapse */}
+                                <Flex 
+                                  p={3}
+                                  bg={headerBg}
+                                  alignItems="center"
+                                  cursor="pointer"
+                                  onClick={() => toggleGroupExpansion(group)}
+                                  _hover={{ bg: hoverBg }}
+                                  aria-expanded={isExpanded}
+                                  aria-controls={`group-${group}`}
+                                  transition="background 0.2s ease"
+                                >
+                                  <motion.div
+                                    animate={{ 
+                                      rotate: isExpanded ? 0 : -90
+                                    }}
+                                    transition={{ 
+                                      duration: 0.3,
+                                      type: "spring",
+                                      stiffness: 260,
+                                      damping: 20
+                                    }}
+                                  >
+                                    <Icon 
+                                      as={FiChevronDown}
+                                      mr={2}
+                                      aria-hidden="true"
+                                    />
+                                  </motion.div>
+                                
+                                  <Badge 
+                                    colorScheme={colorScheme}
+                                    px={2} 
+                                    py={1} 
+                                    borderRadius="full"
+                                    variant="solid"
+                                    mr={2}
+                                  >
+                                    {getRelationshipName(group)}
+                                  </Badge>
+                                  
+                                  <Text fontSize="xs" color="gray.500" ml={1}>
+                                    {rels.length} {rels.length === 1 ? 'connection' : 'connections'}
+                                  </Text>
+                                  
+                                  <Box flex="1" />
+                                  
+                                  <Menu>
+                                    <MenuButton
+                                      as={IconButton}
+                                      size="xs"
+                                      icon={<FiMoreHorizontal />}
+                                      variant="ghost"
+                                      aria-label={`More options for ${getRelationshipName(group)}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <MenuList zIndex={10}>
+                                      <MenuItem icon={<FiStar />}>Mark as important</MenuItem>
+                                      <MenuItem icon={<FiExternalLink />}>View all in map</MenuItem>
+                                      <MenuItem icon={<FiFilter />}>Filter to this type</MenuItem>
+                                    </MenuList>
+                                  </Menu>
+                                </Flex>
+                                
+                                {/* Collapsible relationship items */}
+                                <Collapse in={isExpanded} animateOpacity id={`group-${group}`}>
+                                  {viewMode === 'grid' 
+                                    ? renderGridView(rels, colorScheme)
+                                    : viewMode === 'compact'
+                                      ? renderCompactView(rels, colorScheme)
+                                      : renderListView(rels, colorScheme)
+                                  }
+                                </Collapse>
+                              </Box>
+                            </motion.div>
+                          );
+                        })}
                       </VStack>
-                      <Tooltip label={`View ${rel.label || rel.name || 'Unknown'}`} placement="top">
-                        <IconButton
-                          aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
-                          icon={<FiArrowRight />}
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            // Emit navigation event
-                            const navigateEvent = new CustomEvent('navigate-to-node', {
-                              detail: {
-                                nodeId: rel.nodeId,
-                                nodeType: rel.nodeType || 'UNKNOWN',
-                                label: rel.label || rel.name || 'Unknown'
-                              },
-                              bubbles: true
-                            });
-                            document.dispatchEvent(navigateEvent);
-                          }}
-                        />
-                      </Tooltip>
-                    </HStack>
-                  );
-                })}
-              </SimpleGrid>
-            </Box>
-          ))
-        )}
-      </Box>
-    </VStack>
+                    )}
+                  </Box>
+                </VStack>
+              </TabPanel>
+              
+              <TabPanel p={0}>
+                <Center py={8}>
+                  <VStack spacing={3}>
+                    <Icon as={FiUsers} boxSize={10} color="gray.400" />
+                    <Heading size="sm">Direct Connections</Heading>
+                    <Text color="gray.500" fontSize="sm" textAlign="center">
+                      This view is being developed
+                    </Text>
+                  </VStack>
+                </Center>
+              </TabPanel>
+              
+              <TabPanel p={0}>
+                <Center py={8}>
+                  <VStack spacing={3}>
+                    <Icon as={FiFolder} boxSize={10} color="gray.400" />
+                    <Heading size="sm">Group View</Heading>
+                    <Text color="gray.500" fontSize="sm" textAlign="center">
+                      This view is being developed
+                    </Text>
+                  </VStack>
+                </Center>
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </motion.div>
+        
+        {/* Screen reader only guide for keyboard users */}
+        <VisuallyHidden>
+          <Text>
+            Use the tab key to navigate between relationship items and press Enter to view details.
+            Use arrow keys to navigate within groupings.
+          </Text>
+        </VisuallyHidden>
+      </VStack>
+    </motion.div>
   );
 };
 

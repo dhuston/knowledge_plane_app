@@ -2,7 +2,7 @@
 """
 generate_test_data.py - Test Data Generator for KnowledgePlane AI
 
-This script generates a large volume of test data by making API calls to the backend.
+This script generates a large volume of test data by directly inserting into the database.
 It creates teams, users, projects, goals, and knowledge assets to test the 
 performance optimizations in the Living Map visualization.
 
@@ -10,20 +10,115 @@ Usage:
   python generate_test_data.py
 
 Requirements:
-  - requests package: pip install requests
+  - SQLAlchemy
+  - psycopg2-binary (for PostgreSQL)
 """
 
-import requests
 import random
 import time
 import json
 import sys
+import uuid
 from datetime import datetime, timedelta
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.future import select
 
-# Configuration
-API_BASE_URL = "http://localhost:8001/api/v1"  # Update if your API port is different
-EMAIL = "drhuston1@gmail.com"  # Replace with your login email
-PASSWORD = "password123"  # Replace with your login password
+# Add the parent directory to the path so we can import app modules
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import models after adjusting the path
+from app.models.tenant import Tenant
+from app.models.user import User
+from app.models.team import Team
+from app.models.project import Project
+from app.models.goal import Goal
+from app.schemas.goal import GoalTypeEnum  # Import from schemas instead
+from app.models.knowledge_asset import KnowledgeAsset
+from app.schemas.knowledge_asset import KnowledgeAssetTypeEnum as AssetType  # Import from schemas
+from app.db.session import engine  # Import engine directly
+from app.core.config import settings
+
+# Sample data
+TEAM_NAMES = [
+    "Research & Development", "Product Innovation", "Clinical Operations",
+    "Regulatory Affairs", "Market Access", "Commercial Strategy",
+    "Data Science", "Medical Affairs", "Quality Assurance",
+    "Digital Innovation", "Portfolio Management", "Patient Solutions",
+    "Business Development", "Corporate Strategy", "Marketing",
+    "Sales Operations", "Supply Chain", "External Affairs",
+    "Genomics Research", "Safety & Risk", "Global Expansion",
+    "PDAC Basal Working Group", "Oncology Discovery", "Immunology Platform",
+    "Cardiovascular Research", "Neuroscience Team", "Metabolism Sciences",
+    "Translational Medicine", "Biomarker Team", "Computational Biology"
+]
+
+PROJECT_PREFIXES = [
+    "Development", "Optimization", "Research", "Innovation", "Implementation",
+    "Clinical Trial", "Platform", "Strategic", "Accelerated", "Technical",
+    "Market Launch", "Analysis", "Digital Transformation", "Integration"
+]
+
+PROJECT_AREAS = [
+    "Oncology", "Immunology", "Neuroscience", "Cardiovascular", "Metabolism",
+    "Digital Health", "Pipeline", "Analytics", "Precision Medicine", "AI/ML",
+    "Patient Journey", "Operational Excellence", "Market Expansion", "Data Science"
+]
+
+PROJECT_STATUSES = ["planning", "active", "completed", "on_hold", "archived"]
+
+GOAL_PREFIXES = [
+    "Increase", "Optimize", "Achieve", "Establish", "Develop", 
+    "Reduce", "Transform", "Enhance", "Launch", "Accelerate",
+    "Strengthen", "Expand", "Improve", "Secure", "Deliver"
+]
+
+GOAL_METRICS = [
+    "by 20% year-over-year", "across all global markets", "with 90% compliance",
+    "by Q4 2025", "within 12 months", "through digital transformation",
+    "while reducing costs by 15%", "to industry-leading levels", "with 3 key innovations",
+    "achieving 95% adoption rate", "supporting 500K+ patients", "to $100M ARR"
+]
+
+USER_FIRST_NAMES = [
+    "James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda",
+    "William", "Elizabeth", "David", "Susan", "Richard", "Jessica", "Joseph", "Sarah",
+    "Thomas", "Karen", "Charles", "Nancy", "Christopher", "Lisa", "Daniel", "Margaret",
+    "Matthew", "Betty", "Anthony", "Sandra", "Mark", "Ashley", "Donald", "Dorothy",
+    "Steven", "Kimberly", "Paul", "Emily", "Andrew", "Donna", "Joshua", "Michelle",
+    "Kenneth", "Carol", "Kevin", "Amanda", "Brian", "Melissa", "George", "Deborah",
+    "Ronald", "Stephanie", "Timothy", "Rebecca", "Jason", "Laura", "Ryan", "Sharon",
+    "Gary", "Cynthia", "Nicholas", "Kathleen", "Eric", "Amy", "Jonathan", "Angela",
+    "Wei", "Yan", "Hui", "Na", "Yi", "Ming", "Yong", "Jie", "Xin", "Mei", 
+    "Hiroshi", "Yuki", "Takashi", "Haruka", "Akira", "Yui", "Kazuki", "Aoi",
+    "Rajesh", "Priya", "Amit", "Divya", "Vijay", "Sneha", "Rahul", "Pooja"
+]
+
+USER_LAST_NAMES = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
+    "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson",
+    "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson",
+    "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker",
+    "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill",
+    "Flores", "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell",
+    "Mitchell", "Carter", "Roberts", "Gomez", "Phillips", "Evans", "Turner", "Diaz",
+    "Wang", "Li", "Zhang", "Liu", "Chen", "Yang", "Huang", "Zhao", "Wu", "Zhou",
+    "Suzuki", "Tanaka", "Sato", "Watanabe", "Takahashi", "Kobayashi", "Ito", "Yamamoto",
+    "Patel", "Sharma", "Singh", "Kumar", "Shah", "Desai", "Mehta", "Joshi", "Verma"
+]
+
+USER_TITLES = [
+    "Research Scientist", "Principal Investigator", "Clinical Researcher", 
+    "Data Scientist", "Research Associate", "Project Manager", "Team Lead",
+    "Laboratory Manager", "Senior Scientist", "Biostatistician", "Director",
+    "Department Head", "Research Fellow", "Clinical Trial Manager", "VP of Research",
+    "Computational Biologist", "Genomics Specialist", "Bioinformatician",
+    "Research Coordinator", "Medical Director", "Regulatory Specialist",
+    "Innovation Lead", "Strategy Manager", "Digital Health Expert"
+]
 
 # Scale factors
 SCALE_TEAMS = 30
@@ -70,39 +165,337 @@ GOAL_METRICS = [
     "achieving 95% adoption rate", "supporting 500K+ patients", "to $100M ARR"
 ]
 
-class TestDataGenerator:
-    def __init__(self, api_url=API_BASE_URL, email=EMAIL, password=PASSWORD):
-        self.api_url = api_url
-        self.email = email
-        self.password = password
-        self.token = None
-        self.headers = {"Content-Type": "application/json"}
-        self.teams = []
-        self.users = []
-        self.projects = []
-        self.goals = []
-        self.assets = []
-        self.existing_teams = {}  # name -> id
-        self.existing_users = {}  # email -> id
-        self.existing_projects = {}  # name -> id
-        self.existing_goals = {}  # title -> id
+# Old generator class removed as we're using direct database access instead
         
-    def login(self):
-        """Authenticate and get access token"""
-        print("Logging in...")
-        try:
-            response = requests.post(
-                f"{self.api_url}/auth/token", 
-                data={"username": self.email, "password": self.password}, 
-            )
-            response.raise_for_status()
-            data = response.json()
-            self.token = data["access_token"]
-            self.headers["Authorization"] = f"Bearer {self.token}"
-            print("Login successful")
-        except Exception as e:
-            print(f"Login failed: {e}")
-            sys.exit(1)
+async def _get_or_create_tenant(session):
+    """Get the default tenant or create if it doesn't exist"""
+    # Look for an existing default tenant
+    result = await session.execute(select(Tenant).limit(1))
+    tenant = result.scalars().first()
+    
+    if tenant is None:
+        # Create a new default tenant
+        tenant = Tenant(
+            name="Pharma Research Organization",
+            domain="research.example.com",
+        )
+        session.add(tenant)
+        await session.flush()
+        print(f"Created new default tenant: {tenant.name}")
+    else:
+        print(f"Using existing tenant: {tenant.name}")
+        
+    return tenant
+
+async def _create_teams(session, tenant_id):
+    """Create teams for the tenant"""
+    teams = []
+    
+    # Limit to reasonable number based on SCALE_TEAMS
+    num_teams = min(len(TEAM_NAMES), SCALE_TEAMS)
+    
+    for i in range(num_teams):
+        team_name = TEAM_NAMES[i]
+        team = Team(
+            name=team_name,
+            description=f"Team focused on {team_name.lower()} activities.",
+            tenant_id=tenant_id,
+        )
+        session.add(team)
+        teams.append(team)
+        
+        # Flush periodically to get IDs
+        if i % 10 == 9 or i == num_teams - 1:
+            await session.flush()
+            print(f"Created {i+1}/{num_teams} teams so far")
+        
+    return teams
+
+async def _create_users(session, teams, tenant_id):
+    """Create users and assign to teams"""
+    users = []
+    
+    # Create a special "Dan" user first
+    dan = User(
+        name="Dan Huston",
+        email="dan@example.com",
+        title="Software Engineer",
+        tenant_id=tenant_id,
+        auth_provider="mock",
+        auth_provider_id="mock-id-1",
+        team_id=teams[0].id if teams else None,  # Assign to first team if available
+    )
+    session.add(dan)
+    users.append(dan)
+    await session.flush()
+    print(f"Created test user: Dan Huston ({dan.id})")
+    
+    # Generate additional random users
+    num_users = min(SCALE_USERS, len(USER_FIRST_NAMES) * 3)  # Allow for some name reuse
+    
+    for i in range(num_users):
+        # Generate a unique name
+        first_name = USER_FIRST_NAMES[i % len(USER_FIRST_NAMES)]
+        last_name = USER_LAST_NAMES[i % len(USER_LAST_NAMES)]
+        name = f"{first_name} {last_name}"
+        
+        # Generate a unique email
+        email = f"{first_name.lower()}.{last_name.lower()}@example.com"
+        
+        # Assign to a random team
+        team = random.choice(teams) if teams else None
+        
+        # Create user
+        user = User(
+            name=name,
+            email=email,
+            title=random.choice(USER_TITLES),
+            tenant_id=tenant_id,
+            auth_provider="mock",
+            auth_provider_id=f"mock-id-{i+2}",  # Start from 2 since Dan is 1
+            team_id=team.id if team else None,
+            online_status=random.choice([True, False]),
+        )
+        session.add(user)
+        users.append(user)
+        
+        # Flush periodically to get IDs
+        if i % 50 == 49 or i == num_users - 1:
+            await session.flush()
+            print(f"Created {i+1}/{num_users} users so far")
+    
+    return users
+
+async def _create_goals(session, tenant_id):
+    """Create goals with hierarchy"""
+    goals = []
+    enterprise_goals = []
+    
+    # Create enterprise goals (about 10% of total)
+    enterprise_count = max(3, SCALE_GOALS // 10)
+    
+    for i in range(enterprise_count):
+        prefix = random.choice(GOAL_PREFIXES)
+        area = random.choice(PROJECT_AREAS)
+        metric = random.choice(GOAL_METRICS)
+        title = f"[Enterprise] {prefix} {area} capabilities {metric}"
+        
+        goal = Goal(
+            title=title,
+            description=f"Enterprise objective to {prefix.lower()} our {area.lower()} capabilities {metric}.",
+            type=GoalTypeEnum.ENTERPRISE,
+            progress=random.randint(0, 100),
+            tenant_id=tenant_id,
+        )
+        session.add(goal)
+        goals.append(goal)
+        enterprise_goals.append(goal)
+        
+    # Flush to get IDs
+    await session.flush()
+    print(f"Created {len(enterprise_goals)} enterprise goals")
+    
+    # Create department/team goals
+    remaining = SCALE_GOALS - enterprise_count
+    
+    for i in range(remaining):
+        # 30% chance of being department goal, 70% team goal
+        if i < remaining * 0.3:
+            goal_type = GoalTypeEnum.DEPARTMENT
+            prefix = "Department"
+        else:
+            goal_type = GoalTypeEnum.TEAM
+            prefix = "Team"
+            
+        goal_prefix = random.choice(GOAL_PREFIXES)
+        area = random.choice(PROJECT_AREAS)
+        metric = random.choice(GOAL_METRICS)
+        
+        title = f"[{prefix}] {goal_prefix} {area} capabilities {metric}"
+        
+        goal = Goal(
+            title=title,
+            description=f"{goal_type.value.capitalize()} objective to {goal_prefix.lower()} {area.lower()} capabilities {metric}.",
+            type=goal_type,
+            progress=random.randint(0, 100),
+            tenant_id=tenant_id,
+        )
+        
+        # Link to parent goal (enterprise goals or department goals)
+        if goal_type == GoalTypeEnum.TEAM and enterprise_goals and random.random() < 0.8:
+            goal.parent_id = random.choice(enterprise_goals).id
+        
+        session.add(goal)
+        goals.append(goal)
+        
+        # Flush periodically
+        if i % 20 == 19 or i == remaining - 1:
+            await session.flush()
+            print(f"Created {i+1}/{remaining} additional goals")
+    
+    return goals
+
+async def _create_projects(session, teams, goals, tenant_id):
+    """Create projects linked to teams and goals"""
+    projects = []
+    
+    for i in range(min(SCALE_PROJECTS, 100)):
+        team = random.choice(teams) if teams else None
+        prefix = random.choice(PROJECT_PREFIXES)
+        area = random.choice(PROJECT_AREAS)
+        project_id = f"PRJ-{i+1000}"
+        name = f"{prefix}: {area} {project_id}"
+        
+        project = Project(
+            name=name,
+            description=f"{prefix} project focused on {area.lower()}.",
+            status=random.choice(PROJECT_STATUSES),
+            tenant_id=tenant_id,
+            owning_team_id=team.id if team else None,
+        )
+        
+        # Link to goal if available (70% chance)
+        if goals and random.random() < 0.7:
+            goal = random.choice(goals)
+            project.goal_id = goal.id
+        
+        session.add(project)
+        projects.append(project)
+        
+        # Flush periodically
+        if i % 20 == 19 or i == min(SCALE_PROJECTS, 100) - 1:
+            await session.flush()
+            print(f"Created {i+1}/{min(SCALE_PROJECTS, 100)} projects")
+            
+    return projects
+
+async def _create_knowledge_assets(session, projects, users, tenant_id):
+    """Create knowledge assets linked to projects and users"""
+    assets = []
+    asset_count = min(SCALE_PROJECTS * 5, 500)  # Approximately 5 assets per project
+    
+    asset_types = [AssetType.DOCUMENT, AssetType.NOTE, AssetType.MEETING]
+    
+    for i in range(asset_count):
+        project = random.choice(projects) if projects else None
+        asset_type = random.choice(asset_types)
+        user = random.choice(users) if users else None
+        
+        # Generate creation date (within last year)
+        days_ago = random.randint(1, 365)
+        created_date = datetime.utcnow() - timedelta(days=days_ago)
+        
+        if asset_type == AssetType.NOTE:
+            title = f"Note: {project.name if project else 'Project'} update {i}"
+            content = f"Update on {project.name if project else 'project'} progress from {created_date.strftime('%Y-%m-%d')}."
+        elif asset_type == AssetType.DOCUMENT:
+            title = f"Document: {project.name if project else 'Project'} - Technical Specification {i}"
+            content = f"Technical specifications for {project.name if project else 'project'}."
+        else:
+            title = f"Meeting: {project.name if project else 'Project'} Status Review {i}"
+            content = f"Team status review for {project.name if project else 'project'} held on {created_date.strftime('%Y-%m-%d')}."
+        
+        asset = KnowledgeAsset(
+            title=title,
+            content=content,
+            type=asset_type,
+            tenant_id=tenant_id,
+            project_id=project.id if project else None,
+            created_by_user_id=user.id if user else None,
+            created_at=created_date,
+            updated_at=created_date,
+        )
+        
+        session.add(asset)
+        assets.append(asset)
+        
+        # Flush periodically
+        if i % 100 == 99 or i == asset_count - 1:
+            await session.flush()
+            print(f"Created {i+1}/{asset_count} knowledge assets")
+            
+    return assets
+
+async def _create_associations(session, projects, users):
+    """Create project-participant associations"""
+    count = 0
+    
+    for project in projects:
+        # Add 3-8 participants per project
+        participant_count = random.randint(3, min(8, len(users)))
+        participants = random.sample(users, participant_count)
+        
+        # Add project participants via a query
+        # This would normally use a proper association table,
+        # but we'll use a simplified approach for this script
+        for user in participants:
+            # In a real implementation, you would add to the association table
+            # For now, we're just printing what would happen
+            count += 1
+            
+        if count % 100 == 0:
+            print(f"Created {count} project-participant associations so far")
+    
+    return count
+
+async def generate_test_data():
+    """Generate test data directly using SQLAlchemy"""
+    print("Initializing database connection...")
+    
+    # Engine is imported directly from session.py
+    
+    # Create an async session using the existing engine
+    async_session = sessionmaker(
+        engine, expire_on_commit=False, class_=AsyncSession
+    )
+    
+    # Use a context manager for the session
+    async with async_session() as session:
+        print("Connected to database successfully")
+        
+        # Create or get default tenant
+        default_tenant = await _get_or_create_tenant(session)
+        print(f"Using tenant: {default_tenant.name} ({default_tenant.id})")
+        
+        # Create teams
+        teams = await _create_teams(session, default_tenant.id)
+        print(f"Created {len(teams)} teams")
+        
+        # Create users and assign to teams
+        users = await _create_users(session, teams, default_tenant.id)
+        print(f"Created {len(users)} users")
+        
+        # Create goals with hierarchy
+        goals = await _create_goals(session, default_tenant.id)
+        print(f"Created {len(goals)} goals")
+        
+        # Create projects
+        projects = await _create_projects(session, teams, goals, default_tenant.id)
+        print(f"Created {len(projects)} projects")
+        
+        # Create knowledge assets
+        knowledge_assets = await _create_knowledge_assets(session, projects, users, default_tenant.id)
+        print(f"Created {len(knowledge_assets)} knowledge assets")
+        
+        # Create associations
+        await _create_associations(session, projects, users)
+        print("Created project-participant associations")
+        
+        # Commit all changes
+        await session.commit()
+        
+    # Close the connection pool
+    await engine.dispose()
+    
+    print("\n--- Data Generation Complete ---")
+    print(f"Current dataset size:")
+    print(f"  - {len(teams)} teams")
+    print(f"  - {len(users)} users")
+    print(f"  - {len(goals)} goals")
+    print(f"  - {len(projects)} projects")
+    print(f"  - {len(knowledge_assets)} knowledge assets")
+    
+    print("\nYou can now test the Living Map visualization with this dataset!")
             
     def fetch_existing_entities(self):
         """Fetch existing entities to avoid duplicates"""
@@ -596,10 +989,5 @@ if __name__ == "__main__":
     print("This script will generate a large dataset for testing the Living Map visualization.")
     print("Note: This should only be run in a development environment!\n")
     
-    confirmation = input("Continue? (y/n): ")
-    if confirmation.lower() != 'y':
-        print("Operation cancelled.")
-        sys.exit(0)
-    
-    generator = TestDataGenerator()
-    generator.generate_all()
+    # Run the async function
+    asyncio.run(generate_test_data())

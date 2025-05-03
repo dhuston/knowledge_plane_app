@@ -24,11 +24,13 @@ import TeamPage from './pages/TeamPage'; // Added back for dedicated team pages
 // import ExplorePage from './pages/ExplorePage'; // Removed - Handled by Map/BriefingPanel
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DemoPage from './pages/DemoPage'; // Added for feature demonstrations
+import AdminConsole from './components/admin/AdminConsole'; // Added for admin console
 
 // Import Layout and ProtectedRoute Components
 import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from "./context/AuthContext";
+import AppProviders from './components/layout/AppProviders';
 
 // --- Placeholder Page Components (REMOVED) ---
 // function LoginPage() { ... }
@@ -45,13 +47,14 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
-
-          {/* Protected Routes */}
-          <Route path="/workspace" element={ <ProtectedRoute> <MainLayout /> </ProtectedRoute> } />
+        <AppProviders>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+  
+            {/* Protected Routes */}
+            <Route path="/workspace" element={ <ProtectedRoute> <MainLayout /> </ProtectedRoute> } />
 
           {/* Example of another protected route */}
           <Route path="/profile/:userId" element={ <ProtectedRoute> <ProfilePage /> </ProtectedRoute>} />
@@ -61,6 +64,9 @@ function App() {
           
           {/* Demo page route */}
           <Route path="/demos" element={ <ProtectedRoute> <DemoPage /> </ProtectedRoute>} />
+          
+          {/* Admin Console route */}
+          <Route path="/admin/*" element={ <ProtectedRoute> <AdminConsole /> </ProtectedRoute>} />
 
           {/* Other routes that could be added later */}
           {/* <Route path="/hub/:hubId" element={<HubPage />} /> */}
@@ -74,7 +80,8 @@ function App() {
 
           {/* Catch-all: Redirect unknown routes to workspace (which will redirect to login if needed) */}
           <Route path="*" element={<Navigate to="/workspace" replace />} />
-        </Routes>
+          </Routes>
+        </AppProviders>
       </AuthProvider>
     </Router>
   );

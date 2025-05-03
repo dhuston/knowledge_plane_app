@@ -196,9 +196,127 @@ async def fetch_map_data(
                     type=MapEdgeTypeEnum.ALIGNED_TO
                 ))
 
-    # --- TODO: Fetch relevant Knowledge Assets --- 
-    # --- TODO: Fetch other relevant Users (Team members, Project Participants) --- 
-    # --- TODO: Fetch parent Goals if needed --- 
+    # Fetch Knowledge Assets (primarily notes)
+    knowledge_assets_result = await db.execute(
+        select(crud_knowledge_asset.KnowledgeAssetModel)
+        .where(
+            crud_knowledge_asset.KnowledgeAssetModel.tenant_id == tenant_id,
+            crud_knowledge_asset.KnowledgeAssetModel.type == "note",
+            crud_knowledge_asset.KnowledgeAssetModel.project_id.in_([p.id for p in projects if p.id in node_ids])
+        )
+        .limit(50)  # Limiting to prevent excessive data
+    )
+    knowledge_assets = knowledge_assets_result.scalars().all()
+    
+    for asset in knowledge_assets:
+        if asset.type == "note":
+            note_node = MapNode(
+                id=str(asset.id),
+                type=MapNodeTypeEnum.KNOWLEDGE_ASSET,
+                label=asset.title or "Note",
+                data={
+                    "id": str(asset.id),
+                    "title": asset.title,
+                    "content": asset.content,
+                    "type": asset.type,
+                    "created_at": asset.created_at.isoformat() if asset.created_at else None
+                }
+            )
+            if note_node.id not in node_ids:
+                nodes.append(note_node)
+                node_ids.add(note_node.id)
+                
+            # Add edge connecting note to project
+            if asset.project_id and str(asset.project_id) in node_ids:
+                edges.append(MapEdge(
+                    id=f"{str(asset.id)}_RELATES_TO_{str(asset.project_id)}",
+                    source=str(asset.id),
+                    target=str(asset.project_id),
+                    type=MapEdgeTypeEnum.RELATES_TO
+                ))
+                
+    # Fetch Team Members for teams already in the map
+    team_members_result = await db.execute(
+        select(UserModel)
+        .where(
+            UserModel.tenant_id == tenant_id,
+            UserModel.team_id.in_([UUID(node_id) for node_id in node_ids 
+                                  if node_id.startswith('team-') or 
+                                  any(n.type == MapNodeTypeEnum.TEAM and n.id == node_id for n in nodes)])
+        )
+        .limit(30)  # Limit to reasonable number of team members
+    )
+    team_members = team_members_result.scalars().all()
+    
+    for member in team_members:
+        if member.id != current_user.id:  # Skip the current user, already added
+            member_node = await _entity_to_map_node(member, MapNodeTypeEnum.USER)
+            if member_node and member_node.id not in node_ids:
+                nodes.append(member_node)
+                node_ids.add(member_node.id)
+                
+            # Add membership edge if team exists in the map
+            if member.team_id and str(member.team_id) in node_ids:
+                edges.append(MapEdge(
+                    id=f"{str(member.id)}_MEMBER_OF_{str(member.team_id)}",
+                    source=str(member.id),
+                    target=str(member.team_id),
+                    type=MapEdgeTypeEnum.MEMBER_OF
+                ))
+                
+    # Fetch Project Participants
+    for project in projects:
+        if str(project.id) in node_ids:
+            participants = await crud_project_instance.get_participants(
+                db=db, project_id=project.id, tenant_id=tenant_id
+            )
+            
+            for participant in participants:
+                if participant.id != current_user.id:  # Skip current user
+                    participant_node = await _entity_to_map_node(participant, MapNodeTypeEnum.USER)
+                    if participant_node and participant_node.id not in node_ids:
+                        nodes.append(participant_node)
+                        node_ids.add(participant_node.id)
+                    
+                    # Add participation edge
+                    edges.append(MapEdge(
+                        id=f"{str(participant.id)}_PARTICIPATES_IN_{str(project.id)}",
+                        source=str(participant.id),
+                        target=str(project.id),
+                        type=MapEdgeTypeEnum.PARTICIPATES_IN
+                    ))
+                    
+    # Fetch parent Goals for goals already in the map
+    goals_result = await db.execute(
+        select(GoalModel)
+        .where(
+            GoalModel.tenant_id == tenant_id,
+            GoalModel.id.in_([g.parent_id for g in await db.execute(
+                select(GoalModel.parent_id).where(
+                    GoalModel.tenant_id == tenant_id,
+                    GoalModel.id.in_([UUID(node_id) for node_id in node_ids 
+                                     if any(n.type == MapNodeTypeEnum.GOAL and n.id == node_id for n in nodes)])
+                )
+            ).scalars().all() if g.parent_id])
+        )
+    )
+    parent_goals = goals_result.scalars().all()
+    
+    for goal in parent_goals:
+        goal_node = await _entity_to_map_node(goal, MapNodeTypeEnum.GOAL)
+        if goal_node and goal_node.id not in node_ids:
+            nodes.append(goal_node)
+            node_ids.add(goal_node.id)
+            
+            # Find child goals and add parent-child relationships
+            for node in nodes:
+                if node.type == MapNodeTypeEnum.GOAL and node.data.get('parent_id') == goal_node.id:
+                    edges.append(MapEdge(
+                        id=f"{node.id}_CHILD_OF_{goal_node.id}",
+                        source=node.id,
+                        target=goal_node.id,
+                        type=MapEdgeTypeEnum.CHILD_OF
+                    ))
 
     return MapData(nodes=nodes, edges=edges)
 

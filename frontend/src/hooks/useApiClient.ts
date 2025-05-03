@@ -114,7 +114,6 @@ export const useApiClient = (): AxiosInstance => {
                             throw new Error('No refresh token available');
                         }
 
-                        // Use a separate axios instance for the refresh call
                         const refreshResponse = await axios.post(
                             `${API_BASE_URL}/auth/refresh-token`, 
                             { refresh_token: refreshToken }, 

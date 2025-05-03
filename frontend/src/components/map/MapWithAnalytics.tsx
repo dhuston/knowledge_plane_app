@@ -1,7 +1,3 @@
-/**
- * MapWithAnalytics.tsx
- * Enhanced map component that integrates analytics features on top of WebGLMap
- */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Box, 
@@ -9,37 +5,61 @@ import {
   Icon, 
   useColorModeValue, 
   useDisclosure,
-  Switch,
-  FormControl,
-  FormLabel,
   Tooltip,
-  HStack
+  HStack,
+  Flex,
+  Heading,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Portal,
+  Divider,
+  Text,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverArrow,
+  PopoverBody,
+  Badge,
+  VStack,
+  Spinner,
+  List,
+  ListItem,
+  SimpleGrid,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel
 } from '@chakra-ui/react';
 import { MdOutlineAnalytics } from 'react-icons/md';
-import { BiNetworkChart } from 'react-icons/bi';
-import { FiX } from 'react-icons/fi';
+import { BiNetworkChart, BiExpand, BiCollapseAlt } from 'react-icons/bi';
+import { FiX, FiMaximize, FiMinimize, FiArrowRight, FiArrowDown, FiChevronDown, FiMove } from 'react-icons/fi';
 
-// Import core components
 import WebGLMap from './WebGLMap';
 import AnalyticsEngine, { GraphMetrics } from '../analytics/AnalyticsEngine';
 import InsightsPanel from '../panels/InsightsPanel';
 import { createAnalyticsRenderer, AnalyticsRendererOptions, DEFAULT_ANALYTICS_OPTIONS } from './renderers/AnalyticsRenderer';
+import { MdDataUsage, MdGroups, MdOutlineHub } from 'react-icons/md';
 
-// Import types
 import { MapNode, MapEdgeTypeEnum, MapNodeTypeEnum } from '../../types/map';
 
-// Create a type extending WebGLMapProps for additional analytics props
 interface MapWithAnalyticsProps {
   onNodeClick: (node: MapNode | null) => void;
   onLoad?: () => void;
   onLinkNodes?: (sourceNode: MapNode, targetNode: MapNode) => void;
   showAnalyticsByDefault?: boolean;
-  analyticsViewMode?: boolean; // New prop to indicate we're in the analytics view
+  analyticsViewMode?: boolean;
 }
 
-/**
- * MapWithAnalytics component extending WebGLMap with analytics capabilities
- */
+// Panel position types
+type PanelPosition = 'bottom' | 'right' | 'full';
+
 const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
   onNodeClick,
   onLoad,
@@ -47,7 +67,7 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
   showAnalyticsByDefault = false,
   analyticsViewMode = false
 }) => {
-  // State for analytics features
+  // Analytics state
   const [isAnalyticsEnabled, setIsAnalyticsEnabled] = useState<boolean>(showAnalyticsByDefault || analyticsViewMode);
   const [metricMode, setMetricMode] = useState<'betweenness' | 'closeness' | 'degree' | 'clustering'>('betweenness');
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
@@ -55,29 +75,39 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
   const [edges, setEdges] = useState<{ source: string; target: string; type?: MapEdgeTypeEnum }[]>([]);
   const [graphMetrics, setGraphMetrics] = useState<GraphMetrics | null>(null);
   const [isCalculatingMetrics, setIsCalculatingMetrics] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analyticsOptions, setAnalyticsOptions] = useState<AnalyticsRendererOptions>(DEFAULT_ANALYTICS_OPTIONS);
   
-  // Controls for insights panel
+  // Fixed panel state - always use right side panel
+  const panelPosition = 'right';
+  const [panelSize, setPanelSize] = useState<{height: string, width: string}>({height: '100%', width: '320px'});
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const resizeStartPos = useRef<{x: number, y: number}>({x: 0, y: 0});
+  const startSize = useRef<{height: number, width: number}>({height: 0, width: 0});
+  
   const { 
     isOpen: isInsightsPanelOpen, 
     onOpen: openInsightsPanel, 
     onClose: closeInsightsPanel 
   } = useDisclosure({ defaultIsOpen: showAnalyticsByDefault });
   
-  // Colors
+  // No need to force analytics mode since we removed the dedicated analytics view
+  // This would have been where we'd force-enable analytics, but we're now using a simpler toggle approach
+  
   const toggleBg = useColorModeValue('white', 'gray.700');
   const toggleColor = useColorModeValue('blue.500', 'blue.300');
   const analyticsButtonBg = useColorModeValue('blue.50', 'blue.900');
   const analyticsButtonColor = useColorModeValue('blue.600', 'blue.200');
 
-  // Calculate analytics when enabled or when map data changes
   useEffect(() => {
     if (isAnalyticsEnabled && nodes.length > 0 && edges.length > 0) {
-      calculateGraphMetrics();
+      setIsLoading(true);
+      calculateGraphMetrics().finally(() => {
+        setIsLoading(false);
+      });
     }
   }, [isAnalyticsEnabled, nodes, edges]);
 
-  // Update analytics options when metric mode changes
   useEffect(() => {
     setAnalyticsOptions(prev => ({
       ...prev,
@@ -85,10 +115,8 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
     }));
   }, [metricMode]);
 
-  // Reference to track if the component is mounted
   const isMounted = useRef(true);
   
-  // Set up mount/unmount tracking
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -96,10 +124,8 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
     };
   }, []);
   
-  // Reference to track the calculation timeout
   const calculationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Cleanup function for the calculation timeout
   useEffect(() => {
     return () => {
       if (calculationTimeoutRef.current) {
@@ -109,11 +135,9 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
     };
   }, []);
   
-  // Calculate graph metrics using AnalyticsEngine
   const calculateGraphMetrics = useCallback(async () => {
-    if (nodes.length === 0) return;
+    if (nodes.length === 0) return Promise.resolve();
     
-    // Cancel any previous calculations
     if (calculationTimeoutRef.current) {
       clearTimeout(calculationTimeoutRef.current);
       calculationTimeoutRef.current = null;
@@ -121,129 +145,182 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
     
     setIsCalculatingMetrics(true);
     
-    try {
-      console.log("Calculating graph metrics for", nodes.length, "nodes and", edges.length, "edges");
-      
-      // Store current nodes and edges for comparison later
-      const currentNodes = [...nodes];
-      const currentEdges = [...edges];
-      
-      // Use setTimeout to avoid blocking UI during calculation
-      calculationTimeoutRef.current = setTimeout(() => {
-        // Only proceed if component is still mounted and data hasn't changed
-        if (!isMounted.current) return;
+    return new Promise<void>((resolve) => {
+      try {
+        console.log("Calculating graph metrics for", nodes.length, "nodes and", edges.length, "edges");
         
-        try {
-          // Double-check that data hasn't changed during the timeout
-          if (
-            nodes.length !== currentNodes.length || 
-            edges.length !== currentEdges.length
-          ) {
-            console.log("Data changed during calculation, cancelling");
+        const currentNodes = [...nodes];
+        const currentEdges = [...edges];
+        
+        calculationTimeoutRef.current = setTimeout(() => {
+          if (!isMounted.current) {
+            resolve();
             return;
           }
           
-          const analyticsEngine = new AnalyticsEngine({ nodes: currentNodes, edges: currentEdges });
-          console.log("Created analytics engine, calculating metrics...");
-          const metrics = analyticsEngine.calculateAllMetrics();
-          console.log("Metrics calculated", metrics);
-          
-          // Only update state if component is still mounted
-          if (isMounted.current) {
-            setGraphMetrics(metrics);
+          try {
+            if (
+              nodes.length !== currentNodes.length || 
+              edges.length !== currentEdges.length
+            ) {
+              console.log("Data changed during calculation, cancelling");
+              resolve();
+              return;
+            }
+            
+            const analyticsEngine = new AnalyticsEngine({ nodes: currentNodes, edges: currentEdges });
+            console.log("Created analytics engine, calculating metrics...");
+            const metrics = analyticsEngine.calculateAllMetrics();
+            console.log("Metrics calculated", metrics);
+            
+            if (isMounted.current) {
+              setGraphMetrics(metrics);
+            }
+          } catch (innerError) {
+            console.error("Error in analytics calculation:", innerError);
+            
+            if (isMounted.current) {
+              setGraphMetrics({
+                nodes: {
+                  "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 },
+                  "team-1": { degreeCentrality: 0.8, betweennessCentrality: 0.3, closenessCentrality: 0.5, clusteringCoefficient: 0.6, eigenvectorCentrality: 0.4 }
+                },
+                clusters: [
+                  { id: "cluster-1", nodeIds: ["user-1"], score: 1 },
+                  { id: "cluster-2", nodeIds: ["team-1"], score: 1 }
+                ],
+                mostCentralNodes: ["user-1"],
+                mostConnectedClusters: ["cluster-1"],
+                bottlenecks: [],
+                collaborationOpportunities: [],
+                density: 0.5,
+                modularity: 0.6,
+                connectedness: 0.7,
+                centralization: 0.5,
+                resilience: 0.6,
+                efficiency: 0.7
+              });
+            }
+          } finally {
+            if (isMounted.current) {
+              setIsCalculatingMetrics(false);
+            }
+            calculationTimeoutRef.current = null;
+            resolve();
           }
-        } catch (innerError) {
-          console.error("Error in analytics calculation:", innerError);
-          
-          // Only update state if component is still mounted
-          if (isMounted.current) {
-            // Create a fallback metrics object with basic data
-            setGraphMetrics({
-              nodes: {
-                "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 },
-                "team-1": { degreeCentrality: 0.8, betweennessCentrality: 0.3, closenessCentrality: 0.5, clusteringCoefficient: 0.6, eigenvectorCentrality: 0.4 }
-              },
-              clusters: [
-                { id: "cluster-1", nodeIds: ["user-1"], score: 1 },
-                { id: "cluster-2", nodeIds: ["team-1"], score: 1 }
-              ],
-              mostCentralNodes: ["user-1"],
-              mostConnectedClusters: ["cluster-1"],
-              bottlenecks: [],
-              collaborationOpportunities: [],
-              density: 0.5,
-              modularity: 0.6,
-              connectedness: 0.7,
-              centralization: 0.5,
-              resilience: 0.6,
-              efficiency: 0.7
-            });
-          }
-        } finally {
-          // Only update state if component is still mounted
-          if (isMounted.current) {
-            setIsCalculatingMetrics(false);
-          }
-          calculationTimeoutRef.current = null;
-        }
-      }, 0);
-    } catch (error) {
-      console.error("Error setting up graph metrics calculation:", error);
-      
-      // Only update state if component is still mounted
-      if (isMounted.current) {
-        setIsCalculatingMetrics(false);
+        }, 0);
+      } catch (error) {
+        console.error("Error setting up graph metrics calculation:", error);
         
-        // Set fallback metrics object
-        setGraphMetrics({
-          nodes: {
-            "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 }
-          },
-          clusters: [{ id: "cluster-1", nodeIds: ["user-1"], score: 1 }],
-          mostCentralNodes: ["user-1"],
-          mostConnectedClusters: ["cluster-1"],
-          bottlenecks: [],
-          collaborationOpportunities: [],
-          density: 0.5,
-          modularity: 0.6,
-          connectedness: 0.7,
-          centralization: 0.5,
-          resilience: 0.6,
-          efficiency: 0.7
-        });
+        if (isMounted.current) {
+          setIsCalculatingMetrics(false);
+          
+          setGraphMetrics({
+            nodes: {
+              "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 }
+            },
+            clusters: [{ id: "cluster-1", nodeIds: ["user-1"], score: 1 }],
+            mostCentralNodes: ["user-1"],
+            mostConnectedClusters: ["cluster-1"],
+            bottlenecks: [],
+            collaborationOpportunities: [],
+            density: 0.5,
+            modularity: 0.6,
+            connectedness: 0.7,
+            centralization: 0.5,
+            resilience: 0.6,
+            efficiency: 0.7
+          });
+        }
+        resolve();
       }
-    }
+    });
   }, [nodes, edges]);
 
-  // Handle node click in the context of analytics
+  // Resize panel handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsResizing(true);
+    
+    // Store starting position
+    resizeStartPos.current = { 
+      x: e.clientX, 
+      y: e.clientY 
+    };
+    
+    // Parse current size values
+    const currentHeight = parseFloat(panelSize.height);
+    const currentWidth = parseFloat(panelSize.width);
+    
+    // Store starting size
+    startSize.current = {
+      height: isNaN(currentHeight) ? 35 : currentHeight, 
+      width: isNaN(currentWidth) ? 320 : currentWidth
+    };
+    
+    // Add global event listeners
+    window.addEventListener('mousemove', handleResizeMove);
+    window.addEventListener('mouseup', handleResizeEnd);
+  }, [panelSize]);
+  
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const deltaX = e.clientX - resizeStartPos.current.x;
+    
+    // Calculate new width (pixels)
+    const newWidthPx = startSize.current.width + deltaX;
+    
+    // Constrain width (min 250px, max 50% of viewport)
+    const maxWidth = window.innerWidth * 0.5;
+    const constrained = Math.min(Math.max(newWidthPx, 250), maxWidth);
+    setPanelSize(prev => ({ ...prev, width: `${constrained}px` }));
+  }, [isResizing]);
+  
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+    window.removeEventListener('mousemove', handleResizeMove);
+    window.removeEventListener('mouseup', handleResizeEnd);
+  }, [handleResizeMove]);
+  
+  // Toggle full screen mode
+  const toggleFullScreen = useCallback(() => {
+    if (panelSize.width === '100%') {
+      // Exit full screen
+      setPanelSize({ width: '320px', height: '100%' });
+    } else {
+      // Enter full screen
+      setPanelSize({ width: '100%', height: '100%' });
+    }
+  }, [panelSize.width]);
+
   const handleNodeClick = useCallback((inputNode: MapNode | null) => {
-    // Create a safe copy of the node if it exists, or pass null as is
     let node = inputNode;
     
-    // Ensure node has valid type if it exists
     if (node && !node.type) {
       console.log("Node missing type in MapWithAnalytics, creating copy with default type");
-      // Create a copy instead of mutating the original
       node = { 
         ...node, 
-        type: MapNodeTypeEnum.USER // Set a default type if missing
+        type: MapNodeTypeEnum.USER
       };
     }
     
     setSelectedNode(node);
-    onNodeClick(node);
     
-    // If analytics is enabled and a node is selected, ensure insights panel is open
+    // IMPORTANT: Check if onNodeClick exists before calling it
+    if (typeof onNodeClick === 'function') {
+      onNodeClick(node);
+    } else {
+      console.warn('onNodeClick is not defined in MapWithAnalytics');
+    }
+    
     if (isAnalyticsEnabled && node) {
-      // Always force open the insights panel when a node is clicked in analytics mode
       openInsightsPanel();
       console.log("Opening insights panel for node:", node.id);
     }
   }, [isAnalyticsEnabled, openInsightsPanel, onNodeClick]);
 
-  // Toggle analytics mode
   const toggleAnalytics = useCallback(() => {
-    // If we're in analytics view mode, don't allow disabling analytics
     if (analyticsViewMode && isAnalyticsEnabled) {
       return;
     }
@@ -251,38 +328,35 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
     const newState = !isAnalyticsEnabled;
     setIsAnalyticsEnabled(newState);
     
-    // Open or close the insights panel based on the analytics toggle
     if (newState) {
       openInsightsPanel();
       if (nodes.length > 0 && !graphMetrics) {
-        calculateGraphMetrics();
+        setIsLoading(true);
+        calculateGraphMetrics().finally(() => {
+          setIsLoading(false);
+        });
       }
     } else {
       closeInsightsPanel();
     }
   }, [isAnalyticsEnabled, analyticsViewMode, openInsightsPanel, closeInsightsPanel, nodes, graphMetrics, calculateGraphMetrics]);
 
-  // Handle metric mode changes from the insights panel
   const handleMetricModeChange = useCallback((mode: string) => {
     setMetricMode(mode as 'betweenness' | 'closeness' | 'degree' | 'clustering');
   }, []);
 
-  // Intercept onLoad to capture map data from WebGLMap
   const handleMapDataChange = useCallback((mapNodes: MapNode[], mapEdges: { source: string; target: string; type?: MapEdgeTypeEnum }[]) => {
     setNodes(mapNodes);
     setEdges(mapEdges);
   }, []);
 
   return (
-    <Box position="relative" width="100%" height="100%">
-      {/* Main Map Component with custom prop for capturing data */}
+    <Box position="absolute" inset="0">
       <WebGLMap
         onNodeClick={handleNodeClick}
         onLoad={onLoad}
         onLinkNodes={onLinkNodes}
-        // Add a data change handler prop - we'll need to modify WebGLMap to support this
         onDataChange={handleMapDataChange}
-        // Pass renderer configuration when analytics is enabled
         analyticsEnabled={isAnalyticsEnabled}
         analyticsRenderer={graphMetrics ? 
           { 
@@ -296,7 +370,7 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
           } : undefined}
       />
       
-      {/* Analytics Toggle Button - Hide in analytics view mode */}
+      {/* Ultra-simple Analytics Toggle Button - top right corner, away from side panel */}
       {!analyticsViewMode && (
         <Box
           position="absolute"
@@ -304,117 +378,445 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
           right="16px"
           zIndex={100}
         >
-          <Tooltip label={isAnalyticsEnabled ? "Disable Analytics" : "Enable Analytics"}>
+          <Tooltip label={isAnalyticsEnabled ? "Hide Analytics" : "Show Analytics"} placement="left">
             <IconButton
               icon={<Icon as={BiNetworkChart} boxSize={5} />}
               aria-label="Toggle Analytics"
-              bg={isAnalyticsEnabled ? analyticsButtonBg : "transparent"}
+              onClick={toggleAnalytics}
+              colorScheme={isAnalyticsEnabled ? "blue" : "gray"}
+              bg={isAnalyticsEnabled ? analyticsButtonBg : "white"}
               color={isAnalyticsEnabled ? analyticsButtonColor : "gray.400"}
               border="1px solid"
               borderColor={isAnalyticsEnabled ? analyticsButtonColor : "gray.200"}
+              size="md"
+              shadow="md"
               _hover={{
                 bg: isAnalyticsEnabled ? analyticsButtonBg : "gray.100",
               }}
-              onClick={toggleAnalytics}
             />
           </Tooltip>
         </Box>
       )}
       
-      {/* Analytics Toggle Control - Only show in non-analytics view when analytics is enabled */}
-      {isAnalyticsEnabled && !analyticsViewMode && (
+      {/* Fixed Side Insights Panel */}
+      {isAnalyticsEnabled && (
         <Box
           position="absolute"
-          top="70px"
-          right="16px"
-          zIndex={100}
-          bg={toggleBg}
-          p={2}
-          borderRadius="md"
-          boxShadow="sm"
-        >
-          <HStack spacing={2}>
-            <Icon as={MdOutlineAnalytics} color={toggleColor} />
-            <FormControl display="flex" alignItems="center" size="sm">
-              <FormLabel htmlFor="analytics-toggle" mb={0} fontSize="xs" mr={2}>
-                Analytics
-              </FormLabel>
-              <Switch
-                id="analytics-toggle"
-                colorScheme="blue"
-                isChecked={isAnalyticsEnabled}
-                onChange={toggleAnalytics}
-                size="sm"
-              />
-            </FormControl>
-          </HStack>
-        </Box>
-      )}
-      
-      {/* Insights Panel (shown when analytics is enabled) */}
-      {isAnalyticsEnabled && (
-        <Box 
-          position="absolute" 
-          right="0"
-          top="0"
-          width="300px"
-          height="100%"
+          left="auto"
+          right={0}
+          top="60px" /* Adjusted to prevent overlapping with header */
+          bottom={0}
+          width={panelSize.width}
+          height="calc(100% - 60px)" /* Adjusted height to account for header */
           zIndex={50}
-          border="1px solid"
-          borderColor="gray.200"
-          bg="white"
+          borderLeft="1px solid"
+          borderColor={useColorModeValue('gray.200', 'gray.600')}
+          bg={useColorModeValue('white', 'gray.800')}
+          boxShadow="lg"
           overflow="hidden"
+          display="flex"
+          flexDirection="column"
+          transition="width 0.2s"
         >
-          <InsightsPanel
-            graphMetrics={graphMetrics || {
-              nodes: {
-                "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 },
-                "team-1": { degreeCentrality: 0.8, betweennessCentrality: 0.3, closenessCentrality: 0.5, clusteringCoefficient: 0.6, eigenvectorCentrality: 0.4 }
-              },
-              clusters: [
-                { id: "cluster-1", nodeIds: ["user-1"], score: 1 },
-                { id: "cluster-2", nodeIds: ["team-1"], score: 1 }
-              ],
-              mostCentralNodes: ["user-1"],
-              mostConnectedClusters: ["cluster-1"],
-              bottlenecks: [],
-              collaborationOpportunities: [],
-              density: 0.5,
-              modularity: 0.6,
-              connectedness: 0.7,
-              centralization: 0.5,
-              resilience: 0.6,
-              efficiency: 0.7
-            }}
-            isLoading={false}
-            selectedNode={selectedNode || {id: "user-1", label: "Demo User", type: MapNodeTypeEnum.USER}}
-            nodes={nodes.length > 0 ? nodes : [
-              {id: "user-1", label: "John Doe", type: MapNodeTypeEnum.USER},
-              {id: "team-1", label: "Research Team", type: MapNodeTypeEnum.TEAM}
-            ]}
-            onNodeSelect={(nodeId) => {
-              console.log("Node selected in insights panel:", nodeId);
-              const node = nodes.find(n => n.id === nodeId);
-              if (node) {
-                handleNodeClick(node);
-              }
-            }}
-            onMetricModeChange={handleMetricModeChange}
-          />
-          <IconButton
-            icon={<FiX />}
-            aria-label="Close insights panel"
+          {/* Side panel resize handle */}
+          <Box
             position="absolute"
-            top={2}
-            right={2}
-            size="sm"
-            onClick={closeInsightsPanel}
-            zIndex={60}
+            cursor="ew-resize"
+            width="6px"
+            height="100%"
+            top={0}
+            left="-3px"
+            zIndex={2}
+            onMouseDown={handleResizeStart}
+            _hover={{ bg: "rgba(0,0,0,0.05)" }}
           />
+
+          {/* Unified Panel Header with metrics controls */}
+          <Flex 
+            p={3}
+            bg={useColorModeValue('gray.50', 'gray.700')}
+            borderBottom="1px solid" 
+            borderColor={useColorModeValue('gray.200', 'gray.600')}
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <HStack spacing={2}>
+              <Icon as={MdOutlineAnalytics} boxSize={5} />
+              <VStack align="flex-start" spacing={0}>
+                <Heading size="sm">Network Analytics</Heading>
+                {selectedNode && (
+                  <Text fontSize="xs" color="gray.500">
+                    {selectedNode.label} ({selectedNode.type})
+                  </Text>
+                )}
+              </VStack>
+            </HStack>
+            
+            <HStack>
+              {/* Full Screen toggle */}
+              <Tooltip label={panelSize.width === '100%' ? "Exit Full Screen" : "Full Screen"} placement="top">
+                <IconButton
+                  icon={panelSize.width === '100%' ? <FiMinimize /> : <FiMaximize />}
+                  aria-label="Toggle full screen"
+                  size="sm"
+                  colorScheme={panelSize.width === '100%' ? 'blue' : undefined}
+                  variant="ghost"
+                  onClick={toggleFullScreen}
+                />
+              </Tooltip>
+              
+              {/* Close button */}
+              <IconButton
+                icon={<FiX />}
+                aria-label="Close insights panel"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  closeInsightsPanel();
+                  setIsAnalyticsEnabled(false);
+                }}
+              />
+            </HStack>
+          </Flex>
+          
+          {/* Metric Type Selector */}
+          <Flex 
+            px={3} 
+            py={2} 
+            bg={useColorModeValue('gray.100', 'gray.800')} 
+            borderBottom="1px solid"
+            borderColor={useColorModeValue('gray.200', 'gray.600')}
+            justifyContent="center"
+          >
+            <HStack spacing={2}>
+              <Text fontSize="sm" fontWeight="medium">Metric:</Text>
+              <HStack spacing={1}>
+                <Badge 
+                  px={2} py={1} 
+                  cursor="pointer"
+                  colorScheme={metricMode === 'betweenness' ? 'blue' : 'gray'} 
+                  onClick={() => handleMetricModeChange('betweenness')}
+                >
+                  Betweenness
+                </Badge>
+                <Badge 
+                  px={2} py={1} 
+                  cursor="pointer"
+                  colorScheme={metricMode === 'closeness' ? 'blue' : 'gray'} 
+                  onClick={() => handleMetricModeChange('closeness')}
+                >
+                  Closeness
+                </Badge>
+                <Badge 
+                  px={2} py={1} 
+                  cursor="pointer"
+                  colorScheme={metricMode === 'degree' ? 'blue' : 'gray'} 
+                  onClick={() => handleMetricModeChange('degree')}
+                >
+                  Degree
+                </Badge>
+              </HStack>
+            </HStack>
+          </Flex>
+          
+          {/* Main content area - with customized InsightsPanel */}
+          <Box flex="1" overflow="auto">
+            {/* Using customized render of InsightsPanel without redundant header */}
+            {isLoading ? (
+              <Box flex="1" display="flex" alignItems="center" justifyContent="center" p={8}>
+                <Spinner size="xl" />
+              </Box>
+            ) : (
+              <Box p={4}>
+                {/* Render tabs directly */}
+                <Tabs variant="enclosed" colorScheme="blue" size="sm">
+                  <TabList>
+                    <Tab><Icon as={MdDataUsage} mr={2} />Metrics</Tab>
+                    <Tab><Icon as={MdGroups} mr={2} />Clusters</Tab>
+                    <Tab><Icon as={MdOutlineHub} mr={2} />Network</Tab>
+                  </TabList>
+                  <TabPanels>
+                    {/* Same content structure as InsightsPanel but with header removed */}
+                    {/* Top nodes by metric */}
+                    <TabPanel>
+                      <Box mb={4}>
+                        <Heading size="xs" mb={2}>Top Entities</Heading>
+                        <List spacing={1}>
+                          {getTopNodesByMetric(5).length > 0 ? (
+                            getTopNodesByMetric(5).map((node) => (
+                              <ListItem
+                                key={node.id}
+                                p={2}
+                                borderRadius="md"
+                                _hover={{ bg: useColorModeValue('gray.100', 'gray.700') }}
+                                cursor="pointer"
+                                onClick={() => handleNodeClick(node)}
+                                display="flex"
+                                justifyContent="space-between"
+                                alignItems="center"
+                              >
+                                <HStack>
+                                  <Badge colorScheme={node.type === MapNodeTypeEnum.USER ? 'green' : node.type === MapNodeTypeEnum.TEAM ? 'blue' : 'purple'}>
+                                    {node.type}
+                                  </Badge>
+                                  <Text fontSize="sm">{node.label}</Text>
+                                </HStack>
+                                {graphMetrics?.nodes?.[node.id] && (
+                                  <Badge colorScheme="blue">
+                                    {formatMetricValue(graphMetrics.nodes[node.id][`${metricMode}Centrality`] || 0)}
+                                  </Badge>
+                                )}
+                              </ListItem>
+                            ))
+                          ) : (
+                            <ListItem p={2} borderRadius="md">
+                              <Text fontSize="sm" color="gray.500">
+                                No entities found with this metric.
+                              </Text>
+                            </ListItem>
+                          )}
+                        </List>
+                      </Box>
+
+                      {/* Selected node metrics */}
+                      {selectedNode && graphMetrics?.nodes && graphMetrics.nodes[selectedNode.id] && (
+                        <Box mb={4} p={3} bg={useColorModeValue('gray.50', 'gray.700')} borderRadius="md">
+                          <SimpleGrid columns={2} spacing={4}>
+                            <Stat size="sm">
+                              <StatLabel>Degree Centrality</StatLabel>
+                              <StatNumber>
+                                {formatMetricValue(graphMetrics.nodes[selectedNode.id]?.degreeCentrality || 0)}
+                              </StatNumber>
+                              <StatHelpText>Direct connections</StatHelpText>
+                            </Stat>
+                            <Stat size="sm">
+                              <StatLabel>Betweenness</StatLabel>
+                              <StatNumber>
+                                {formatMetricValue(graphMetrics.nodes[selectedNode.id]?.betweennessCentrality || 0)}
+                              </StatNumber>
+                              <StatHelpText>Bridge importance</StatHelpText>
+                            </Stat>
+                            <Stat size="sm">
+                              <StatLabel>Closeness</StatLabel>
+                              <StatNumber>
+                                {formatMetricValue(graphMetrics.nodes[selectedNode.id]?.closenessCentrality || 0)}
+                              </StatNumber>
+                              <StatHelpText>Network proximity</StatHelpText>
+                            </Stat>
+                            <Stat size="sm">
+                              <StatLabel>Clustering</StatLabel>
+                              <StatNumber>
+                                {formatMetricValue(graphMetrics.nodes[selectedNode.id]?.clusteringCoefficient || 0)}
+                              </StatNumber>
+                              <StatHelpText>Connected neighbors</StatHelpText>
+                            </Stat>
+                          </SimpleGrid>
+                        </Box>
+                      )}
+                    </TabPanel>
+
+                    {/* Clusters Panel - same as InsightsPanel but simplified */}
+                    <TabPanel>
+                      <Text fontSize="sm" color="gray.500" mb={4}>
+                        {graphMetrics?.clusters?.length || 0} clusters identified in the network
+                      </Text>
+                      
+                      <List spacing={3}>
+                        {(graphMetrics?.clusters || []).map((cluster, index) => (
+                          <Box 
+                            key={cluster.id} 
+                            p={3} 
+                            borderWidth="1px" 
+                            borderRadius="md"
+                            borderColor={useColorModeValue('gray.200', 'gray.600')}
+                          >
+                            <HStack mb={1} justify="space-between">
+                              <Text fontWeight="medium">Cluster {index + 1}</Text>
+                              <Badge colorScheme="blue">{cluster.nodeIds.length} entities</Badge>
+                            </HStack>
+                            
+                            <List>
+                              {cluster.nodeIds
+                                .slice(0, 3)
+                                .map(id => nodes.find(n => n.id === id))
+                                .filter(Boolean)
+                                .map(node => (
+                                  <ListItem 
+                                    key={node!.id} 
+                                    fontSize="sm" 
+                                    cursor="pointer"
+                                    onClick={() => handleNodeClick(node!)}
+                                    _hover={{ textDecoration: "underline" }}
+                                  >
+                                    {node!.label} ({node!.type})
+                                  </ListItem>
+                                ))
+                              }
+                              {cluster.nodeIds.length > 3 && (
+                                <Text fontSize="xs" color="gray.500">
+                                  ...and {cluster.nodeIds.length - 3} more
+                                </Text>
+                              )}
+                            </List>
+                          </Box>
+                        ))}
+                      </List>
+                    </TabPanel>
+
+                    {/* Network Panel - simplified */}
+                    <TabPanel>
+                      {/* Network statistics */}
+                      <Box mb={4} p={3} bg={useColorModeValue('gray.50', 'gray.700')} borderRadius="md">
+                        <SimpleGrid columns={2} spacing={4}>
+                          <Stat size="sm">
+                            <StatLabel>Total Nodes</StatLabel>
+                            <StatNumber>{nodes.length}</StatNumber>
+                          </Stat>
+                          <Stat size="sm">
+                            <StatLabel>Clusters</StatLabel>
+                            <StatNumber>{graphMetrics?.clusters?.length || 0}</StatNumber>
+                          </Stat>
+                          <Stat size="sm">
+                            <StatLabel>Density</StatLabel>
+                            <StatNumber>{graphMetrics?.density ? (graphMetrics.density * 100).toFixed(1) + '%' : 'N/A'}</StatNumber>
+                          </Stat>
+                          <Stat size="sm">
+                            <StatLabel>Centralization</StatLabel>
+                            <StatNumber>{graphMetrics?.centralization ? (graphMetrics.centralization * 100).toFixed(1) + '%' : 'N/A'}</StatNumber>
+                          </Stat>
+                        </SimpleGrid>
+                      </Box>
+
+                      {/* Recommendations based on metrics */}
+                      {selectedNode && (
+                        <Box>
+                          <Heading size="xs" mb={2}>Recommendations</Heading>
+                          <List spacing={2}>
+                            {generateRecommendations().length > 0 ? (
+                              generateRecommendations().map((recommendation, index) => (
+                                <ListItem 
+                                  key={index} 
+                                  fontSize="sm" 
+                                  p={2} 
+                                  borderRadius="md" 
+                                  bg={useColorModeValue('yellow.50', 'yellow.900')}
+                                  color={useColorModeValue('yellow.800', 'yellow.200')}
+                                >
+                                  {recommendation}
+                                </ListItem>
+                              ))
+                            ) : (
+                              <Text fontSize="sm" color="gray.500">
+                                No recommendations available for this node.
+                              </Text>
+                            )}
+                          </List>
+                        </Box>
+                      )}
+                    </TabPanel>
+                  </TabPanels>
+                </Tabs>
+              </Box>
+            )}
+          </Box>
         </Box>
       )}
     </Box>
   );
+
+  // Utility functions extracted from InsightsPanel
+  function getTopNodesByMetric(count: number = 5): MapNode[] {
+    if (!graphMetrics || !graphMetrics.nodes) return [];
+    
+    try {
+      const nodeScores = Object.entries(graphMetrics.nodes || {}).map(([nodeId, metrics]) => {
+        if (!metrics) return { nodeId, score: 0 };
+        
+        let score = 0;
+        switch (metricMode) {
+          case 'degree':
+            score = metrics.degreeCentrality || 0;
+            break;
+          case 'betweenness':
+            score = metrics.betweennessCentrality || 0;
+            break;
+          case 'closeness':
+            score = metrics.closenessCentrality || 0;
+            break;
+          case 'clustering':
+            score = metrics.clusteringCoefficient || 0;
+            break;
+          default:
+            score = metrics.betweennessCentrality || 0;
+        }
+        return { nodeId, score };
+      });
+      
+      // Sort by score and get top nodes
+      const topNodeIds = nodeScores
+        .sort((a, b) => b.score - a.score)
+        .slice(0, count)
+        .map(item => item.nodeId);
+        
+      // Map to actual node objects
+      return topNodeIds
+        .map(id => nodes.find(n => n.id === id))
+        .filter((node): node is MapNode => !!node);
+    } catch (error) {
+      console.error("Error getting top nodes by metric:", error);
+      return [];
+    }
+  }
+
+  function formatMetricValue(value: number): string {
+    return (value * 100).toFixed(1) + '%';
+  }
+
+  function generateRecommendations(): string[] {
+    if (!graphMetrics || !graphMetrics.nodes || !selectedNode) return [];
+    
+    const recommendations: string[] = [];
+    
+    try {
+      // Get metrics for the selected node
+      const metrics = graphMetrics.nodes[selectedNode.id];
+      if (!metrics) return [];
+      
+      // Recommendation based on betweenness
+      if ((metrics.betweennessCentrality || 0) > 0.7) {
+        recommendations.push(
+          "This node is a critical connector. Consider reducing dependency on this entity."
+        );
+      } else if ((metrics.betweennessCentrality || 0) < 0.1) {
+        recommendations.push(
+          "This entity has low connectivity. Consider establishing more relationships."
+        );
+      }
+      
+      // Recommendation based on clustering
+      if ((metrics.clusteringCoefficient || 0) > 0.8) {
+        recommendations.push(
+          "This entity is in a highly clustered group. Look for opportunities to connect with other clusters."
+        );
+      } else if ((metrics.clusteringCoefficient || 0) < 0.2) {
+        recommendations.push(
+          "This entity's connections are not well connected to each other. Consider strengthening internal relationships."
+        );
+      }
+      
+      // Add more recommendations based on other metrics
+      if ((metrics.degreeCentrality || 0) > 0.6) {
+        recommendations.push(
+          "This entity has many direct connections. Review if all connections are necessary."
+        );
+      }
+      
+      return recommendations;
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      return ["Unable to generate recommendations due to data issues."];
+    }
+  }
 };
 
 export default MapWithAnalytics;

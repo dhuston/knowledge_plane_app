@@ -4,11 +4,27 @@
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MapData, MapNodeTypeEnum, MapNode } from '../../types/map';
-import { Box, Spinner, Text, useToast, IconButton, useDisclosure } from '@chakra-ui/react';
-import { FaFilter } from 'react-icons/fa';
+import { Box, Spinner, Text, useToast, IconButton, useDisclosure, Tooltip } from '@chakra-ui/react';
+import { FaFilter, FaChartBar } from 'react-icons/fa';
 import { useApiClient } from '../../hooks/useApiClient';
 import { useDeltaStream } from '../../hooks/useDeltaStream';
+import { useFeatureFlags } from '../../utils/featureFlags';
 import debounce from 'lodash/debounce';
+
+// Import the ContextDrawer and NodeSelection context
+import ContextDrawer from '../panels/ContextDrawer';
+import { useNodeSelection } from '../../context/NodeSelectionContext';
+
+// Add custom CSS for the full-page map
+const fullPageMapStyles = {
+  '.sigma-container': {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  }
+};
 
 // Import from the shared styles
 import { nodeStyles } from './styles/MapStyles';
@@ -126,8 +142,10 @@ const LivingMap: React.FC<LivingMapProps> = ({
   onNodeClick,
   onMapLoad,
 }) => {
+  // Node selection is now managed by the NodeSelectionContext
   const toast = useToast();
   const apiClient = useApiClient();
+  const { flags } = useFeatureFlags();
   const isMounted = useRef(true);
   const lastDeltaUpdateRef = useRef<number>(0);
   const lastViewportFetchRef = useRef<number>(0);
@@ -500,21 +518,13 @@ const LivingMap: React.FC<LivingMapProps> = ({
   // Connect to delta stream
   useDeltaStream(handleDeltaUpdate);
 
-  // Search Logic - enhanced with node types and proper type checking
-  const focusOnNode = useCallback((nodeId: string) => {
-    const node = sigmaGraphData?.nodes.find(n => n.id === nodeId);
-    if (node) {
-      // Focus the camera on this node - no need to check x/y since they're required by SigmaNode type
-      updateFilters({ centerNodeId: nodeId });
-    }
-    setSearchResults([]);
-  }, [sigmaGraphData, updateFilters]);
-
+  // Handle search node selection
   const handleSearch = useCallback(() => {
     if (searchResults.length) {
-      focusOnNode(searchResults[0].id);
+      // Select the first search result
+      handleNodeSelect(searchResults[0].id);
     }
-  }, [searchResults, focusOnNode]);
+  }, [searchResults, handleNodeSelect]);
 
   // Enhanced search with type filtering - using useMemo for better performance
   useEffect(() => {
@@ -560,13 +570,82 @@ const LivingMap: React.FC<LivingMapProps> = ({
     return <Box p={5}><Text color="red.500">Error: {error}</Text></Box>;
   }
 
+  // Use the NodeSelectionContext for node selection
+  const { selectNode } = useNodeSelection();
+  
+  // Handle node selection with proper memory to prevent errors on subsequent selections
+  const selectedNodeRef = useRef<MapNode | null>(null);
+  
+  const handleNodeSelect = useCallback((nodeId: string | null) => {
+    if (nodeId === null) {
+      // Deselection - pass null to clear selection
+      selectNode(null);
+      selectedNodeRef.current = null;
+    } else {
+      // Find and set the selected node
+      const node = sigmaGraphData?.nodes.find(n => n.originalApiData.id === nodeId);
+      
+      if (node) {
+        // Store the full node data in a ref to use for subsequent operations
+        selectedNodeRef.current = node.originalApiData;
+        
+        // Use the central selectNode function from context
+        selectNode(node.originalApiData);
+      } else if (selectedNodeRef.current) {
+        // If we can't find the node in the graph but we have a previously selected node,
+        // we can try to find it in the related nodes of that one
+        const relationships = selectedNodeRef.current.data?.relationships || [];
+        const relatedNodeId = relationships.find(rel => 
+          rel.targetId === nodeId || rel.sourceId === nodeId
+        );
+        
+        if (relatedNodeId) {
+          // We found a related node - use its data if available
+          const relatedNode = relatedNodeId.targetId === nodeId 
+            ? relatedNodeId.target 
+            : relatedNodeId.source;
+            
+          if (relatedNode) {
+            // We have the full node data
+            selectNode(relatedNode);
+            selectedNodeRef.current = relatedNode;
+          } else {
+            // Create a placeholder node with minimal data
+            const placeholderNode: MapNode = {
+              id: nodeId,
+              label: `Node ${nodeId}`,
+              type: MapNodeTypeEnum.USER,  // Default type
+              data: {}
+            };
+            selectNode(placeholderNode);
+            selectedNodeRef.current = placeholderNode;
+          }
+        } else {
+          // Create a minimal placeholder node
+          const placeholderNode: MapNode = {
+            id: nodeId,
+            label: `Node ${nodeId}`,
+            type: MapNodeTypeEnum.USER,  // Default type
+            data: {}
+          };
+          selectNode(placeholderNode);
+          selectedNodeRef.current = placeholderNode;
+        }
+      }
+    }
+    
+    // Call the parent's onNodeClick if provided (keeping backward compatibility)
+    if (onNodeClick) {
+      onNodeClick(nodeId);
+    }
+  }, [sigmaGraphData?.nodes, selectNode, onNodeClick]);
+
   return (
     <Box height="100%" width="100%" position="relative">
       <Box 
-        height="100%" 
-        width="100%" 
+        position="absolute" 
+        inset="0" 
         background="#f8f8f8" 
-        minH="300px"
         tabIndex={0} // Make the map container focusable
         role="application" 
         aria-label="Interactive map visualization"
@@ -671,9 +750,17 @@ const LivingMap: React.FC<LivingMapProps> = ({
               allowInvalidContainer: true,
               // Enable labels only at high zoom levels
               renderLabels: viewport.ratio < 0.6,
-              // Limit edge rendering at low zoom levels
-              renderEdgeLabels: viewport.ratio < 0.4
+              // Always render edges - this is what we want
+              renderEdges: true,
+              // Limit edge labels at low zoom levels
+              renderEdgeLabels: viewport.ratio < 0.4,
+              // Ensure edge rendering is prioritized
+              edgeProgramClasses: { 
+                def: { backgroundColor: '#fff' } 
+              }
             }}
+            className="full-page-sigma-container" // Add a class for custom styling
+            sx={fullPageMapStyles} // Apply the custom styles
           >
             <CameraController onViewportChange={handleViewportChange} />
             
@@ -691,12 +778,12 @@ const LivingMap: React.FC<LivingMapProps> = ({
                 [sigmaGraphData.edges]
               )}
               onSigmaNodeClick={useCallback(
-                (node: MapNode | null) => onNodeClick(node?.id || null), 
-                [onNodeClick]
+                (node: MapNode | null) => handleNodeSelect(node?.id || null), 
+                [handleNodeSelect]
               )}
               onStageClick={useCallback(
-                () => onNodeClick(null), 
-                [onNodeClick]
+                () => handleNodeSelect(null), 
+                [handleNodeSelect]
               )}
               onNodeHover={useCallback(
                 (_node: MapNode | null) => {
@@ -740,6 +827,32 @@ const LivingMap: React.FC<LivingMapProps> = ({
         aria-controls="filter-panel"
         aria-haspopup="dialog"
       />
+      
+      {/* Analytics Toggle - only shown if feature flag is enabled */}
+      {flags.enableAnalytics && (
+        <Tooltip label="Toggle Analytics View">
+          <IconButton
+            aria-label="Toggle Analytics View"
+            icon={<FaChartBar />}
+            size="sm"
+            position="absolute"
+            top="15px"
+            right="60px"
+            zIndex={4}
+            onClick={() => {
+              // This would typically update some analytics state
+              toast({
+                title: "Analytics mode toggled",
+                description: "Map analytics view has been enabled",
+                status: "info",
+                duration: 2000,
+              });
+            }}
+            colorScheme="teal"
+            variant="outline"
+          />
+        </Tooltip>
+      )}
 
       {/* Enhanced Filter Panel */}
       {isFilterPanelOpen && (
@@ -764,12 +877,15 @@ const LivingMap: React.FC<LivingMapProps> = ({
       {/* Search Suggestions Dropdown */}
       <SearchResultsList
         results={searchResults}
-        onResultClick={focusOnNode}
+        onResultClick={handleNodeSelect}
         visible={searchResults.length > 0}
       />
 
       {/* Loading Indicator Overlay */}
       <MapLoadingOverlay isLoading={isLoading} />
+      
+      {/* Context Drawer - simplified with context */}
+      <ContextDrawer />
     </Box>
   );
 };

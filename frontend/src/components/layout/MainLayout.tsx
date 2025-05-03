@@ -22,11 +22,10 @@ import {
   Tooltip,
 } from "@chakra-ui/react";
 import { FiMap } from 'react-icons/fi';
-import { FaCogs } from 'react-icons/fa';
+import { FaCogs, FaSync } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import WebGLMap from '../map/WebGLMap';
 import MapWithAnalytics from '../map/MapWithAnalytics';
-import NotificationCenter from '../notifications/NotificationCenter';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
 import ContextPanel from '../panels/ContextPanel';
 import Header from './Header';
@@ -40,6 +39,7 @@ import HighlightedText, { HighlightedTextSegment } from '../text/HighlightedText
 import { useFeatureFlags } from '../../utils/featureFlags';
 import IntegrationsPanel from '../integrations/IntegrationsPanel';
 import FeatureFlagsPanel from '../admin/FeatureFlagsPanel';
+import { HierarchyNavigator } from '../hierarchy/HierarchyNavigator';
 
 // Different workspace view types
 type WorkspaceViewType = 'command-center' | 'map-focus' | 'grid';
@@ -52,16 +52,12 @@ const HEADER_HEIGHT = '60px';
 export default function MainLayout() {
   const navigate = useNavigate();
   const { isLoading, setToken, user } = useAuth();
-  const {
-    isOpen: isNotificationsOpen,
-    onClose: onNotificationsClose
-  } = useDisclosure();
 
   // Workspace view state
   const [workspaceView, setWorkspaceView] = useState<WorkspaceViewType>('command-center');
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
   // State for active view
-  const [activeView, setActiveView] = useState<'myWork' | 'explore' | 'analytics'>('myWork');
+  const [activeView, setActiveView] = useState<'myWork' | 'explore'>('myWork');
   // Feature flag state
   const { flags } = useFeatureFlags();
   // Integration and admin panels
@@ -191,34 +187,22 @@ export default function MainLayout() {
     );
   }
 
-  // Render Map-Only View - Expanded for full view without header
+  // Render Map-Only View - Filling the entire space
   const renderMapFocusView = () => (
-    <Box height="100%" p={{ base: 2, md: 4 }}>
-      <Card h="100%" shadow="sm" bg={cardBgColor} borderColor={borderColor} borderWidth="1px">
-        <CardBody p={{ base: 0, md: 0 }}>
-          <Box
-            position="relative"
-            h="100%"
-            borderRadius="md"
-            overflow="hidden"
-          >
-            <ErrorBoundary>
-              {isMapLoading && (
-                <Center position="absolute" inset={0} bg="rgba(0,0,0,0.1)" zIndex={1}>
-                  <Spinner size="xl" color="primary.500" />
-                </Center>
-              )}
-              <MapWithAnalytics
-                onNodeClick={handleMapNodeClick}
-                onLoad={handleMapLoad}
-                onLinkNodes={handleLinkNodes}
-                showAnalyticsByDefault={activeView === 'analytics'}
-                analyticsViewMode={activeView === 'analytics'}
-              />
-            </ErrorBoundary>
-          </Box>
-        </CardBody>
-      </Card>
+    <Box position="absolute" inset={0} overflow="hidden">
+      <ErrorBoundary>
+        {isMapLoading && (
+          <Center position="absolute" inset={0} bg="rgba(0,0,0,0.1)" zIndex={1}>
+            <Spinner size="xl" color="primary.500" />
+          </Center>
+        )}
+        <MapWithAnalytics
+          onNodeClick={handleMapNodeClick}
+          onLoad={handleMapLoad}
+          onLinkNodes={handleLinkNodes}
+          showAnalyticsByDefault={false}
+        />
+      </ErrorBoundary>
     </Box>
   );
 
@@ -365,21 +349,10 @@ export default function MainLayout() {
   // const [activeView, setActiveView] = useState<'myWork' | 'explore' | 'analytics'>('myWork');
 
   // Handle view change
-  const handleViewToggle = (view: 'myWork' | 'explore' | 'analytics') => {
+  const handleViewToggle = (view: 'myWork' | 'explore') => {
     setActiveView(view);
     // Map views to workspace views
-    let mappedView: WorkspaceViewType;
-    if (view === 'myWork') {
-      mappedView = 'command-center';
-    } else if (view === 'explore') {
-      mappedView = 'map-focus';
-    } else if (view === 'analytics') {
-      // For analytics view, we'll also use the map but with analytics enabled
-      mappedView = 'map-focus';
-      // We could set an analytics flag here if needed
-    } else {
-      mappedView = 'command-center';
-    }
+    const mappedView: WorkspaceViewType = view === 'myWork' ? 'command-center' : 'map-focus';
     handleViewChange(mappedView);
   };
 
@@ -397,20 +370,38 @@ export default function MainLayout() {
           activeView={activeView}
         />
 
-        {/* Main Content Area - Full width without sidebar - Increased margins */}
-        <Box
+        {/* Main Content Area with optional Hierarchy Navigator sidebar */}
+        <Flex
           as="main"
-          overflow="auto"
+          overflow="hidden"
           id="main-content"
           position="relative"
-          bg={bgColor}
           h={`calc(100vh - ${HEADER_HEIGHT})`}
           mt={HEADER_HEIGHT}
-          px={{ base: 8, md: 16, lg: 32 }}
-          py={{ base: 8, md: 10 }}
-          maxWidth="1800px"
-          mx="auto"
         >
+          {/* Hierarchy Navigator - Only shown in My Work view */}
+          {activeView === 'myWork' && workspaceView === 'command-center' && flags.enableHierarchyNavigator && (
+            <Box height="100%" zIndex="5">
+              <HierarchyNavigator 
+                onUnitSelected={(unitId) => {
+                  console.log(`Selected unit: ${unitId}`);
+                  // Here we could filter workspace content based on organization unit
+                }}
+              />
+            </Box>
+          )}
+          
+          {/* Main Content */}
+          <Box
+            flex="1"
+            overflow="hidden"
+            bg={bgColor}
+            px={workspaceView === 'map-focus' ? 0 : { base: 8, md: 16, lg: 32 }}
+            py={workspaceView === 'map-focus' ? 0 : { base: 8, md: 10 }}
+            maxWidth={workspaceView === 'map-focus' ? "100%" : "1800px"}
+            mx="auto"
+            width="100%"
+          >
             {/* Global Command Bar - Keyboard accessible (⌘+K) */}
             <Box
               position="absolute"
@@ -435,7 +426,8 @@ export default function MainLayout() {
             {workspaceView === 'command-center' && renderCommandCenterView()}
             {workspaceView === 'map-focus' && renderMapFocusView()}
             {workspaceView === 'grid' && renderGridView()}
-        </Box>
+          </Box>
+        </Flex>
 
         {/* Modals and Panels - Refined with better styling */}
         <Portal>
@@ -445,32 +437,27 @@ export default function MainLayout() {
               onClose={() => setSelectedNode(null)}
               projectOverlaps={projectOverlaps}
               getProjectNameById={(id: string) => `Project ${id.substring(0, 4)}...`}
+              onNodeClick={(nodeId) => {
+                console.log("Node clicked in ContextPanel:", nodeId);
+                if (nodeId) {
+                  // Handle node click in the main layout
+                  handleMapNodeClick({
+                    id: nodeId,
+                    label: `Item ${nodeId}`,
+                    type: MapNodeTypeEnum.USER, // Default type
+                    data: {}
+                  });
+                }
+              }}
             />
           )}
 
           {/* Daily briefing panel removed as it's now integrated in the main view */}
-
-          <NotificationCenter
-            isOpen={isNotificationsOpen}
-            onClose={onNotificationsClose}
-          />
         </Portal>
 
-        {/* Tool buttons */}
-        <Box position="fixed" bottom="30px" right="30px" zIndex="100">
-          <VStack spacing={3}>
-            {/* Feature Flags Toggle Button - Admin Only */}
-            <Tooltip label="Feature Settings">
-              <IconButton
-                icon={<FaCogs />}
-                aria-label="Feature Settings"
-                colorScheme={showFeatureFlagsPanel ? "blue" : "gray"}
-                onClick={() => setShowFeatureFlagsPanel(!showFeatureFlagsPanel)}
-                size="md"
-                shadow="md"
-              />
-            </Tooltip>
-            
+        {/* Tool buttons - positioned left of the EntityActionButton */}
+        <Box position="fixed" bottom="24px" right="80px" zIndex="100">
+          <HStack spacing={3}>
             {/* Integrations Button - Only shown if flag is enabled */}
             {flags.enableIntegrations && (
               <Tooltip label="Data Integrations">
@@ -484,7 +471,19 @@ export default function MainLayout() {
                 />
               </Tooltip>
             )}
-          </VStack>
+            
+            {/* Feature Flags Toggle Button - Admin Only */}
+            <Tooltip label="Feature Settings">
+              <IconButton
+                icon={<FaCogs />}
+                aria-label="Feature Settings"
+                colorScheme={showFeatureFlagsPanel ? "blue" : "gray"}
+                onClick={() => setShowFeatureFlagsPanel(!showFeatureFlagsPanel)}
+                size="md"
+                shadow="md"
+              />
+            </Tooltip>
+          </HStack>
         </Box>
 
         {/* Show Feature Flags Panel when enabled */}

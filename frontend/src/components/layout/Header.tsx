@@ -15,6 +15,10 @@ import {
     VStack,
     Portal,
     Heading,
+    IconButton,
+    HStack,
+    Tooltip,
+    useDisclosure,
 } from '@chakra-ui/react';
 import {
     FiUser,
@@ -25,16 +29,20 @@ import {
     FiStar,
     FiClock,
     FiUsers,
+    FiBell,
 } from 'react-icons/fi';
 import { useLocation, Link } from 'react-router-dom';
 import { User } from '../../context/AuthContext';
 import ViewToggle from '../ui/ViewToggle';
+import useNotifications from '../../hooks/useNotifications';
+import NotificationBadge from '../notifications/NotificationBadge';
+import NotificationCenter from '../notifications/NotificationCenter';
 
 interface HeaderProps {
     onCreateProjectClick?: () => void;
     onLogout: () => void;
-    onViewChange?: (view: 'myWork' | 'explore' | 'analytics') => void;
-    activeView?: 'myWork' | 'explore' | 'analytics';
+    onViewChange?: (view: 'myWork' | 'explore') => void;
+    activeView?: 'myWork' | 'explore';
     user: User | null;
 }
 
@@ -49,6 +57,8 @@ const Header: React.FC<HeaderProps> = ({
     const bgColor = useColorModeValue('surface.500', '#262626'); // White : Button color
     const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
     const logoColor = useColorModeValue('#262626', 'secondary.400'); // Button color : Off-white/cream
+    const { isOpen: isNotificationsOpen, onOpen: openNotifications, onClose: closeNotifications } = useDisclosure();
+    const { notifications, unreadCount } = useNotifications();
     
     // State to control logo visibility
     const [logoOpacity, setLogoOpacity] = useState(1);
@@ -98,28 +108,47 @@ const Header: React.FC<HeaderProps> = ({
                         />
                     </Box>
 
-                    {/* Right section - User Profile */}
+                    {/* Right section - Notifications & User Profile */}
                     <Box width="200px" display="flex" justifyContent="flex-end">
-                        <Menu>
-                            <MenuButton
-                                as={Button}
-                                variant="ghost"
-                                rounded="full"
-                                cursor="pointer"
-                                minW={0}
-                                px={2}
-                            >
-                                <Avatar
-                                    size="sm"
-                                    name={user?.name || 'User'}
-                                    src={user?.avatar_url || undefined}
-                                    bg="#262626" // Button color
-                                    color="white" // White text for contrast
-                                    getInitials={(name) => name.split(' ').map(n => n[0]).join('')}
-                                />
-                            </MenuButton>
-                            <Portal>
-                                <MenuList zIndex={1001} p={2}>
+                        <HStack spacing={2}>
+                            {/* Notification Bell */}
+                            <Box position="relative">
+                                <Tooltip label="Notifications" placement="bottom">
+                                    <IconButton
+                                        aria-label="Notifications"
+                                        icon={<FiBell />}
+                                        variant="ghost"
+                                        size="md"
+                                        onClick={openNotifications}
+                                        borderRadius="full"
+                                    />
+                                </Tooltip>
+                                {unreadCount > 0 && (
+                                    <NotificationBadge count={unreadCount} />
+                                )}
+                            </Box>
+                            
+                            {/* User Profile */}
+                            <Menu>
+                                <MenuButton
+                                    as={Button}
+                                    variant="ghost"
+                                    rounded="full"
+                                    cursor="pointer"
+                                    minW={0}
+                                    px={2}
+                                >
+                                    <Avatar
+                                        size="sm"
+                                        name={user?.name || 'User'}
+                                        src={user?.avatar_url || undefined}
+                                        bg="#262626" // Button color
+                                        color="white" // White text for contrast
+                                        getInitials={(name) => name.split(' ').map(n => n[0]).join('')}
+                                    />
+                                </MenuButton>
+                                <Portal>
+                                    <MenuList zIndex={1001} p={2}>
                                     <VStack align="stretch" spacing={2}>
                                         <Box px={3} py={2} borderRadius="md" bg={useColorModeValue('secondary.400', '#363636')}>
                                             <Text fontWeight="medium">{user?.name}</Text>
@@ -141,6 +170,13 @@ const Header: React.FC<HeaderProps> = ({
                                             My Team
                                         </MenuItem>
                                         <MenuItem icon={<FiSettings />} command="⌘,">Settings</MenuItem>
+                                        <MenuItem 
+                                          icon={<FiSettings />} 
+                                          as={Link} 
+                                          to="/admin"
+                                        >
+                                          Admin Console
+                                        </MenuItem>
                                         <MenuItem icon={<FiStar />}>Favorites</MenuItem>
                                         <MenuItem icon={<FiClock />}>Recent</MenuItem>
                                         <MenuDivider my={1} />
@@ -159,9 +195,16 @@ const Header: React.FC<HeaderProps> = ({
                                 </MenuList>
                             </Portal>
                         </Menu>
+                        </HStack>
                     </Box>
                 </Flex>
             </Container>
+            
+            {/* Notification Center */}
+            <NotificationCenter 
+                isOpen={isNotificationsOpen} 
+                onClose={closeNotifications} 
+            />
         </Box>
     );
 };

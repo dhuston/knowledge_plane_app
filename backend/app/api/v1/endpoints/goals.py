@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -50,14 +50,41 @@ async def read_goals(
     db: AsyncSession = Depends(get_db_session),
     skip: int = 0,
     limit: int = 100,
+    goal_type: Optional[str] = None,
+    parent_id: Optional[UUID] = None,
+    status: Optional[str] = None,
+    progress_min: Optional[int] = None,
+    progress_max: Optional[int] = None,
+    due_date_before: Optional[str] = None,
+    due_date_after: Optional[str] = None,
     current_user: models.User = Depends(get_current_user),
 ) -> Any:
     """
-    Retrieve goals for the current user's tenant.
+    Retrieve goals for the current user's tenant with optional filtering.
+    
+    - **goal_type**: Filter by goal type (e.g., 'strategic', 'operational', 'tactical')
+    - **parent_id**: Filter by parent goal ID
+    - **status**: Filter by status (e.g., 'active', 'completed', 'cancelled')
+    - **progress_min**: Filter by minimum progress percentage (0-100)
+    - **progress_max**: Filter by maximum progress percentage (0-100)
+    - **due_date_before**: Filter by due date before this date (ISO format)
+    - **due_date_after**: Filter by due date after this date (ISO format)
     """
-    # TODO: Add filtering by type, parent, status etc.
-    goals = await crud_goal.get_multi_by_tenant(
-        db, tenant_id=current_user.tenant_id, skip=skip, limit=limit
+    # Prepare filter parameters
+    filters = {}
+    if goal_type:
+        filters["type"] = goal_type
+    if parent_id:
+        filters["parent_id"] = parent_id
+    if status:
+        filters["status"] = status
+    if progress_min is not None or progress_max is not None:
+        filters["progress_range"] = (progress_min, progress_max)
+    if due_date_before or due_date_after:
+        filters["due_date_range"] = (due_date_after, due_date_before)
+    
+    goals = await crud_goal.get_multi_by_tenant_filtered(
+        db, tenant_id=current_user.tenant_id, skip=skip, limit=limit, filters=filters
     )
     return goals
 

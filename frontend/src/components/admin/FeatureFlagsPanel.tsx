@@ -32,7 +32,8 @@ const FeatureFlagsPanel: React.FC = () => {
   const featureCategories = {
     'Real-time Features': ['enableDeltaStream'],
     'Visualization Features': ['enableAnalytics', 'enableTeamClustering'],
-    'UI Components': ['enableIntegrations', 'enableSuggestions', 'enableActivityTimeline']
+    'UI Components': ['enableIntegrations', 'enableSuggestions', 'enableActivityTimeline'],
+    'Navigation': ['enableHierarchyNavigator']
   };
 
   return (

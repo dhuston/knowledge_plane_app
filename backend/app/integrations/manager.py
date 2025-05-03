@@ -43,7 +43,7 @@ class IntegrationManager:
         self._db = db
         self._registry = registry or connector_registry
         self._tenant_id = tenant_id
-        self._processors = {}  # Cache of processor instances
+        self._processors = {}
     
     async def register_integration(self, config: Dict[str, Any]) -> UUID:
         """

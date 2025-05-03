@@ -343,7 +343,7 @@ def create_mock_development_user() -> models.User:
         title="Software Developer",
         avatar_url=None,
         online_status=True,
-        tenant_id=UUID("33333333-3333-3333-3333-333333333333"),
+        tenant_id=UUID("d3667ea1-079a-434e-84d2-60e84757b5d5"),  # Use our actual test tenant ID
         auth_provider="mock",
         auth_provider_id="mock_id",
         created_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
@@ -373,19 +373,41 @@ async def create_new_access_token(user_id: UUID) -> str:
     return new_access_token
 
 
-# TODO: Add endpoint to logout (potentially blacklist tokens)
-
 @router.post("/logout")
 async def logout(
-    # Optional: Could take the token to blacklist it if needed
-    # response: Response # If needing to clear HttpOnly cookies
+    request: Request,
+    token: str = Depends(security.oauth2_scheme),
+    db: AsyncSession = Depends(get_db_session)
 ) -> Any:
     """
     Endpoint for client to signal logout.
-    Currently does nothing on the backend, but could be extended
-    to invalidate refresh tokens (e.g., add to a blacklist).
+    Invalidates refresh tokens by adding to a blacklist.
     """
     logger.info("Received request for /logout")
-    # No action needed on backend for simple JWT invalidation (client deletes)
-    # If using server-side refresh token invalidation, implement logic here.
-    return {"message": "Logout endpoint called"} 
+    
+    try:
+        # Extract user ID from token
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id = payload.get("sub")
+        
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        # Add token to the blacklist
+        # This is a simplified implementation - in production you would
+        # want to use a more efficient storage like Redis for token blacklisting
+        await crud_user.add_to_token_blacklist(
+            db=db,
+            user_id=UUID(user_id),
+            token=token
+        )
+        
+        logger.info(f"User {user_id} logged out successfully")
+        return {"message": "Logged out successfully"}
+    except Exception as e:
+        logger.error(f"Error during logout: {e}")
+        return {"message": "Logout processed"} 

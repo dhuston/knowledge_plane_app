@@ -121,12 +121,10 @@ async def read_project_participants(
             detail="Project not found or not part of your tenant."
         )
 
-    # TODO: Implement the actual fetching of participants
-    # This likely involves a join query or a specific CRUD function
-    # Example placeholder - replace with actual logic:
-    # participants = await crud_project_instance.get_participants(db=db, project_id=project_id, tenant_id=current_user.tenant_id)
-    # For now, returning an empty list to avoid breaking:
-    participants = [] 
+    # Fetch project participants using the crud method
+    participants = await crud_project_instance.get_participants(
+        db=db, project_id=project_id, tenant_id=current_user.tenant_id
+    )
     return participants
 
 # Optional: Add listing endpoint later

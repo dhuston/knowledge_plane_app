@@ -211,7 +211,8 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
           size: style.size,
           type: style.type,
           animated: style.animated,
-          edgeType: edgeType // Store the edge type for reference
+          edgeType: edgeType, // Store the edge type for reference
+          hidden: false // ALWAYS show edges by default
         });
       }
 
@@ -656,7 +657,13 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
           return newData;
         }
 
-        // Apply hover effects
+        // Debug - checking if edges are initially hidden by something else
+        console.log(`Edge ${edge} renderState: hidden=${newData.hidden}, color=${newData.color}, size=${newData.size}`);
+        
+        // Force edges to always be visible
+        newData.hidden = false;
+        
+        // Always show edges, but apply hover effects when hovering
         if (hoveredNode) {
           if (graph.hasExtremity(edge, hoveredNode)) {
             // Edges connected to hovered node get emphasized
@@ -681,9 +688,16 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
               }
             }
           } else {
-            // Other edges get hidden or significantly faded
-            newData.hidden = true;
+            // Other edges get faded but still visible
+            newData.color = "#E2E2E280"; // Semi-transparent
+            newData.size = (newData.size || 1) * 0.5;
           }
+        } else {
+          // When not hovering, all edges are visible at default size
+          newData.color = newData.color || "#AAAAAA";
+          newData.size = newData.size || 1;
+          // Force edges to be visible ALWAYS
+          newData.hidden = false;
         }
 
         return newData;

@@ -1,10 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, Table, Column, String, DateTime, MetaData, insert
 from sqlalchemy.dialects.postgresql import insert
 from uuid import UUID
 from sqlalchemy.future import select
 from typing import Any, Dict, Optional, Union, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import selectinload, joinedload, Query
 
@@ -15,6 +15,7 @@ from app.models.project import Project as ProjectModel
 from app.schemas.project import ProjectRead
 from app.models.goal import Goal as GoalModel
 from app.schemas.goal import GoalRead
+from app.db.base_class import Base
 
 async def get_user(db: AsyncSession, user_id: UUID) -> UserModel | None:
     result = await db.execute(select(UserModel).filter(UserModel.id == user_id))
@@ -195,13 +196,59 @@ class CRUDUser():
 
     async def get_by_refresh_token(self, db: AsyncSession, *, refresh_token: str) -> Optional[UserModel]:
         """Finds a user by their stored Google refresh token."""
-        # TODO: Add index on google_refresh_token column for performance
-        # TODO: Ensure refresh tokens are stored securely (encryption)
-        # TODO: Add relationship loading option?
         result = await db.execute(
             select(UserModel).where(UserModel.google_refresh_token == refresh_token)
         )
         return result.scalar_one_or_none()
+        
+    async def add_to_token_blacklist(self, db: AsyncSession, *, user_id: UUID, token: str) -> bool:
+        """
+        Add a JWT token to the blacklist.
+        
+        Args:
+            db: Database session
+            user_id: User ID associated with the token
+            token: The JWT token to blacklist
+            
+        Returns:
+            True if successfully added to blacklist
+        """
+        # Create token_blacklist table if it doesn't exist
+        metadata = MetaData()
+        token_blacklist = Table(
+            "token_blacklist", 
+            metadata,
+            Column("token", String, primary_key=True),
+            Column("user_id", String, nullable=False),
+            Column("created_at", DateTime, nullable=False),
+            Column("expires_at", DateTime, nullable=False),
+        )
+        
+        # Make sure table exists
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS token_blacklist (
+                token VARCHAR(1000) PRIMARY KEY,
+                user_id UUID NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+            );
+            """
+        )
+        
+        # Insert the token into the blacklist
+        # Set expiration to 24 hours for demo purposes
+        # In a real implementation, extract expiry from token
+        stmt = insert(token_blacklist).values(
+            token=token,
+            user_id=str(user_id),
+            created_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(hours=24)
+        )
+        
+        await db.execute(stmt)
+        await db.commit()
+        return True
 
     async def get_participating_project_ids(self, db: AsyncSession, *, user_id: UUID) -> List[UUID]:
         """Returns a list of project IDs the user is participating in."""

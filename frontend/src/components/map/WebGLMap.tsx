@@ -401,7 +401,7 @@ const WebGLMap: React.FC<WebGLMapProps> = ({
   const rendererProps = getRendererProps();
 
   return (
-    <Box position="relative" width="100%" height="100%">
+    <Box position="absolute" inset="0">
       <SigmaContainer style={{ width: '100%', height: '100%' }} settings={{ allowInvalidContainer: true }}>
         <SigmaGraphLoader
           nodes={nodes}

@@ -9,10 +9,13 @@ class LLMClient:
         # Check if we're in development mode with disabled OpenAI
         if getattr(settings, "DISABLE_OPENAI", False) or not settings.OPENAI_API_KEY:
             logger.warning("OPENAI_API_KEY not set or OpenAI is disabled. Using mock LLM client.")
+            logger.info(f"OPENAI_API_KEY from settings (in LLMClient): {'Set (value hidden)' if settings.OPENAI_API_KEY else 'Not Set'}")
+            logger.info(f"DISABLE_OPENAI from settings (in LLMClient): {settings.DISABLE_OPENAI}")
             self.client = None
             self.mock_mode = True
         else:
             # Consider using async client if FastAPI routes are async
+            logger.info("Initializing OpenAI client with API key")
             self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
             self.mock_mode = False
 
@@ -70,13 +73,16 @@ class LLMService:
         # Check if we should use a mock client
         if getattr(settings, "DISABLE_OPENAI", False) or not settings.OPENAI_API_KEY:
             logger.warning("OPENAI_API_KEY not set or OpenAI is disabled. Using mock mode.")
+            logger.info(f"OPENAI_API_KEY from settings (in LLMService.get_client): {'Set (value hidden)' if settings.OPENAI_API_KEY else 'Not Set'}")
+            logger.info(f"DISABLE_OPENAI from settings (in LLMService.get_client): {settings.DISABLE_OPENAI}")
             cls._mock_mode = True
             return None
         
         # Initialize real client if needed
         if cls._client is None:
+            logger.info("AsyncOpenAI client initializing with API key from settings")
             cls._client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-            logger.info("AsyncOpenAI client initialized.")
+            logger.info("AsyncOpenAI client initialized successfully")
             cls._mock_mode = False
             
         return cls._client
@@ -95,12 +101,16 @@ class LLMService:
                 # Create mock response based on the content of the messages
                 prompt = " ".join([msg.get("content", "") for msg in messages])
                 logger.info(f"Mock LLM generating response for: {prompt[:30]}...")
+                logger.info(f"OPENAI_API_KEY from settings (in generate_response): {'Set (value hidden)' if settings.OPENAI_API_KEY else 'Not Set'}")
+                logger.info(f"DISABLE_OPENAI from settings (in generate_response): {settings.DISABLE_OPENAI}")
                 return f"This is a mock LLM response for development purposes. Your messages were about: {prompt[:50]}..."
                 
             # Get real client
+            logger.info("Getting real OpenAI client")
             client = self.get_client()
             
             # Make API call
+            logger.info(f"Making OpenAI API call with model: {model}")
             response = await client.chat.completions.create(
                 model=model,
                 messages=messages,

@@ -7,24 +7,23 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { FiHome, FiMap } from 'react-icons/fi';
-import { MdOutlineAnalytics } from 'react-icons/md';
 
 interface ViewToggleProps {
   /**
    * Current active view
    */
-  activeView: 'myWork' | 'explore' | 'analytics';
+  activeView: 'myWork' | 'explore';
 
   /**
    * Callback when view is changed
    */
-  onViewChange: (view: 'myWork' | 'explore' | 'analytics') => void;
+  onViewChange: (view: 'myWork' | 'explore') => void;
 }
 
 /**
  * ViewToggle
  *
- * A toggle component for switching between "My Work", "Explore", and "Analytics" views
+ * A toggle component for switching between "My Work" and "Explore" views
  * with a smooth sliding animation
  */
 const ViewToggle: React.FC<ViewToggleProps> = ({
@@ -58,16 +57,10 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
         position="absolute"
         top="1px"
         height="calc(100% - 2px)"
-        width="33.33%"
+        width="50%"
         bg={activeBgColor}
         borderRadius="full"
-        left={
-          activeView === 'myWork' 
-            ? '1px' 
-            : activeView === 'explore' 
-              ? 'calc(33.33% - 1px)' 
-              : 'calc(66.66% - 1px)'
-        }
+        left={activeView === 'myWork' ? '1px' : 'calc(50% - 1px)'}
         transition="left 0.3s ease"
         boxShadow={`0 2px 4px ${shadowColor}`}
         borderWidth="1px"
@@ -127,31 +120,6 @@ const ViewToggle: React.FC<ViewToggleProps> = ({
         </Flex>
       </Box>
 
-      {/* Analytics Option */}
-      <Box
-        as="button"
-        py={2}
-        px={2}
-        borderRadius="full"
-        flex="1"
-        textAlign="center"
-        color={activeView === 'analytics' ? activeTextColor : textColor}
-        fontWeight={activeView === 'analytics' ? 'medium' : 'normal'}
-        transition="all 0.2s"
-        onClick={() => onViewChange('analytics')}
-        zIndex={1}
-        position="relative" // Needed to appear above the sliding background
-        bg="transparent" // Remove background as it's handled by the sliding element
-        borderWidth="0"   // Remove border as it's handled by the sliding element
-        _hover={{
-          color: activeTextColor,
-        }}
-      >
-        <Flex align="center" justify="center">
-          <Icon as={MdOutlineAnalytics} mr={1} />
-          <Text fontSize="sm">Analytics</Text>
-        </Flex>
-      </Box>
     </Flex>
   );
 };

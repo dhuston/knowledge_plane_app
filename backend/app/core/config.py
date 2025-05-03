@@ -1,6 +1,12 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import PostgresDsn, computed_field
 from typing import Optional
+import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -12,6 +18,14 @@ class Settings(BaseSettings):
     # Development flags
     DISABLE_OAUTH: bool = False
     DISABLE_OPENAI: bool = False
+    
+    # Configure environment variable loading
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
 
     # Database
     POSTGRES_SERVER: str = "db" # Service name in docker-compose
@@ -48,4 +62,12 @@ class Settings(BaseSettings):
 
 
 
-settings = Settings() 
+# Log environment variables for debugging
+logger.info("Environment variables for debugging:")
+openai_key = os.environ.get("OPENAI_API_KEY")
+logger.info(f"OPENAI_API_KEY from os.environ: {'Set (value hidden)' if openai_key else 'Not Set'}")
+logger.info(f"DISABLE_OPENAI from os.environ: {os.environ.get('DISABLE_OPENAI', 'Not Set')}")
+
+settings = Settings()
+logger.info(f"OPENAI_API_KEY from settings: {'Set (value hidden)' if settings.OPENAI_API_KEY else 'Not Set'}")
+logger.info(f"DISABLE_OPENAI from settings: {settings.DISABLE_OPENAI}") 

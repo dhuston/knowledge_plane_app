@@ -34,11 +34,11 @@ import NotificationPreferences from './NotificationPreferences';
 import EmptyState from '../common/EmptyState';
 
 interface NotificationCenterProps {
-  // Props if needed
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const NotificationCenter: React.FC<NotificationCenterProps> = () => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose }) => {
   const [showPreferences, setShowPreferences] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const btnRef = React.useRef<HTMLButtonElement>(null);
@@ -102,20 +102,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = () => {
   
   return (
     <>
-      {/* Notification Bell Icon with Badge */}
-      <Box position="relative" display="inline-block">
-        <IconButton
-          ref={btnRef}
-          aria-label="Notifications"
-          icon={<FaBell />}
-          onClick={onOpen}
-          variant="ghost"
-          size="md"
-        />
-        {unreadCount > 0 && (
-          <NotificationBadge count={unreadCount} />
-        )}
-      </Box>
+      {/* Drawer only - we're not rendering the notification bell here anymore */}
       
       {/* Notification Drawer */}
       <Drawer
@@ -127,13 +114,13 @@ const NotificationCenter: React.FC<NotificationCenterProps> = () => {
       >
         <DrawerOverlay />
         <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px">
+          <DrawerCloseButton position="absolute" top="12px" right="12px" zIndex="10" />
+          <DrawerHeader pt={6} pb={3} borderBottomWidth="1px">
             <Flex justifyContent="space-between" alignItems="center">
-              <Heading size="md">Notifications</Heading>
-              <HStack spacing={2}>
+              <Heading size="md" mr={4}>Notifications</Heading>
+              <HStack spacing={2} mr={8}> {/* Add right margin to avoid overlap with close button */}
                 {/* Filter Menu */}
-                <Menu>
+                <Menu placement="bottom-end">
                   <Tooltip label="Filter notifications">
                     <MenuButton
                       as={IconButton}
@@ -160,7 +147,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = () => {
                 </Menu>
                 
                 {/* Actions Menu */}
-                <Menu>
+                <Menu placement="bottom-end">
                   <MenuButton
                     as={IconButton}
                     aria-label="Notification options"

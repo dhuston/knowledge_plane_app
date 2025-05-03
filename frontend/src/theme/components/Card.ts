@@ -1,5 +1,5 @@
 // KnowledgePlane AI Card Component
-// Modern, professional card styles with brand identity
+// Airbnb-inspired clean, airy card styles with generous spacing
 
 import { defineStyleConfig } from '@chakra-ui/react';
 
@@ -8,64 +8,69 @@ const Card = defineStyleConfig({
   baseStyle: {
     container: {
       bg: 'white',
-      borderRadius: 'card',
-      boxShadow: 'card',
-      transition: 'all 0.2s',
+      borderRadius: '12px', // More rounded corners like Airbnb
+      boxShadow: '0 6px 16px rgba(0, 0, 0, 0.08)', // Subtle shadow
+      transition: 'all 0.2s ease',
       position: 'relative',
       width: '100%',
       display: 'flex',
       flexDirection: 'column',
+      border: '1px solid',
+      borderColor: '#DDDDDD', // Airbnb-style light border
+      overflow: 'hidden',
     },
     header: {
-      padding: 'card-padding',
+      padding: '20px 24px', // More generous padding
       borderBottom: '1px solid',
-      borderColor: 'neutral.200',
+      borderColor: '#EBEBEB', // Airbnb-style divider
     },
     body: {
-      padding: 'card-padding',
+      padding: '24px', // More generous padding
       flex: 1,
     },
     footer: {
-      padding: 'card-padding',
+      padding: '16px 24px', // More generous padding
       borderTop: '1px solid',
-      borderColor: 'neutral.200',
+      borderColor: '#EBEBEB', // Airbnb-style divider
     },
   },
 
   // Variations
   variants: {
-    // Default card
+    // Default card - clean, minimalist
     elevated: {
       container: {
         _hover: {
-          boxShadow: 'card-hover',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.10)',
         },
       },
     },
 
-    // Outlined card
+    // Outlined card - subtle border only
     outlined: {
       container: {
         boxShadow: 'none',
         border: '1px solid',
-        borderColor: 'neutral.200',
+        borderColor: '#DDDDDD', // Airbnb-style border
       },
     },
 
-    // Filled card
+    // Filled card - subtle background
     filled: {
       container: {
-        bg: 'neutral.50',
+        bg: 'secondary.100', // Light cream background
         boxShadow: 'none',
+        border: '1px solid',
+        borderColor: '#DDDDDD', // Airbnb-style border
       },
     },
 
-    // Interactive card
+    // Interactive card - with hover effects
     interactive: {
       container: {
         cursor: 'pointer',
         _hover: {
-          boxShadow: 'card-hover',
+          boxShadow: '0 8px 28px rgba(0, 0, 0, 0.12)',
           transform: 'translateY(-2px)',
         },
         _active: {
@@ -77,10 +82,10 @@ const Card = defineStyleConfig({
     // Feature card with accent
     feature: {
       container: {
-        borderTop: '4px solid',
-        borderColor: 'brand.500',
+        borderTop: '3px solid',
+        borderColor: 'primary.500', // Airbnb coral
         _hover: {
-          boxShadow: 'card-hover',
+          boxShadow: '0 8px 28px rgba(0, 0, 0, 0.12)',
         },
       },
     },
@@ -88,7 +93,7 @@ const Card = defineStyleConfig({
     // Success card
     success: {
       container: {
-        borderLeft: '4px solid',
+        borderLeft: '3px solid',
         borderColor: 'success.500',
         bg: 'success.50',
       },
@@ -97,7 +102,7 @@ const Card = defineStyleConfig({
     // Warning card
     warning: {
       container: {
-        borderLeft: '4px solid',
+        borderLeft: '3px solid',
         borderColor: 'warning.500',
         bg: 'warning.50',
       },
@@ -106,7 +111,7 @@ const Card = defineStyleConfig({
     // Error card
     error: {
       container: {
-        borderLeft: '4px solid',
+        borderLeft: '3px solid',
         borderColor: 'error.500',
         bg: 'error.50',
       },
@@ -115,7 +120,7 @@ const Card = defineStyleConfig({
     // Info card
     info: {
       container: {
-        borderLeft: '4px solid',
+        borderLeft: '3px solid',
         borderColor: 'info.500',
         bg: 'info.50',
       },
@@ -126,44 +131,44 @@ const Card = defineStyleConfig({
   sizes: {
     sm: {
       container: {
-        borderRadius: 'sm',
+        borderRadius: '8px', // Slightly rounded
       },
       header: {
-        padding: 3,
+        padding: '12px 16px',
       },
       body: {
-        padding: 3,
+        padding: '16px',
       },
       footer: {
-        padding: 3,
+        padding: '12px 16px',
       },
     },
     md: {
       container: {
-        borderRadius: 'card',
+        borderRadius: '12px', // Medium rounded corners
       },
       header: {
-        padding: 'card-padding',
+        padding: '20px 24px',
       },
       body: {
-        padding: 'card-padding',
+        padding: '24px',
       },
       footer: {
-        padding: 'card-padding',
+        padding: '16px 24px',
       },
     },
     lg: {
       container: {
-        borderRadius: 'lg',
+        borderRadius: '16px', // More rounded corners
       },
       header: {
-        padding: 6,
+        padding: '24px 32px',
       },
       body: {
-        padding: 6,
+        padding: '32px',
       },
       footer: {
-        padding: 6,
+        padding: '20px 32px',
       },
     },
   },
