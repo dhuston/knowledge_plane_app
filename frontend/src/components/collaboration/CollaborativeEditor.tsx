@@ -1,4 +1,4 @@
-import React, { FC, useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { FC, useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { PresenceUser } from '../../models/collaboration/PresenceUser';
 import PresenceIndicator from './PresenceIndicator';
 import { useCollaborationService } from '../../hooks/useCollaborationService';
@@ -99,7 +99,7 @@ const CollaborativeEditor: FC<CollaborativeEditorProps> = ({
   }, [content, initialContent, autoSaveInterval, readOnly]);
   
   // Track cursor position and selection changes
-  const trackCursorPosition = useCallback((e: React.MouseEvent<HTMLTextAreaElement>) => {
+  const trackCursorPosition = useCallback((e: React.MouseEvent<HTMLTextAreaElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (readOnly) return;
     
     const element = e.currentTarget;
@@ -218,7 +218,7 @@ const CollaborativeEditor: FC<CollaborativeEditorProps> = ({
         value={content}
         onChange={handleChange}
         onMouseUp={trackCursorPosition}
-        onKeyUp={e => trackCursorPosition(e as unknown as React.MouseEvent<HTMLTextAreaElement>)}
+        onKeyUp={trackCursorPosition}
         readOnly={readOnly}
         placeholder="Start typing here..."
         aria-label="Document content"

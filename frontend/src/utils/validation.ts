@@ -163,7 +163,7 @@ export function validateRequiredProps<T extends object>(
   }
   
   for (const prop of requiredProps) {
-    // @ts-ignore: Dynamic property access
+    // @ts-expect-error: Dynamic property access with string keys from requiredProps
     if (obj[prop] === undefined || obj[prop] === null) {
       throw new Error(`${objectName} is missing required property: ${prop}`);
     }

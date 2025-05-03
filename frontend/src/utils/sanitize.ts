@@ -5,7 +5,7 @@
 import DOMPurify from 'dompurify';
 
 // URL validation regex - same as in SafeMarkdown component
-export const URL_PATTERN = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+export const URL_PATTERN = /^(https?:\/\/)?([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?([/\\w .-]*)*\/?$/i;
 
 /**
  * Sanitizes a string to prevent XSS attacks
@@ -33,8 +33,8 @@ export const sanitizeUrl = (url: string): string => {
  * Sanitizes an object by sanitizing all string properties
  * This is useful for sanitizing form input objects
  */
-export const sanitizeObject = <T extends Record<string, any>>(obj: T): T => {
-  const result: Record<string, any> = {};
+export const sanitizeObject = <T extends Record<string, unknown>>(obj: T): T => {
+  const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {

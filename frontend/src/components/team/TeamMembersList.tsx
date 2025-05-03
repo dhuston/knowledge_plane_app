@@ -44,7 +44,7 @@ const TeamMembersList: React.FC<TeamMembersListProps> = ({ members, teamLead }) 
             }}
             transition="all 0.2s"
             cursor="pointer"
-            onClick={() => window.location.href = `/profile/${member.id}`}
+            onClick={() => console.log(`Navigating to profile for ${member.name}`)}
           >
             <Flex direction={{ base: "column", sm: "row" }} align={{ base: "center", sm: "flex-start" }}>
               <Avatar

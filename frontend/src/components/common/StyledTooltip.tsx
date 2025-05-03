@@ -1,6 +1,6 @@
 /**
  * StyledTooltip.tsx
- * A consistent tooltip component for the application
+ * A consistent tooltip component for the application without animations
  */
 import React, { ReactElement } from 'react';
 import { Tooltip, TooltipProps } from '@chakra-ui/react';
@@ -11,7 +11,7 @@ interface StyledTooltipProps extends Omit<TooltipProps, 'children'> {
 }
 
 /**
- * A consistent tooltip component with standardized styling and behavior
+ * A consistent tooltip component with standardized styling and immediate appearance
  */
 export const StyledTooltip: React.FC<StyledTooltipProps> = ({
   label,
@@ -24,14 +24,15 @@ export const StyledTooltip: React.FC<StyledTooltipProps> = ({
       label={label}
       placement={placement}
       hasArrow
-      openDelay={300}
-      closeDelay={100}
-      gutter={10}
-      animation="scale"
+      openDelay={0}
+      closeDelay={0}
+      animation="none"
+      offset={[0, 0]}
       bg="gray.700"
       color="white"
       fontSize="sm"
       borderRadius="md"
+      portalProps={{ appendToParentPortal: false }}
       {...rest}
     >
       {children}

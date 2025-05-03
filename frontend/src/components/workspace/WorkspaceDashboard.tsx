@@ -58,21 +58,35 @@ export function WorkspaceDashboard({ initialLayout = 'standard' }: WorkspaceDash
         <Grid
           templateColumns="repeat(12, 1fr)"
           templateRows="auto"
-          gap={4}
+          gap={3}
+          maxHeight="calc(100vh - 110px)"
+          overflow="auto"
+          pr={2}
+          css={{
+            '&::-webkit-scrollbar': { width: '6px' },
+            '&::-webkit-scrollbar-track': { width: '8px' },
+            '&::-webkit-scrollbar-thumb': { 
+              background: borderColor, 
+              borderRadius: '24px',
+            },
+          }}
         >
           {/* Welcome Panel - Spans full width */}
-          <GridItem colSpan={12} p={4} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
+          <GridItem colSpan={12} p={3} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
             <WelcomePanel />
           </GridItem>
           
-          {/* Daily Briefing - Left column on larger screens */}
-          <GridItem colSpan={{ base: 12, lg: 6 }} p={3} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
-            <DailyBriefing />
-          </GridItem>
-          
-          {/* Team Activity - Right column on larger screens */}
-          <GridItem colSpan={{ base: 12, lg: 6 }} p={3} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
-            <TeamActivity />
+          {/* Left and Right columns side by side */}
+          <GridItem colSpan={12} display="grid" gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={3}>
+            {/* Daily Briefing - Left column */}
+            <Box bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm" p={3} maxHeight={{ lg: "520px" }} overflow="auto">
+              <DailyBriefing />
+            </Box>
+            
+            {/* Team Activity - Right column */}
+            <Box bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm" p={3} maxHeight={{ lg: "520px" }} overflow="auto">
+              <TeamActivity />
+            </Box>
           </GridItem>
           
           {/* Task Management - Left column on larger screens */}

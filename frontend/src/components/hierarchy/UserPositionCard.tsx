@@ -7,7 +7,6 @@ import {
   Box,
   Avatar,
   Badge,
-  Tooltip,
   useColorModeValue,
   IconButton,
   VStack,
@@ -15,6 +14,7 @@ import {
   Icon
 } from '@chakra-ui/react';
 import { FiUser, FiUsers, FiTarget } from 'react-icons/fi';
+import { StyledTooltip } from '../common/StyledTooltip';
 import { useAuth } from '../../context/AuthContext';
 import { useHierarchy } from './state/HierarchyContext';
 
@@ -55,13 +55,9 @@ export const UserPositionCard: React.FC = () => {
       mb={4}
     >
       <VStack spacing={1}>
-        <Tooltip 
+        <StyledTooltip
           label={`Your current position: ${user?.name || 'You'}`}
           placement="right"
-          openDelay={300}
-          hasArrow
-          gutter={10}
-          animation="scale"
         >
           <Box
             position="relative"
@@ -120,13 +116,9 @@ export const UserPositionCard: React.FC = () => {
         
         {/* Show team icon if user has a team */}
         {userTeamId && (
-          <Tooltip 
+          <StyledTooltip
             label={units[userTeamId]?.name || 'Your team'}
             placement="right"
-            openDelay={300}
-            hasArrow
-            gutter={10}
-            animation="scale"
           >
             <IconButton
               icon={<FiUsers size="1rem" />}
@@ -137,7 +129,7 @@ export const UserPositionCard: React.FC = () => {
               onClick={handleTeamClick}
               color={roleIconColor}
             />
-          </Tooltip>
+          </StyledTooltip>
         )}
       </VStack>
     </Box>

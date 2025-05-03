@@ -103,10 +103,9 @@ export const HierarchyItem: React.FC<HierarchyItemProps> = ({
         label={unit.name}
         placement="right"
         isDisabled={isPopoverOpen}
-        openDelay={300}
         hasArrow
-        gutter={10}
-        animation="scale"
+        openDelay={0}
+        animation="none"
       >
         <Box
           as={motion.div}

@@ -13,13 +13,23 @@ import UserManagement from './users/UserManagement';
 
 // Helper function to check if user has admin access
 const hasAdminAccess = (user: any) => {
+  // Check for superuser flag directly on user object
+  if (user?.is_superuser === true) {
+    return true;
+  }
+  
   // For development, allow specific test users
   if (user?.email === 'dev@example.com' || user?.name === 'Development User') {
     return true;
   }
   
-  // Also check for admin role
-  return user?.role?.includes('admin');
+  // Also check for admin role if present
+  if (user?.role?.includes('admin')) {
+    return true;
+  }
+  
+  // Default to false - no access
+  return false;
 };
 
 // Main component content (separated to allow for provider wrapping)

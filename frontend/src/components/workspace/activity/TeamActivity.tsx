@@ -177,25 +177,25 @@ export function TeamActivity() {
   
   return (
     <Box>
-      <Heading size="md" mb={2}>Team Activity</Heading>
+      <Heading size="md" mb={1}>Team Activity</Heading>
       
       {/* Team Metrics Section */}
-      <Box mb={3}>
-        <HStack spacing={6} justify="center">
+      <Box mb={2}>
+        <HStack spacing={4} justify="center">
           {metrics.map((metric, index) => (
             <Box key={index} textAlign="center">
               <CircularProgress 
                 value={(metric.value / metric.target) * 100} 
-                size="70px" 
+                size="60px" 
                 color="blue.400"
-                thickness="8px"
+                thickness="6px"
               >
-                <CircularProgressLabel>
+                <CircularProgressLabel fontSize="xs">
                   {metric.value}/{metric.target}
                 </CircularProgressLabel>
               </CircularProgress>
-              <Text mt={1} fontWeight="medium" fontSize="sm">{metric.name}</Text>
-              <Text fontSize="xs" color={subtleText}>
+              <Text fontWeight="medium" fontSize="xs">{metric.name}</Text>
+              <Text fontSize="2xs" color={subtleText}>
                 {metric.value} of {metric.target} {metric.unit}
               </Text>
             </Box>
@@ -203,16 +203,16 @@ export function TeamActivity() {
         </HStack>
       </Box>
       
-      <Divider mb={2} />
+      <Divider mb={1} />
       
       {/* Recent Activity Feed */}
       <Box>
-        <Heading size="sm" mb={2}>Recent Activity</Heading>
+        <Heading size="sm" mb={1}>Recent Activity</Heading>
         
         <VStack 
-          spacing={3} 
+          spacing={2} 
           align="stretch" 
-          maxH="220px" 
+          maxH="180px" 
           overflowY="auto" 
           pr={2}
           css={{
@@ -239,32 +239,32 @@ export function TeamActivity() {
             >
               <Flex>
                 <Avatar 
-                  size="sm" 
+                  size="xs" 
                   name={activity.user.name} 
                   src={activity.user.avatarUrl} 
-                  mr={3} 
+                  mr={2} 
                 />
                 <Box flex="1">
                   <Flex 
                     justify="space-between" 
                     align="flex-start" 
-                    mb={1}
+                    mb={0}
                   >
-                    <HStack>
-                      <Text fontWeight="medium">{activity.user.name}</Text>
-                      <Badge colorScheme={getBadgeColor(activity.entityType)}>
+                    <HStack spacing={1}>
+                      <Text fontWeight="medium" fontSize="xs">{activity.user.name}</Text>
+                      <Badge colorScheme={getBadgeColor(activity.entityType)} fontSize="2xs">
                         {activity.entityType}
                       </Badge>
                     </HStack>
-                    <Text fontSize="xs" color={subtleText}>
+                    <Text fontSize="2xs" color={subtleText}>
                       {activity.timestamp}
                     </Text>
                   </Flex>
-                  <Text fontSize="sm" mb={2}>
-                    <Icon as={getActivityIcon(activity.type)} mr={1} />
+                  <Text fontSize="xs" mb={1}>
+                    <Icon as={getActivityIcon(activity.type)} mr={1} boxSize="10px" />
                     <Text as="span" fontWeight="medium">{activity.entityName}</Text>
                   </Text>
-                  <Text fontSize="sm">{activity.description}</Text>
+                  <Text fontSize="xs" noOfLines={1}>{activity.description}</Text>
                 </Box>
               </Flex>
             </Box>

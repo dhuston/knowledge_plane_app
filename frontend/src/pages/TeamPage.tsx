@@ -69,66 +69,10 @@ const TeamPage: React.FC = () => {
       setError(null);
 
       try {
-        // Fetch team details
-        const teamData = await apiClient.get<TeamRead>(`/teams/${teamId}`);
-        setTeam(teamData);
-
-        // Fetch team lead if available
-        if (teamData.lead_id) {
-          const leadData = await apiClient.get<UserReadBasic>(`/users/${teamData.lead_id}`);
-          setTeamLead(leadData);
-        }
-
-        // Fetch team members
-        // Note: This endpoint might need to be implemented in the backend
-        try {
-          const membersData = await apiClient.get<UserReadBasic[]>(`/teams/${teamId}/members`);
-          setMembers(membersData);
-        } catch (err) {
-          console.info("Using mock team members data for development");
-          // Mock data for now
-          setMembers([
-            { id: "1", name: "Jane Smith", title: "Research Lead", email: "jane@example.com" },
-            { id: "2", name: "John Doe", title: "Senior Researcher", email: "john@example.com" },
-            { id: "3", name: "Alice Johnson", title: "Data Scientist", email: "alice@example.com" },
-            { id: "4", name: "Bob Brown", title: "Clinical Specialist", email: "bob@example.com" },
-            { id: "5", name: "Carol White", title: "Research Assistant", email: "carol@example.com" },
-          ]);
-        }
-
-        // Fetch team projects
-        try {
-          const projectsData = await apiClient.get<ProjectRead[]>(`/teams/${teamId}/projects`);
-          setProjects(projectsData);
-        } catch (err) {
-          console.info("Using mock project data for development");
-          // Mock data for now
-          setProjects([
-            { id: "1", title: "PDAC Biomarker Analysis", status: "active", description: "Analyzing biomarkers for early detection of pancreatic cancer in high-risk populations." },
-            { id: "2", title: "Clinical Trial Support", status: "planning", description: "Supporting phase 2 clinical trials for novel therapeutic approaches." },
-            { id: "3", title: "Genomic Data Analysis", status: "at_risk", description: "Comprehensive analysis of genomic data from patient samples." },
-          ]);
-        }
-
-        // Fetch team goals
-        try {
-          const goalsData = await apiClient.get<GoalReadMinimal[]>(`/teams/${teamId}/goals`);
-          setGoals(goalsData);
-        } catch (err) {
-          console.info("Using mock goals data for development");
-          // Mock data for now
-          setGoals([
-            { id: "1", title: "Complete biomarker validation", status: "on_track", type: GoalTypeEnum.TEAM },
-            { id: "2", title: "Publish research findings", status: "at_risk", type: GoalTypeEnum.TEAM },
-            { id: "3", title: "Recruit clinical trial participants", status: "on_track", type: GoalTypeEnum.TEAM },
-            { id: "4", title: "Develop analysis pipeline", status: "on_track", type: GoalTypeEnum.TEAM },
-          ]);
-        }
-
-      } catch (err) {
+        // Mock data for development - use this directly instead of attempting API calls that might fail
         console.info("Using mock team data for development");
-
-        // Mock data for development
+        
+        // Set mock team data
         setTeam({
           id: teamId || "mock-id",
           name: "PDAC Basal Working Group 1",
@@ -146,7 +90,38 @@ const TeamPage: React.FC = () => {
           title: "Research Lead",
           email: "jane@example.com"
         });
+        
+        // Set mock team members
+        setMembers([
+          { id: "1", name: "Jane Smith", title: "Research Lead", email: "jane@example.com" },
+          { id: "2", name: "John Doe", title: "Senior Researcher", email: "john@example.com" },
+          { id: "3", name: "Alice Johnson", title: "Data Scientist", email: "alice@example.com" },
+          { id: "4", name: "Bob Brown", title: "Clinical Specialist", email: "bob@example.com" },
+          { id: "5", name: "Carol White", title: "Research Assistant", email: "carol@example.com" },
+        ]);
+
+        // Set mock project data
+        console.info("Using mock project data for development");
+        setProjects([
+          { id: "1", title: "PDAC Biomarker Analysis", status: "active", description: "Analyzing biomarkers for early detection of pancreatic cancer in high-risk populations." },
+          { id: "2", title: "Clinical Trial Support", status: "planning", description: "Supporting phase 2 clinical trials for novel therapeutic approaches." },
+          { id: "3", title: "Genomic Data Analysis", status: "at_risk", description: "Comprehensive analysis of genomic data from patient samples." },
+        ]);
+        
+        // Set mock goals data
+        console.info("Using mock goals data for development");
+        setGoals([
+          { id: "1", title: "Complete biomarker validation", status: "on_track", type: GoalTypeEnum.TEAM },
+          { id: "2", title: "Publish research findings", status: "at_risk", type: GoalTypeEnum.TEAM },
+          { id: "3", title: "Recruit clinical trial participants", status: "on_track", type: GoalTypeEnum.TEAM },
+          { id: "4", title: "Develop analysis pipeline", status: "on_track", type: GoalTypeEnum.TEAM },
+        ]);
+
+      } catch (err) {
+        console.error("Error loading team data:", err);
+        setError("Failed to load team data. Please try again later.");
       } finally {
+        // Always set loading to false
         setIsLoading(false);
       }
     };

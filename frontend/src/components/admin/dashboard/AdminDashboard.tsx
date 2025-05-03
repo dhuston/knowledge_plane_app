@@ -125,25 +125,38 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
+  const { adminStats, loadStats } = useAdmin();
+  const { apiClient } = { apiClient: null }; // We'll use the useAdmin context instead
+  
   // Fetch dashboard stats
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
       try {
-        // In a real implementation, this would be an API call
-        // For now, we'll use mock data after a simulated delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await loadStats();
         
-        setStats({
-          userCount: 124,
-          activeUserCount: 87,
-          teamCount: 15,
-          projectCount: 28,
-          integrationCount: 6,
-          activeIntegrations: 4,
-          featureFlagCount: 12,
-          enabledFeatures: 8
+        // Get feature flag stats (in a real implementation these might come from the admin stats endpoint)
+        // For now we'll make a separate call to count them
+        const featureResponse = await fetch('/api/v1/admin/feature-flags', {
+          credentials: 'include'
         });
+        
+        if (featureResponse.ok) {
+          const featureData = await featureResponse.json();
+          const flagCount = Object.keys(featureData).length;
+          const enabledCount = Object.values(featureData).filter((flag: any) => flag.enabled).length;
+          
+          setStats(prevStats => ({
+            userCount: adminStats?.users || 0,
+            activeUserCount: Math.floor((adminStats?.users || 0) * 0.7), // Estimate active users
+            teamCount: adminStats?.teams || 0,
+            projectCount: adminStats?.projects || 0,
+            integrationCount: adminStats?.integrations || 0,
+            activeIntegrations: Math.floor((adminStats?.integrations || 0) * 0.8), // Estimate active integrations
+            featureFlagCount: flagCount,
+            enabledFeatures: enabledCount
+          }));
+        }
       } catch (error) {
         console.error('Error fetching admin dashboard stats:', error);
       } finally {
@@ -152,25 +165,18 @@ const AdminDashboard: React.FC = () => {
     };
     
     fetchStats();
-  }, []);
+  }, [adminStats, loadStats]);
   
   // Custom refresh function
   const handleRefresh = async () => {
-    await refreshData();
     setIsLoading(true);
-    
-    // Simulate fetching fresh data
-    setTimeout(() => {
-      setStats(prevStats => {
-        if (!prevStats) return null;
-        
-        return {
-          ...prevStats,
-          activeUserCount: prevStats.activeUserCount + Math.floor(Math.random() * 5) - 2
-        };
-      });
+    try {
+      await refreshData(); // This will call loadStats() internally
+    } catch (error) {
+      console.error('Error refreshing dashboard data:', error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
   
   return (

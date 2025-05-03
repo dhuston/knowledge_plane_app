@@ -64,6 +64,15 @@ interface SigmaNode {
   originalApiData: MapNode;
 }
 
+interface MapEdge {
+  id: string;
+  source: string;
+  target: string;
+  type?: string;
+  label?: string;
+  data?: Record<string, unknown>;
+}
+
 interface SigmaEdge {
   id: string;
   source: string;
@@ -71,7 +80,8 @@ interface SigmaEdge {
   label?: string;
   color: string;
   size: number;
-  originalApiData: any; // Will be replaced with proper type once API is typed
+  type?: string;
+  originalApiData: MapEdge;
 }
 
 interface SigmaGraphData {
@@ -83,7 +93,7 @@ interface SigmaGraphData {
 interface DeltaUpdate {
   added?: {
     nodes?: MapNode[];
-    edges?: any[]; // Will be replaced with proper type once API is typed
+    edges?: MapEdge[];
   };
   removed?: {
     nodeIds?: string[];
@@ -91,7 +101,7 @@ interface DeltaUpdate {
   };
   updated?: {
     nodes?: MapNode[];
-    edges?: any[]; // Will be replaced with proper type once API is typed
+    edges?: MapEdge[];
   };
 }
 
@@ -196,7 +206,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
       debouncedFetchMapDataRef.current = debouncedFn;
       return debouncedFn;
     }, 
-    [fetchMapData]
+    [] // Empty dependency array to avoid circular dependency with fetchMapData
   );
 
   // Cleanup effect
@@ -268,6 +278,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
               label: edge.label || undefined,
               color: '#ccc',
               size: 1,
+              type: edge.type,
               originalApiData: edge
             });
           }
@@ -474,6 +485,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
         label: edge.label || undefined,
         color: '#ccc',
         size: 1,
+        type: edge.type,
         originalApiData: edge
       }));
       updatedEdges.push(...newEdges);
@@ -581,9 +593,9 @@ const LivingMap: React.FC<LivingMapProps> = ({
       // Deselection - pass null to clear selection
       selectNode(null);
       selectedNodeRef.current = null;
-    } else {
+    } else if (sigmaGraphData?.nodes) {
       // Find and set the selected node
-      const node = sigmaGraphData?.nodes.find(n => n.originalApiData.id === nodeId);
+      const node = sigmaGraphData.nodes.find(n => n.originalApiData.id === nodeId);
       
       if (node) {
         // Store the full node data in a ref to use for subsequent operations
@@ -638,7 +650,7 @@ const LivingMap: React.FC<LivingMapProps> = ({
     if (onNodeClick) {
       onNodeClick(nodeId);
     }
-  }, [sigmaGraphData?.nodes, selectNode, onNodeClick]);
+  }, [sigmaGraphData, selectNode, onNodeClick]);
 
   return (
     <Box height="100%" width="100%" position="relative">

@@ -40,8 +40,8 @@ interface SigmaGraphLoaderProps {
   onNodeHover: (node: MapNode | null, position: { x: number; y: number } | null) => void;
   zoomLevel: number;
   // New analytics props
-  customNodeRenderer?: (context: CanvasRenderingContext2D, data: any, settings: any) => boolean;
-  customEdgeRenderer?: (context: CanvasRenderingContext2D, data: any, settings: any) => boolean;
+  customNodeRenderer?: (context: CanvasRenderingContext2D, data: Record<string, unknown>, settings: Record<string, unknown>) => boolean;
+  customEdgeRenderer?: (context: CanvasRenderingContext2D, data: Record<string, unknown>, settings: Record<string, unknown>) => boolean;
   analyticsEnabled?: boolean;
   // Data change callback for analytics
   onDataChange?: (nodes: MapNode[], edges: { source: string; target: string; type?: MapEdgeTypeEnum }[]) => void;

@@ -1,23 +1,38 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import { useEffect, useRef, useState } from 'react';
 import { debounce } from 'lodash';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../utils/featureFlags';
 
+interface DeltaNode {
+  id: string;
+  label: string;
+  type: string;
+  position?: { x: number; y: number };
+  data?: Record<string, unknown>;
+}
+
+interface DeltaEdge {
+  id: string;
+  source: string;
+  target: string;
+  type?: string;
+  data?: Record<string, unknown>;
+}
+
 interface DeltaData {
-  addNodes?: any[];
-  updateNodes?: any[];
+  addNodes?: DeltaNode[];
+  updateNodes?: DeltaNode[];
   removeNodeIds?: string[];
-  addEdges?: any[];
-  updateEdges?: any[];
+  addEdges?: DeltaEdge[];
+  updateEdges?: DeltaEdge[];
   removeEdgeIds?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 type DeltaStreamSubscriber = {
   dataType: string;
-  callback: (data: any, operation: string) => void;
+  callback: (data: unknown, operation: string) => void;
   unsubscribe: () => void;
 };
 
@@ -114,7 +129,7 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
     };
   }, [debouncedOnMessage, token, flags.enableDeltaStream, isAuthenticated]);
   
-  const subscribe = (dataType: string, callback: (data: any, operation: string) => void): DeltaStreamSubscriber => {
+  const subscribe = (dataType: string, callback: (data: unknown, operation: string) => void): DeltaStreamSubscriber => {
     const subscriber: DeltaStreamSubscriber = {
       dataType,
       callback,

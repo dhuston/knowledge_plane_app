@@ -171,13 +171,16 @@ const Header: React.FC<HeaderProps> = ({
                                             My Team
                                         </MenuItem>
                                         <MenuItem icon={<FiSettings />} command="⌘,">Settings</MenuItem>
-                                        <MenuItem 
-                                          icon={<FiGrid />} 
-                                          as={Link} 
-                                          to="/admin"
-                                        >
-                                          Admin Console
-                                        </MenuItem>
+                                        {/* Only show Admin Console for superusers */}
+                                        {user?.is_superuser && (
+                                          <MenuItem 
+                                            icon={<FiGrid />} 
+                                            as={Link} 
+                                            to="/admin"
+                                          >
+                                            Admin Console
+                                          </MenuItem>
+                                        )}
                                         <MenuItem icon={<FiStar />}>Favorites</MenuItem>
                                         <MenuItem icon={<FiClock />}>Recent</MenuItem>
                                         <MenuDivider my={1} />

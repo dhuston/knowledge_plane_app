@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     health, auth, users, integrations, teams, projects, goals, map, briefings, insights,
-    notes, notifications, emergent_model
+    notes, notifications, emergent_model, admin
 )
 
 api_router = APIRouter()
@@ -21,3 +21,4 @@ api_router.include_router(insights.router, prefix="/insights", tags=["insights"]
 api_router.include_router(notes.router, prefix="/notes", tags=["notes"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(emergent_model.router, prefix="/emergent-model", tags=["emergent-model"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
