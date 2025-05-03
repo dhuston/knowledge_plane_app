@@ -3,37 +3,54 @@
  * Tab navigation component for context panels with enhanced animations
  */
 import React, { useRef, useEffect } from 'react';
-import { HStack, Button, useColorModeValue, Box } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
+import { HStack, Button, useColorModeValue, Box, usePrefersReducedMotion } from '@chakra-ui/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useFeatureFlags } from '../../../utils/featureFlags';
 import { useAnimatedTab } from '../../../hooks/useAnimatedTab';
+import AnimatedTransition from '../../common/AnimatedTransition';
 
 export type PanelTabType = 'details' | 'activity' | 'related';
 
 interface PanelTabsProps {
   activeTab: PanelTabType;
   onTabChange: (tab: PanelTabType) => void;
+  animationVariant?: 'minimal' | 'enhanced' | 'none';
+  indicatorStyle?: 'bar' | 'pill' | 'highlight' | 'none';
+  dataTestId?: string;
 }
 
 const PanelTabs: React.FC<PanelTabsProps> = ({
   activeTab,
-  onTabChange
+  onTabChange,
+  animationVariant = 'enhanced',
+  indicatorStyle = 'bar',
+  dataTestId = 'panel-tabs'
 }) => {
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const activeColor = useColorModeValue('blue.500', 'blue.300');
   const hoverBg = useColorModeValue('gray.100', 'gray.700');
+  const pillBg = useColorModeValue('blue.50', 'blue.900');
+  const highlightBg = useColorModeValue('blue.50', 'blue.900');
+  const prefersReducedMotion = usePrefersReducedMotion();
   const { flags } = useFeatureFlags();
 
-  // Use our custom animated tab hook
+  // Use our custom animated tab hook with enhanced options
   const { 
     isTransitioning,
-    animationProps
+    animationProps,
+    motionProps,
+    previousTab
   } = useAnimatedTab({
     initialTab: activeTab,
-    transitionDuration: 0.3,
+    transitionDuration: prefersReducedMotion ? 0 : 0.3,
     onTabChanged: (newTab: string) => {
-      console.log(`Tab changed to: ${newTab}`);
-    }
+      // Only log in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Tab changed to: ${newTab}`);
+      }
+    },
+    animationVariant: animationVariant === 'none' ? 'fade' : 'slide',
+    immediate: animationVariant === 'none' || prefersReducedMotion
   });
 
   // Refs for tab positions (for indicator animation)
@@ -145,28 +162,83 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
       </HStack>
       
       {/* Animated tab indicator */}
-      <motion.div
-        style={{
-          position: 'absolute',
-          height: '2px',
-          backgroundColor: activeColor,
-          bottom: '0px',
-          left: indicatorStyle.left,
-          width: indicatorStyle.width,
-          opacity: indicatorStyle.opacity,
-        }}
-        transition={{ 
-          type: 'spring', 
-          stiffness: 500, 
-          damping: 30 
-        }}
-        animate={{ 
-          left: indicatorStyle.left,
-          width: indicatorStyle.width,
-          opacity: indicatorStyle.opacity
-        }}
-        data-testid="tab-indicator"
-      />
+      {/* Render different indicator styles based on the prop */}
+      {indicatorStyle === 'bar' && (
+        <motion.div
+          style={{
+            position: 'absolute',
+            height: '2px',
+            backgroundColor: activeColor,
+            bottom: '0px',
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            opacity: indicatorStyle.opacity,
+          }}
+          transition={{ 
+            type: 'spring', 
+            stiffness: 500, 
+            damping: 30 
+          }}
+          animate={{ 
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            opacity: indicatorStyle.opacity
+          }}
+          data-testid="tab-indicator"
+        />
+      )}
+      
+      {/* Pill style indicator */}
+      {indicatorStyle === 'pill' && (
+        <motion.div
+          style={{
+            position: 'absolute',
+            height: '80%',
+            backgroundColor: pillBg,
+            bottom: '10%',
+            left: 0,
+            width: indicatorStyle.width,
+            borderRadius: '100px',
+            zIndex: 0,
+          }}
+          transition={{ 
+            type: 'spring', 
+            stiffness: 400, 
+            damping: 28 
+          }}
+          animate={{ 
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            opacity: indicatorStyle.opacity
+          }}
+          data-testid="tab-indicator-pill"
+        />
+      )}
+      
+      {/* Highlight style indicator */}
+      {indicatorStyle === 'highlight' && (
+        <motion.div
+          style={{
+            position: 'absolute',
+            height: '80%',
+            backgroundColor: highlightBg,
+            bottom: '10%',
+            borderRadius: '4px',
+            zIndex: 0,
+          }}
+          transition={{ 
+            type: 'spring', 
+            stiffness: 400, 
+            damping: 28 
+          }}
+          animate={{ 
+            left: indicatorStyle.left - 8, // Add some padding
+            width: indicatorStyle.width + 16, // Add some padding
+            opacity: indicatorStyle.opacity
+          }}
+          data-testid="tab-indicator-highlight"
+        />
+      )}
     </Box>
   );
 };

@@ -90,11 +90,21 @@ self.onmessage = (event: MessageEvent) => {
  * @param options Additional options for calculation
  * @returns The calculated metric result
  */
+interface MetricOptions {
+  threshold?: number;
+  includeTypes?: string[];
+  maxDepth?: number;
+  weighted?: boolean;
+  [key: string]: unknown;
+}
+
+type MetricResult = Record<string, number> | Record<string, string[]> | number;
+
 function calculateSpecificMetric(
   mapData: MapData, 
   metricName: string,
-  options: any = {}
-): any {
+  options: MetricOptions = {}
+): MetricResult {
   const adjacencyList = buildAdjacencyList(mapData);
   
   switch (metricName) {

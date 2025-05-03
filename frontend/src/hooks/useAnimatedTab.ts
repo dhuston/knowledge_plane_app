@@ -17,6 +17,13 @@ interface AnimatedTabOptions {
   immediate?: boolean;
   /** Callback when a tab change completes */
   onTabChanged?: (newTab: string, prevTab: string | null) => void;
+  /** Animation variant to use for tab transitions */
+  animationVariant?: 'fade' | 'slide' | 'scale' | 'custom';
+  /** Custom animation properties for the 'custom' variant */
+  customAnimation?: {
+    entering?: Record<string, any>;
+    exiting?: Record<string, any>;
+  };
 }
 
 /**
@@ -39,6 +46,13 @@ interface AnimatedTabResult {
   };
   /** Whether the transition should be animated */
   shouldAnimate: boolean;
+  /** Animation properties for framer-motion */
+  motionProps: {
+    initial: Record<string, any>;
+    animate: Record<string, any>;
+    exit: Record<string, any>;
+    transition: Record<string, any>;
+  };
 }
 
 /**
@@ -50,7 +64,9 @@ export const useAnimatedTab = (options: AnimatedTabOptions): AnimatedTabResult =
     initialTab,
     transitionDuration = 0.3,
     immediate = false,
-    onTabChanged
+    onTabChanged,
+    animationVariant = 'fade',
+    customAnimation = {}
   } = options;
   
   const [activeTab, setActiveTabState] = useState<string>(initialTab);
@@ -139,13 +155,63 @@ export const useAnimatedTab = (options: AnimatedTabOptions): AnimatedTabResult =
     transform: isTransitioning ? `translateX(${translateValue})` : 'translateX(0)'
   };
   
+  // Generate motion props based on animation variant
+  const getMotionProps = () => {
+    const baseTransition = { 
+      duration: transitionDuration,
+      ease: "easeOut" 
+    };
+    
+    // Default properties for each animation variant
+    switch (animationVariant) {
+      case 'fade':
+        return {
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          exit: { opacity: 0 },
+          transition: baseTransition
+        };
+      case 'slide':
+        return {
+          initial: { opacity: 0, x: transitionDirection === 'right' ? 20 : -20 },
+          animate: { opacity: 1, x: 0 },
+          exit: { opacity: 0, x: transitionDirection === 'right' ? -20 : 20 },
+          transition: baseTransition
+        };
+      case 'scale':
+        return {
+          initial: { opacity: 0, scale: 0.95 },
+          animate: { opacity: 1, scale: 1 },
+          exit: { opacity: 0, scale: 0.95 },
+          transition: baseTransition
+        };
+      case 'custom':
+        return {
+          initial: customAnimation.entering || { opacity: 0 },
+          animate: { opacity: 1, ...customAnimation.entering },
+          exit: customAnimation.exiting || { opacity: 0 },
+          transition: baseTransition
+        };
+      default:
+        return {
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          exit: { opacity: 0 },
+          transition: baseTransition
+        };
+    }
+  };
+  
+  const motionProps = getMotionProps();
+  
   return {
     activeTab,
     previousTab,
     isTransitioning,
     setActiveTab,
     animationProps,
-    shouldAnimate
+    shouldAnimate,
+    motionProps
   };
 };
 

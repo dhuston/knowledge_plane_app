@@ -14,6 +14,7 @@ import {
 } from '@chakra-ui/react';
 import ContextPanel from './ContextPanel';
 import { useNodeSelection } from '../../context/NodeSelectionContext';
+import { MapNodeTypeEnum } from '../../types/map';
 
 // Only accept additional props, core functionality comes from context
 interface ContextDrawerProps {
@@ -100,11 +101,16 @@ const ContextDrawer: React.FC<ContextDrawerProps> = ({
                   }
                 } else {
                   // No relationship data available, create a placeholder
+                  // Use the selected node's type if available, otherwise use a safe default
+                  // This prevents security issues with defaulting to 'user' type without validation
+                  const nodeType = selectedNode?.type || MapNodeTypeEnum.UNKNOWN;
                   const placeholderNode = {
                     id: nodeId,
                     label: `Node ${nodeId}`,
-                    type: 'user', // Default type
-                    data: {}
+                    type: nodeType,
+                    data: {
+                      isPlaceholder: true // Flag to indicate this is a placeholder with limited permissions
+                    }
                   };
                   selectNode(placeholderNode);
                 }

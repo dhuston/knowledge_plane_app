@@ -43,11 +43,84 @@ export const transitionVariants = {
     exit: { opacity: 0, x: -20, transition: { duration: 0.2 } }
   },
   
+  // Panel slide in from right
+  panelInRight: {
+    initial: { opacity: 0, x: 30, boxShadow: "0 0 0 rgba(0,0,0,0)" },
+    animate: { 
+      opacity: 1, 
+      x: 0, 
+      boxShadow: "0 4px 20px rgba(0,0,0,0.1)", 
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: 30, 
+      boxShadow: "0 0 0 rgba(0,0,0,0)", 
+      transition: { 
+        duration: 0.3 
+      } 
+    }
+  },
+  
+  // Panel slide in from left
+  panelInLeft: {
+    initial: { opacity: 0, x: -30, boxShadow: "0 0 0 rgba(0,0,0,0)" },
+    animate: { 
+      opacity: 1, 
+      x: 0, 
+      boxShadow: "0 4px 20px rgba(0,0,0,0.1)", 
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: -30, 
+      boxShadow: "0 0 0 rgba(0,0,0,0)", 
+      transition: { 
+        duration: 0.3 
+      } 
+    }
+  },
+  
   // Scale with fade
   scale: {
     initial: { opacity: 0, scale: 0.95 },
     animate: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
     exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
+  },
+  
+  // Content fade in
+  contentFade: {
+    initial: { opacity: 0, y: 5 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+    exit: { opacity: 0, y: 5, transition: { duration: 0.2 } }
+  },
+  
+  // Panel entry transition
+  panelEntry: {
+    initial: { opacity: 0, scale: 0.98, y: 5 },
+    animate: { 
+      opacity: 1, 
+      scale: 1, 
+      y: 0, 
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.98, 
+      y: 5, 
+      transition: { 
+        duration: 0.25 
+      } 
+    }
   },
   
   // For list items that stagger their appearance
@@ -62,6 +135,28 @@ export const transitionVariants = {
       }
     }),
     exit: { opacity: 0, transition: { duration: 0.2 } }
+  },
+  
+  // Enhanced stagger for panel elements
+  staggerItems: {
+    initial: { opacity: 0, y: 10 },
+    animate: (custom: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: custom * 0.08,  // Slightly longer delay between items
+        duration: 0.35,
+        ease: "easeOut"
+      }
+    }),
+    exit: { 
+      opacity: 0, 
+      y: 5,
+      transition: { 
+        duration: 0.2,
+        ease: "easeIn" 
+      } 
+    }
   },
 
   // Spring animation with bounce
@@ -90,6 +185,27 @@ export const transitionVariants = {
     initial: { opacity: 0.8 },
     animate: { opacity: 1, transition: { duration: 0.2 } },
     exit: { opacity: 0.8, transition: { duration: 0.1 } }
+  },
+  
+  // Tab transition animation
+  tabTransition: {
+    initial: { opacity: 0, x: 10 },
+    animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, x: -10, transition: { duration: 0.2 } }
+  },
+  
+  // Drawer animation (for side panels)
+  drawer: {
+    initial: { opacity: 0, x: '100%' },
+    animate: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } },
+    exit: { opacity: 0, x: '100%', transition: { duration: 0.3 } }
+  },
+  
+  // Crossfade for smooth content switching
+  crossfade: {
+    initial: { opacity: 0, position: "absolute" },
+    animate: { opacity: 1, position: "relative", transition: { duration: 0.3 } },
+    exit: { opacity: 0, position: "absolute", transition: { duration: 0.3 } }
   }
 };
 

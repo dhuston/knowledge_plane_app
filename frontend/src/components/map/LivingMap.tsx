@@ -647,7 +647,8 @@ const LivingMap: React.FC<LivingMapProps> = ({
     }
     
     // Call the parent's onNodeClick if provided (keeping backward compatibility)
-    if (onNodeClick) {
+    // Making sure onNodeClick is defined before calling it
+    if (typeof onNodeClick === 'function') {
       onNodeClick(nodeId);
     }
   }, [sigmaGraphData, selectNode, onNodeClick]);

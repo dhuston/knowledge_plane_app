@@ -7,10 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Security
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db_session, get_current_active_user, get_tenant_id
+from app.api.deps import get_db_session, get_current_active_user, get_tenant_id, get_current_active_superuser
 from app.models.user import User
 from app.schemas.user import UserRead
-from app.core.security import get_current_superuser
 from app.core.tenant_filter import apply_tenant_filter
 
 # Import the CRUDUser for user operations
@@ -45,7 +44,7 @@ router = APIRouter()
 
 # ----- User Management Endpoints -----
 
-@router.get("/users", response_model=List[UserRead], dependencies=[Depends(get_current_superuser)])
+@router.get("/users", response_model=List[UserRead], dependencies=[Depends(get_current_active_superuser)])
 async def get_all_users(
     db: AsyncSession = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
@@ -69,7 +68,7 @@ async def get_all_users(
     
     return users
 
-@router.get("/users/count", dependencies=[Depends(get_current_superuser)])
+@router.get("/users/count", dependencies=[Depends(get_current_active_superuser)])
 async def get_user_count(
     db: AsyncSession = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
@@ -88,7 +87,7 @@ async def get_user_count(
     
     return {"count": count}
 
-@router.put("/users/{user_id}/role", dependencies=[Depends(get_current_superuser)])
+@router.put("/users/{user_id}/role", dependencies=[Depends(get_current_active_superuser)])
 async def update_user_role(
     user_id: UUID,
     is_superuser: bool,
@@ -152,7 +151,7 @@ async def get_feature_flags(
     """Get all feature flags for the current tenant."""
     return get_tenant_feature_flags(tenant_id)
 
-@router.post("/feature-flags", response_model=FeatureFlag, dependencies=[Depends(get_current_superuser)])
+@router.post("/feature-flags", response_model=FeatureFlag, dependencies=[Depends(get_current_active_superuser)])
 async def create_feature_flag(
     feature_flag: FeatureFlagCreate,
     tenant_id: UUID = Depends(get_tenant_id),
@@ -172,7 +171,7 @@ async def create_feature_flag(
     
     return new_flag
 
-@router.put("/feature-flags/{key}", response_model=FeatureFlag, dependencies=[Depends(get_current_superuser)])
+@router.put("/feature-flags/{key}", response_model=FeatureFlag, dependencies=[Depends(get_current_active_superuser)])
 async def update_feature_flag(
     key: str,
     feature_flag: FeatureFlagUpdate,
@@ -195,7 +194,7 @@ async def update_feature_flag(
     
     return tenant_flags[key]
 
-@router.delete("/feature-flags/{key}", dependencies=[Depends(get_current_superuser)])
+@router.delete("/feature-flags/{key}", dependencies=[Depends(get_current_active_superuser)])
 async def delete_feature_flag(
     key: str,
     tenant_id: UUID = Depends(get_tenant_id),
@@ -220,7 +219,7 @@ async def delete_feature_flag(
 async def get_admin_stats(
     db: AsyncSession = Depends(get_db_session),
     tenant_id: UUID = Depends(get_tenant_id),
-    current_user: User = Depends(get_current_superuser),  # Only superusers
+    current_user: User = Depends(get_current_active_superuser),  # Only superusers
 ):
     """
     Get summary statistics for the admin dashboard.

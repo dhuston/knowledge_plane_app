@@ -29,23 +29,23 @@ dependencies = [
     "openai (>=1.35,<2.0)"
 ]
 
-
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-package-mode = false
+package-mode = true
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.5"
 black = "^25.1.0"
+pytest = "^8.0.0"
 
 [tool.ruff]
-# Enable Pyflakes `F` and a subset of the pycodestyle `E` rules.
+# Enable Pyflakes `F`, Pycodestyle `E`, and import `I` rules
 # Extends the default configuration:
 # https://docs.astral.sh/ruff/configuration/#using-ruffs-default-configuration
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "I"]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
@@ -77,8 +77,8 @@ exclude = [
     "venv",
 ]
 
-# Same as Black.
-line-length = 88
+# Updated line length to match project standards
+line-length = 100
 indent-width = 4
 
 # Assume Python 3.10
@@ -97,3 +97,5 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
+[tool.pytest.ini_options]
+pythonpath = [".", "app"]

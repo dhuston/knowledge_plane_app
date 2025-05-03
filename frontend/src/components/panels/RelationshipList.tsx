@@ -545,219 +545,469 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
     );
   }
 
-  // Render the grid view component
-  const renderGridView = (rels: EnhancedRelationship[], colorScheme: string) => (
-    <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={2} p={2}>
-      {rels.map((rel, idx) => {
-        const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
-        return (
-          <Box
-            key={`${rel.nodeId || ''}-${idx}`}
-            p={3}
-            borderWidth="1px"
-            borderRadius="md"
-            _hover={{ 
-              bg: hoverBg,
-              borderColor: `${colorScheme}.400`
-            }}
-            onClick={() => handleSelectRelationship(rel)}
-            role="button"
-            tabIndex={0}
-            aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleSelectRelationship(rel);
-              }
+  // Single grid item component
+  const GridItem = React.memo(({ rel, colorScheme, hoverBg, handleSelectRelationship }: {
+    rel: EnhancedRelationship;
+    colorScheme: string;
+    hoverBg: string;
+    handleSelectRelationship: (rel: EnhancedRelationship) => void;
+  }) => {
+    const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
+    
+    return (
+      <Box
+        p={3}
+        borderWidth="1px"
+        borderRadius="md"
+        _hover={{ 
+          bg: hoverBg,
+          borderColor: `${colorScheme}.400`
+        }}
+        onClick={() => handleSelectRelationship(rel)}
+        role="button"
+        tabIndex={0}
+        aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleSelectRelationship(rel);
+          }
+        }}
+      >
+        <VStack spacing={2} align="center">
+          <Center 
+            p={2} 
+            borderRadius="full" 
+            bg={`${colorScheme}.50`} 
+            color={`${colorScheme}.500`}
+            boxSize="40px"
+            _dark={{ 
+              bg: `${colorScheme}.900`, 
+              color: `${colorScheme}.200` 
             }}
           >
-            <VStack spacing={2} align="center">
-              <Center 
-                p={2} 
-                borderRadius="full" 
-                bg={`${colorScheme}.50`} 
-                color={`${colorScheme}.500`}
-                boxSize="40px"
-                _dark={{ 
-                  bg: `${colorScheme}.900`, 
-                  color: `${colorScheme}.200` 
-                }}
-              >
-                <Icon as={getNodeIcon(nodeType)} boxSize={4} />
-              </Center>
+            <Icon as={getNodeIcon(nodeType)} boxSize={4} />
+          </Center>
+          
+          <Text fontSize="sm" fontWeight="medium" noOfLines={1} textAlign="center">
+            {rel.label || rel.name || 'Unknown'}
+          </Text>
+          
+          <Text fontSize="xs" color="gray.500" noOfLines={1}>
+            {getRelationshipName(nodeType)}
+          </Text>
+          
+          {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
+        </VStack>
+      </Box>
+    );
+  });
+  
+  // Render the grid view component with virtualization for large datasets
+  const renderGridView = (rels: EnhancedRelationship[], colorScheme: string) => {
+    // Don't virtualize for small lists
+    if (rels.length < 25) {
+      return (
+        <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={2} p={2}>
+          {rels.map((rel, idx) => (
+            <GridItem
+              key={`${rel.nodeId || ''}-${idx}`}
+              rel={rel}
+              colorScheme={colorScheme}
+              hoverBg={hoverBg}
+              handleSelectRelationship={handleSelectRelationship}
+            />
+          ))}
+        </SimpleGrid>
+      );
+    }
+
+    // For larger lists, implement grid virtualization
+    const gridRef = React.useRef<HTMLDivElement>(null);
+    const [scrollPosition, setScrollPosition] = React.useState(0);
+    const containerHeight = 400; // Fixed container height
+    
+    // Grid configuration
+    const itemsPerRow = 4; // Based on lg: 4 setting in SimpleGrid
+    const itemHeight = 140; // Approximate height of each grid item in pixels
+    
+    // Calculate row information
+    const totalRows = Math.ceil(rels.length / itemsPerRow);
+    const rowHeight = itemHeight;
+    const totalHeight = totalRows * rowHeight;
+    
+    // Calculate visible rows based on scroll position
+    const visibleRowStart = Math.max(0, Math.floor(scrollPosition / rowHeight) - 1); // 1 row buffer
+    const visibleRowEnd = Math.min(totalRows, Math.ceil((scrollPosition + containerHeight) / rowHeight) + 1); // 1 row buffer
+    
+    // Calculate items to display
+    const startIndex = visibleRowStart * itemsPerRow;
+    const endIndex = Math.min(rels.length, visibleRowEnd * itemsPerRow);
+    const visibleItems = rels.slice(startIndex, endIndex);
+    
+    // Calculate top padding to position items correctly
+    const topPadding = visibleRowStart * rowHeight;
+    
+    // Handle scroll events
+    const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+      setScrollPosition(e.currentTarget.scrollTop);
+    }, []);
+    
+    return (
+      <Box
+        height={`${containerHeight}px`}
+        overflowY="auto"
+        onScroll={handleScroll}
+        position="relative"
+        className="virtualized-grid-container"
+        data-testid="virtualized-grid"
+        ref={gridRef}
+      >
+        <Box
+          position="relative"
+          height={`${totalHeight}px`}
+        >
+          <Box
+            position="absolute"
+            top={`${topPadding}px`}
+            width="100%"
+            p={2}
+          >
+            <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={2}>
+              {visibleItems.map((rel, idx) => (
+                <GridItem
+                  key={`${rel.nodeId || ''}-${startIndex + idx}`}
+                  rel={rel}
+                  colorScheme={colorScheme}
+                  hoverBg={hoverBg}
+                  handleSelectRelationship={handleSelectRelationship}
+                />
+              ))}
+            </SimpleGrid>
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
+  // Single compact tag component
+  const CompactTag = React.memo(({ rel, colorScheme, handleSelectRelationship }: {
+    rel: EnhancedRelationship;
+    colorScheme: string;
+    handleSelectRelationship: (rel: EnhancedRelationship) => void;
+  }) => {
+    const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
+    return (
+      <Tag
+        size="md"
+        borderRadius="full"
+        colorScheme={rel.strength && rel.strength > 0.6 ? colorScheme : undefined}
+        variant={rel.strength && rel.strength > 0.6 ? "subtle" : "outline"}
+        cursor="pointer"
+        onClick={() => handleSelectRelationship(rel)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleSelectRelationship(rel);
+          }
+        }}
+        m={1} // Add margin for proper spacing in virtualized layout
+      >
+        <Icon 
+          as={getNodeIcon(nodeType)} 
+          mr={1} 
+          boxSize={3} 
+        />
+        <TagLabel noOfLines={1}>
+          {rel.label || rel.name || 'Unknown'}
+        </TagLabel>
+      </Tag>
+    );
+  });
+
+  // Render the compact view component with chunked virtualization for large datasets
+  const renderCompactView = (rels: EnhancedRelationship[], colorScheme: string) => {
+    // Don't virtualize for small lists
+    if (rels.length < 50) {
+      return (
+        <Box p={2}>
+          <Flex flexWrap="wrap" gap={2}>
+            {rels.map((rel, idx) => (
+              <CompactTag
+                key={`${rel.nodeId || ''}-${idx}`}
+                rel={rel}
+                colorScheme={colorScheme}
+                handleSelectRelationship={handleSelectRelationship}
+              />
+            ))}
+          </Flex>
+        </Box>
+      );
+    }
+
+    // For larger lists, implement chunked virtualization
+    // This is different from list/grid virtualization because tags have variable widths
+    // So we chunk them into rows of approximately 25 items each
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const [scrollPosition, setScrollPosition] = React.useState(0);
+    const containerHeight = 300; // Fixed container height
+    
+    // Configuration
+    const itemsPerChunk = 25;
+    const chunkHeight = 40; // Approximate height of a row of tags in pixels
+    
+    // Calculate chunk information
+    const totalChunks = Math.ceil(rels.length / itemsPerChunk);
+    const totalHeight = totalChunks * chunkHeight;
+    
+    // Calculate visible chunks based on scroll position
+    const visibleChunkStart = Math.max(0, Math.floor(scrollPosition / chunkHeight) - 1); // 1 chunk buffer
+    const visibleChunkEnd = Math.min(totalChunks, Math.ceil((scrollPosition + containerHeight) / chunkHeight) + 1); // 1 chunk buffer
+    
+    // Calculate items to display
+    const startIndex = visibleChunkStart * itemsPerChunk;
+    const endIndex = Math.min(rels.length, visibleChunkEnd * itemsPerChunk);
+    const visibleItems = rels.slice(startIndex, endIndex);
+    
+    // Calculate top padding to position items correctly
+    const topPadding = visibleChunkStart * chunkHeight;
+    
+    // Handle scroll events
+    const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+      setScrollPosition(e.currentTarget.scrollTop);
+    }, []);
+    
+    return (
+      <Box
+        height={`${containerHeight}px`}
+        overflowY="auto"
+        onScroll={handleScroll}
+        position="relative"
+        className="virtualized-compact-container"
+        data-testid="virtualized-compact"
+        ref={containerRef}
+      >
+        <Box
+          position="relative"
+          height={`${totalHeight}px`}
+        >
+          <Box
+            position="absolute"
+            top={`${topPadding}px`}
+            width="100%"
+            p={2}
+          >
+            <Flex flexWrap="wrap">
+              {visibleItems.map((rel, idx) => (
+                <CompactTag
+                  key={`${rel.nodeId || ''}-${startIndex + idx}`}
+                  rel={rel}
+                  colorScheme={colorScheme}
+                  handleSelectRelationship={handleSelectRelationship}
+                />
+              ))}
+            </Flex>
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
+  // Render a single relationship item
+  const RelationshipItem = React.memo(({ rel, idx, handleSelectRelationship, colorScheme, borderColor, hoverBg }: {
+    rel: EnhancedRelationship;
+    idx: number;
+    handleSelectRelationship: (rel: EnhancedRelationship) => void;
+    colorScheme: string;
+    borderColor: string;
+    hoverBg: string;
+  }) => {
+    const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
+    
+    return (
+      <Box 
+        borderTopWidth={idx > 0 ? "1px" : "0"}
+        borderColor={borderColor}
+      >
+        <Grid 
+          templateColumns="auto 1fr auto"
+          gap={3}
+          p={3}
+          alignItems="center"
+          _hover={{ bg: hoverBg }}
+          onClick={() => handleSelectRelationship(rel)}
+          cursor="pointer"
+          role="button"
+          tabIndex={0}
+          aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleSelectRelationship(rel);
+            }
+          }}
+          borderLeftWidth="3px"
+          borderLeftColor={rel.strength && rel.strength > 0.7 ? 
+            `${colorScheme}.500` : 
+            "transparent"
+          }
+          pl={rel.strength && rel.strength > 0.7 ? 2 : 3}
+        >
+          {/* Entity icon */}
+          <GridItem>
+            <Center 
+              p={2} 
+              borderRadius="full" 
+              bg={`${colorScheme}.50`} 
+              color={`${colorScheme}.500`}
+              _dark={{ 
+                bg: `${colorScheme}.900`, 
+                color: `${colorScheme}.200` 
+              }}
+            >
+              <Icon as={getNodeIcon(nodeType)} boxSize={4} />
+            </Center>
+          </GridItem>
+          
+          {/* Entity details */}
+          <GridItem>
+            <VStack align="start" spacing={1}>
+              <Flex alignItems="center" width="100%">
+                <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
+                  {rel.label || rel.name || 'Unknown'}
+                </Text>
+                
+                {rel.strength && rel.strength > 0.8 && (
+                  <Tooltip label="Strong relationship">
+                    <Icon as={FiStar} boxSize={3} color="yellow.500" ml={1} />
+                  </Tooltip>
+                )}
+              </Flex>
               
-              <Text fontSize="sm" fontWeight="medium" noOfLines={1} textAlign="center">
-                {rel.label || rel.name || 'Unknown'}
-              </Text>
-              
-              <Text fontSize="xs" color="gray.500" noOfLines={1}>
-                {getRelationshipName(nodeType)}
-              </Text>
+              <HStack spacing={3}>
+                <Text fontSize="xs" color="gray.500">
+                  {getRelationshipName(nodeType)}
+                </Text>
+                
+                {rel.lastInteraction && (
+                  <HStack spacing={1}>
+                    <Icon as={FiCalendar} boxSize={3} color="gray.500" />
+                    <Text fontSize="xs" color="gray.500">
+                      {formatDate(rel.lastInteraction)}
+                    </Text>
+                  </HStack>
+                )}
+              </HStack>
               
               {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
             </VStack>
-          </Box>
-        );
-      })}
-    </SimpleGrid>
-  );
-
-  // Render the compact view component
-  const renderCompactView = (rels: EnhancedRelationship[], colorScheme: string) => (
-    <Box p={2}>
-      <Flex flexWrap="wrap" gap={2}>
-        {rels.map((rel, idx) => {
-          const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
-          return (
-            <Tag
-              key={`${rel.nodeId || ''}-${idx}`}
-              size="md"
-              borderRadius="full"
-              colorScheme={rel.strength && rel.strength > 0.6 ? colorScheme : undefined}
-              variant={rel.strength && rel.strength > 0.6 ? "subtle" : "outline"}
-              cursor="pointer"
-              onClick={() => handleSelectRelationship(rel)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleSelectRelationship(rel);
-                }
-              }}
-            >
-              <Icon 
-                as={getNodeIcon(nodeType)} 
-                mr={1} 
-                boxSize={3} 
-              />
-              <TagLabel noOfLines={1}>
-                {rel.label || rel.name || 'Unknown'}
-              </TagLabel>
-            </Tag>
-          );
-        })}
-      </Flex>
-    </Box>
-  );
-
-  // Render the list view component
-  const renderListView = (rels: EnhancedRelationship[], colorScheme: string) => (
-    <Box>
-      {rels.map((rel, idx) => {
-        const nodeType = rel.nodeType || MapNodeTypeEnum.USER;
-        return (
-          <Box 
-            key={`${rel.nodeId || ''}-${idx}`}
-            borderTopWidth={idx > 0 ? "1px" : "0"}
-            borderColor={borderColor}
-          >
-            <Grid 
-              templateColumns="auto 1fr auto"
-              gap={3}
-              p={3}
-              alignItems="center"
-              _hover={{ bg: hoverBg }}
-              onClick={() => handleSelectRelationship(rel)}
-              cursor="pointer"
-              role="button"
-              tabIndex={0}
-              aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleSelectRelationship(rel);
-                }
-              }}
-              borderLeftWidth="3px"
-              borderLeftColor={rel.strength && rel.strength > 0.7 ? 
-                `${colorScheme}.500` : 
-                "transparent"
-              }
-              pl={rel.strength && rel.strength > 0.7 ? 2 : 3}
-            >
-              {/* Entity icon */}
-              <GridItem>
-                <Center 
-                  p={2} 
-                  borderRadius="full" 
-                  bg={`${colorScheme}.50`} 
-                  color={`${colorScheme}.500`}
-                  _dark={{ 
-                    bg: `${colorScheme}.900`, 
-                    color: `${colorScheme}.200` 
+          </GridItem>
+          
+          {/* Action buttons */}
+          <GridItem>
+            <HStack spacing={1}>
+              <Tooltip label="Send message" placement="top">
+                <IconButton
+                  aria-label="Send message"
+                  icon={<FiMessageSquare />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Message action
                   }}
-                >
-                  <Icon as={getNodeIcon(nodeType)} boxSize={4} />
-                </Center>
-              </GridItem>
+                />
+              </Tooltip>
               
-              {/* Entity details */}
-              <GridItem>
-                <VStack align="start" spacing={1}>
-                  <Flex alignItems="center" width="100%">
-                    <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
-                      {rel.label || rel.name || 'Unknown'}
-                    </Text>
-                    
-                    {rel.strength && rel.strength > 0.8 && (
-                      <Tooltip label="Strong relationship">
-                        <Icon as={FiStar} boxSize={3} color="yellow.500" ml={1} />
-                      </Tooltip>
-                    )}
-                  </Flex>
-                  
-                  <HStack spacing={3}>
-                    <Text fontSize="xs" color="gray.500">
-                      {getRelationshipName(nodeType)}
-                    </Text>
-                    
-                    {rel.lastInteraction && (
-                      <HStack spacing={1}>
-                        <Icon as={FiCalendar} boxSize={3} color="gray.500" />
-                        <Text fontSize="xs" color="gray.500">
-                          {formatDate(rel.lastInteraction)}
-                        </Text>
-                      </HStack>
-                    )}
-                  </HStack>
-                  
-                  {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
-                </VStack>
-              </GridItem>
-              
-              {/* Action buttons */}
-              <GridItem>
-                <HStack spacing={1}>
-                  <Tooltip label="Send message" placement="top">
-                    <IconButton
-                      aria-label="Send message"
-                      icon={<FiMessageSquare />}
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Message action
-                      }}
-                    />
-                  </Tooltip>
-                  
-                  <Tooltip label={`View ${rel.label || rel.name || 'Unknown'}`} placement="top">
-                    <IconButton
-                      aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
-                      icon={<FiArrowRight />}
-                      size="sm"
-                      variant="ghost"
-                    />
-                  </Tooltip>
-                </HStack>
-              </GridItem>
-            </Grid>
+              <Tooltip label={`View ${rel.label || rel.name || 'Unknown'}`} placement="top">
+                <IconButton
+                  aria-label={`View ${rel.label || rel.name || 'Unknown'}`}
+                  icon={<FiArrowRight />}
+                  size="sm"
+                  variant="ghost"
+                />
+              </Tooltip>
+            </HStack>
+          </GridItem>
+        </Grid>
+      </Box>
+    );
+  });
+  
+  // Render the list view component with virtualization for large datasets
+  const renderListView = (rels: EnhancedRelationship[], colorScheme: string) => {
+    // Don't virtualize for small lists (less than 20 items)
+    if (rels.length < 20) {
+      return (
+        <Box>
+          {rels.map((rel, idx) => (
+            <RelationshipItem
+              key={`${rel.nodeId || ''}-${idx}`}
+              rel={rel}
+              idx={idx}
+              handleSelectRelationship={handleSelectRelationship}
+              colorScheme={colorScheme}
+              borderColor={borderColor}
+              hoverBg={hoverBg}
+            />
+          ))}
+        </Box>
+      );
+    }
+
+    // For larger lists, implement virtualization
+    const itemHeight = 84; // Approximate height of each item in pixels
+    const [scrollPosition, setScrollPosition] = React.useState(0);
+    const containerHeight = 400; // Fixed container height
+    const contentRef = React.useRef<HTMLDivElement>(null);
+    
+    // Calculate which items to render based on scroll position
+    const startIndex = Math.max(0, Math.floor(scrollPosition / itemHeight) - 5); // Buffer of 5 items
+    const endIndex = Math.min(rels.length, Math.ceil((scrollPosition + containerHeight) / itemHeight) + 5); // Buffer of 5 items
+    const visibleItems = rels.slice(startIndex, endIndex);
+    
+    // Calculate padding to preserve scroll position
+    const topPadding = startIndex * itemHeight;
+    const totalHeight = rels.length * itemHeight;
+    
+    // Handle scroll events
+    const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+      setScrollPosition(e.currentTarget.scrollTop);
+    }, []);
+    
+    return (
+      <Box 
+        height={`${containerHeight}px`} 
+        overflowY="auto" 
+        onScroll={handleScroll}
+        position="relative"
+        className="virtualized-container"
+        data-testid="virtualized-list"
+      >
+        <Box 
+          position="relative"
+          height={`${totalHeight}px`}
+          ref={contentRef}
+        >
+          <Box position="absolute" top={`${topPadding}px`} width="100%">
+            {visibleItems.map((rel, idx) => (
+              <RelationshipItem
+                key={`${rel.nodeId || ''}-${startIndex + idx}`}
+                rel={rel}
+                idx={startIndex + idx}
+                handleSelectRelationship={handleSelectRelationship}
+                colorScheme={colorScheme}
+                borderColor={borderColor}
+                hoverBg={hoverBg}
+              />
+            ))}
           </Box>
-        );
-      })}
-    </Box>
-  );
+        </Box>
+      </Box>
+    );
+  };
 
   // Main content rendering
   return (

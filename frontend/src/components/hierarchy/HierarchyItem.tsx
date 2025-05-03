@@ -6,11 +6,11 @@ import React, { useState } from 'react';
 import {
   Box,
   IconButton,
-  Tooltip,
   useColorModeValue,
   Badge,
   useDisclosure,
 } from '@chakra-ui/react';
+import { StyledTooltip } from '../common/StyledTooltip';
 import { FiUser, FiUsers, FiBriefcase, FiHome, FiGrid, FiCompass } from 'react-icons/fi';
 import { OrganizationalUnitEntity, OrganizationalUnitTypeEnum, ConnectionStrengthEnum } from '../../types/hierarchy';
 import { motion } from 'framer-motion';
@@ -99,13 +99,10 @@ export const HierarchyItem: React.FC<HierarchyItemProps> = ({
   
   return (
     <Box position="relative">
-      <Tooltip
+      <StyledTooltip
         label={unit.name}
         placement="right"
         isDisabled={isPopoverOpen}
-        hasArrow
-        openDelay={0}
-        animation="none"
       >
         <Box
           as={motion.div}
@@ -149,7 +146,7 @@ export const HierarchyItem: React.FC<HierarchyItemProps> = ({
             />
           )}
         </Box>
-      </Tooltip>
+      </StyledTooltip>
       
       {/* Popover with unit details */}
       {isPopoverOpen && (

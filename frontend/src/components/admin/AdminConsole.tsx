@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Box, Flex, Alert, AlertTitle, AlertDescription, AlertIcon } from '@chakra-ui/react';
 import { FiGrid, FiUsers, FiToggleRight, FiLink, FiDatabase, FiSettings, FiList } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
@@ -11,20 +11,29 @@ import EnhancedFeatureFlags from './features/EnhancedFeatureFlags';
 import EnhancedIntegrationsPanel from './integrations/EnhancedIntegrationsPanel';
 import UserManagement from './users/UserManagement';
 
+interface AdminUser {
+  is_superuser?: boolean;
+  email?: string;
+  name?: string;
+  role?: string[];
+}
+
 // Helper function to check if user has admin access
-const hasAdminAccess = (user: any) => {
+const hasAdminAccess = (user: AdminUser | null): boolean => {
+  if (!user) return false;
+
   // Check for superuser flag directly on user object
-  if (user?.is_superuser === true) {
+  if (user.is_superuser === true) {
     return true;
   }
   
   // For development, allow specific test users
-  if (user?.email === 'dev@example.com' || user?.name === 'Development User') {
+  if (user.email === 'dev@example.com' || user.name === 'Development User') {
     return true;
   }
   
   // Also check for admin role if present
-  if (user?.role?.includes('admin')) {
+  if (user.role?.includes('admin')) {
     return true;
   }
   

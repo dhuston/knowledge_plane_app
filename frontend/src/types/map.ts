@@ -10,6 +10,7 @@ export enum MapNodeTypeEnum {
     KNOWLEDGE_ASSET = "knowledge_asset",
     DEPARTMENT = "department",
     TEAM_CLUSTER = "team_cluster",
+    UNKNOWN = "unknown" // Safe default type for placeholder nodes
 }
 
 export enum MapEdgeTypeEnum {

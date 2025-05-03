@@ -5,7 +5,6 @@ import {
   Heading,
   Text,
   Stat,
-  StatLabel,
   StatNumber,
   StatHelpText,
   SimpleGrid,
@@ -121,12 +120,11 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon, helperText, isL
 };
 
 const AdminDashboard: React.FC = () => {
-  const { refreshData, isRefreshing } = useAdmin();
+  const { refreshData } = useAdmin();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const { adminStats, loadStats } = useAdmin();
-  const { apiClient } = { apiClient: null }; // We'll use the useAdmin context instead
   
   // Fetch dashboard stats
   useEffect(() => {

@@ -112,7 +112,7 @@ export const UserPositionCard: React.FC = () => {
               <Icon as={FiTarget} fontSize="8px" color="white" />
             </Badge>
           </Box>
-        </Tooltip>
+        </StyledTooltip>
         
         {/* Show team icon if user has a team */}
         {userTeamId && (

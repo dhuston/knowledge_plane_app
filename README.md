@@ -1,30 +1,71 @@
-# KnowledgePlane AI
+# Biosphere Alpha
 
-This repository contains the code for KnowledgePlane AI, an adaptive organization fabric designed to get your organization on the same page.
+## Developer Setup
 
-## Quick Links
+### Backend
 
-* **Vision & Strategy:** [docs/VISION_STRATEGY.md](./docs/VISION_STRATEGY.md)
-* **Product Backlog:** [docs/PRODUCT_BACKLOG.md](./docs/PRODUCT_BACKLOG.md)
-* **Technical Architecture:** [docs/TECHNICAL_ARCHITECTURE.md](./docs/TECHNICAL_ARCHITECTURE.md)
-* **Onboarding Guide:** [docs/onboarding.md](./docs/onboarding.md)
-* **Architecture Decisions:** [docs/adr/](./docs/adr/)
-* **Data Model:** [docs/data-model.md](./docs/data-model.md)
+To install the backend for development:
 
-## Frontend Development
+```bash
+cd backend
+# Add the current directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:$(pwd)
+```
 
-See the [Frontend README](./frontend/README.md) and the [Onboarding Guide](./docs/onboarding.md) for setup and development instructions.
+This will enable imports like `from app.models.user import User` to work correctly in your backend Python code.
 
-## Backend Development
+### Python Import Structure
 
-The primary backend implementation uses Python and FastAPI. See the [Backend README](./backend/README.md) for setup and development instructions.
+When importing modules in your Python code, follow this structure:
 
-## Project Structure
+```python
+# Import standard Python modules first
+import os
+import sys
+from typing import List, Optional
 
-- `/frontend/` - React/TypeScript frontend application
-- `/backend/` - Python/FastAPI backend service
-- `/docs/` - Project documentation
+# Import third-party modules
+import fastapi
+from sqlalchemy import Column, Integer, String
+from pydantic import BaseModel
 
-## Documentation Structure
+# Import local modules
+from app.core import security
+from app.models.user import User
+from app.schemas.user import UserCreate
+```
 
-All major project documentation lives in the `/docs` directory.
+### Running Linting
+
+To run linting and formatting:
+
+```bash
+# Run the formatting script
+./scripts/format-and-lint.sh all check  # Check mode
+./scripts/format-and-lint.sh all fix    # Fix mode
+```
+
+## Frontend
+
+The frontend is a React application using TypeScript and Vite.
+
+### Development Server
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Linting and Formatting
+
+```bash
+# Lint code
+npm run lint
+
+# Auto-fix linting issues
+npm run lint:fix
+
+# Format code with Prettier
+npm run format
+```

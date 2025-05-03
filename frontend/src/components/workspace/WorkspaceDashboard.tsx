@@ -108,7 +108,10 @@ export function WorkspaceDashboard({ initialLayout = 'standard' }: WorkspaceDash
           shadow="sm"
           overflow="hidden"
         >
-          <LivingMap />
+          <LivingMap 
+            onNodeClick={() => {/* No action needed, handled by NodeSelectionContext */}}
+            projectOverlaps={{}}
+          />
         </Box>
       )}
     </Box>

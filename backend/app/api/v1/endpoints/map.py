@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Set, Dict, Tuple
+from typing import Any, List, Optional, Set, Dict, Tuple, TypeVar, Generic
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -11,7 +11,7 @@ from app.crud.crud_user import user as crud_user # Specific imports
 from app.crud.crud_team import team as crud_team
 from app.crud.crud_project import project as crud_project
 from app.crud.crud_goal import goal as crud_goal
-from app import models, schemas
+from app import models, schemas, crud
 # Removed: from app.api import deps
 # Import dependencies directly
 from app.db.session import get_db_session
@@ -20,6 +20,110 @@ from app.models.project import project_participants
 from app.core.neighbour_cache import get_neighbors, set_neighbors
 
 router = APIRouter()
+
+# Helper function to get the appropriate repository based on entity type
+def get_entity_repository(entity_type: schemas.MapNodeTypeEnum) -> Any:
+    """
+    Returns the appropriate CRUD repository based on the entity type.
+    
+    Args:
+        entity_type: The type of entity (user, team, project, goal, etc.)
+        
+    Returns:
+        The corresponding CRUD repository or None if not found
+    """
+    repo_map = {
+        schemas.MapNodeTypeEnum.USER: crud_user,
+        schemas.MapNodeTypeEnum.TEAM: crud_team,
+        schemas.MapNodeTypeEnum.PROJECT: crud_project,
+        schemas.MapNodeTypeEnum.GOAL: crud_goal,
+        # Add other entity types as needed
+    }
+    return repo_map.get(entity_type)
+
+# Helper function to determine entity type from model instance
+def get_entity_type_from_model(entity: Any) -> Optional[schemas.MapNodeTypeEnum]:
+    """
+    Determines the MapNodeTypeEnum value based on the entity model class.
+    
+    Args:
+        entity: The entity model instance
+        
+    Returns:
+        The corresponding MapNodeTypeEnum value or None if not recognized
+    """
+    if isinstance(entity, models.User): 
+        return schemas.MapNodeTypeEnum.USER
+    elif isinstance(entity, models.Team): 
+        return schemas.MapNodeTypeEnum.TEAM
+    elif isinstance(entity, models.Project): 
+        return schemas.MapNodeTypeEnum.PROJECT
+    elif isinstance(entity, models.Goal): 
+        return schemas.MapNodeTypeEnum.GOAL
+    elif isinstance(entity, models.Department):
+        return schemas.MapNodeTypeEnum.DEPARTMENT
+    elif isinstance(entity, models.KnowledgeAsset):
+        return schemas.MapNodeTypeEnum.KNOWLEDGE_ASSET
+    # Add other entity types as needed
+    return None
+
+# Helper function to add an entity to the appropriate fetch set based on its type
+def add_entity_to_fetch_sets(
+    entity_id: UUID, 
+    entity_type: schemas.MapNodeTypeEnum,
+    user_ids: Set[UUID],
+    team_ids: Set[UUID],
+    project_ids: Set[UUID],
+    goal_ids: Set[UUID]
+) -> None:
+    """
+    Adds an entity ID to the appropriate fetch set based on its type.
+    
+    Args:
+        entity_id: The ID of the entity
+        entity_type: The type of the entity
+        user_ids: Set of user IDs to fetch
+        team_ids: Set of team IDs to fetch
+        project_ids: Set of project IDs to fetch
+        goal_ids: Set of goal IDs to fetch
+    """
+    if entity_type == schemas.MapNodeTypeEnum.USER:
+        user_ids.add(entity_id)
+    elif entity_type == schemas.MapNodeTypeEnum.TEAM:
+        team_ids.add(entity_id)
+    elif entity_type == schemas.MapNodeTypeEnum.PROJECT:
+        project_ids.add(entity_id)
+    elif entity_type == schemas.MapNodeTypeEnum.GOAL:
+        goal_ids.add(entity_id)
+    # Add other entity types as needed
+
+# Helper function to check if an entity passes the filters
+def passes_filters(entity: Any, entity_type: schemas.MapNodeTypeEnum, 
+                  included_types: Optional[Set[schemas.MapNodeTypeEnum]] = None,
+                  included_statuses: Optional[Set[str]] = None) -> bool:
+    """
+    Checks if an entity passes the specified filters.
+    
+    Args:
+        entity: The entity to check
+        entity_type: The type of the entity
+        included_types: Set of entity types to include (if None, include all)
+        included_statuses: Set of statuses to include (if None, include all)
+        
+    Returns:
+        True if the entity passes all filters, False otherwise
+    """
+    # Check type filter first
+    if included_types is not None and entity_type not in included_types:
+        return False
+        
+    # Check status filter for Projects and Goals
+    if included_statuses is not None and entity_type in [schemas.MapNodeTypeEnum.PROJECT, schemas.MapNodeTypeEnum.GOAL]:
+        entity_status = getattr(entity, 'status', None)
+        if not entity_status or entity_status.lower() not in included_statuses:
+            return False
+    
+    return True
 
 # --- Helper Function to Get 1-Hop Neighbors --- 
 async def get_neighbor_ids(node_id: UUID, node_type: schemas.MapNodeTypeEnum, db: AsyncSession) -> Dict[str, Set[UUID]]:
@@ -102,12 +206,19 @@ async def get_neighbor_ids(node_id: UUID, node_type: schemas.MapNodeTypeEnum, db
 # This needs access to current_user for tenant check
 # Or, it assumes node_id provided is already validated for tenant access
 async def get_entity_internal(node_id: UUID, node_type: schemas.MapNodeTypeEnum, db: AsyncSession) -> Any:
-    from app import crud # Import crud here
-    repo = None
-    if node_type == schemas.MapNodeTypeEnum.USER: repo = crud.user
-    elif node_type == schemas.MapNodeTypeEnum.TEAM: repo = crud.team
-    elif node_type == schemas.MapNodeTypeEnum.PROJECT: repo = crud.project
-    elif node_type == schemas.MapNodeTypeEnum.GOAL: repo = crud.goal
+    """
+    Internal helper to fetch entity without using the main cache.
+    Uses the entity repository lookup helper to get the appropriate repository.
+    
+    Args:
+        node_id: The ID of the entity to fetch
+        node_type: The type of the entity (user, team, project, goal, etc.)
+        db: The database session
+        
+    Returns:
+        The entity if found, None otherwise
+    """
+    repo = get_entity_repository(node_type)
     
     if repo:
         # Assuming crud.get methods handle not found appropriately (return None)
@@ -257,16 +368,14 @@ async def get_map_data(
         # --- Centered View Logic --- 
         print(f"Fetching centered view for node: {center_node_id}, depth: {depth}")
         
-        # Determine center node type 
+        # Determine center node type using our helper function
         center_node = None
         center_node_type = None
-        possible_repos = { # Use specific crud instances
-            schemas.MapNodeTypeEnum.USER: crud_user,
-            schemas.MapNodeTypeEnum.TEAM: crud_team,
-            schemas.MapNodeTypeEnum.PROJECT: crud_project,
-            schemas.MapNodeTypeEnum.GOAL: crud_goal,
-        }
-        for node_type, repo in possible_repos.items():
+        
+        # Try each possible node type using the entity repository helper
+        for node_type in [schemas.MapNodeTypeEnum.USER, schemas.MapNodeTypeEnum.TEAM, 
+                          schemas.MapNodeTypeEnum.PROJECT, schemas.MapNodeTypeEnum.GOAL]:
+            repo = get_entity_repository(node_type)
             # Use the main get_entity helper which uses cache and checks tenant
             entity = await get_entity(center_node_id, repo) 
             if entity:
@@ -277,11 +386,15 @@ async def get_map_data(
         if not center_node or not center_node_type:
              raise HTTPException(status_code=404, detail=f"Center node with ID {center_node_id} not found or not accessible.")
 
-        # Add center node to fetch sets
-        if center_node_type == schemas.MapNodeTypeEnum.USER: user_ids_to_fetch.add(center_node_id)
-        elif center_node_type == schemas.MapNodeTypeEnum.TEAM: team_ids_to_fetch.add(center_node_id)
-        elif center_node_type == schemas.MapNodeTypeEnum.PROJECT: project_ids_to_fetch.add(center_node_id)
-        elif center_node_type == schemas.MapNodeTypeEnum.GOAL: goal_ids_to_fetch.add(center_node_id)
+        # Add center node to fetch sets using our helper function
+        add_entity_to_fetch_sets(
+            center_node_id, 
+            center_node_type,
+            user_ids_to_fetch,
+            team_ids_to_fetch,
+            project_ids_to_fetch,
+            goal_ids_to_fetch
+        )
 
         # Get depth 1 neighbors using the helper
         depth1_neighbors = await get_neighbor_ids(center_node_id, center_node_type, db)
@@ -635,11 +748,10 @@ async def get_map_data(
         print("Processing UNCLUSTERED map data...")
         for entity_id, entity in fetched_entities.items():
             if not entity: continue 
-            node_type_enum = None
-            if isinstance(entity, models.User): node_type_enum = schemas.MapNodeTypeEnum.USER
-            elif isinstance(entity, models.Team): node_type_enum = schemas.MapNodeTypeEnum.TEAM
-            elif isinstance(entity, models.Project): node_type_enum = schemas.MapNodeTypeEnum.PROJECT
-            elif isinstance(entity, models.Goal): node_type_enum = schemas.MapNodeTypeEnum.GOAL
+            
+            # Use a helper function to determine entity type based on class
+            node_type_enum = get_entity_type_from_model(entity)
+            
             if node_type_enum:
                 # Use simplified node adding to map
                  _add_node_if_allowed_simplified(final_nodes_map, entity, node_type_enum, included_types, included_statuses)
@@ -659,20 +771,29 @@ async def get_map_data(
 # These are needed because the original helpers relied on the global nodes/edges/node_ids lists
 
 def _add_node_if_allowed_simplified(nodes_map: Dict[str, schemas.MapNode], entity: Any, entity_type: schemas.MapNodeTypeEnum, included_types: Optional[Set[schemas.MapNodeTypeEnum]], included_statuses: Optional[Set[str]]):
+    """
+    Simplified helper to add a node to the map if it passes all filters.
+    Uses the passes_filters helper to check if the entity should be added.
+    
+    Args:
+        nodes_map: Dictionary mapping node IDs to MapNode objects
+        entity: The entity to potentially add as a node
+        entity_type: The type of the entity
+        included_types: Set of entity types to include (if None, include all)
+        included_statuses: Set of statuses to include (if None, include all)
+        
+    Returns:
+        True if the node was added, False otherwise
+    """
     entity_id_str = str(entity.id)
     entity_label = getattr(entity, 'name', getattr(entity, 'title', entity_id_str))
     
-    # Check type filter first
-    if included_types is not None and entity_type not in included_types:
-        print(f"[Map Endpoint] Skipping node {entity_id_str} ({entity_label}) due to TYPE filter.") # Log skip
-        return False # Skip
-        
-    # Check status filter
-    if included_statuses is not None and entity_type in [schemas.MapNodeTypeEnum.PROJECT, schemas.MapNodeTypeEnum.GOAL]:
+    # Use our centralized filter checking logic
+    if not passes_filters(entity, entity_type, included_types, included_statuses):
+        filter_type = "TYPE" if included_types is not None and entity_type not in included_types else "STATUS"
         entity_status = getattr(entity, 'status', None)
-        if not entity_status or entity_status.lower() not in included_statuses:
-            print(f"[Map Endpoint] Skipping node {entity_id_str} ({entity_label}) due to STATUS filter (Status: {entity_status})") # Log skip
-            return False
+        print(f"[Map Endpoint] Skipping node {entity_id_str} ({entity_label}) due to {filter_type} filter. Status: {entity_status}")
+        return False
             
     node_id_str = str(entity.id) # Renamed from entity_id_str above, corrected here
     if node_id_str not in nodes_map:

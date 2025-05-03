@@ -7,9 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crud.crud_activity_log import activity_log as crud_activity_log # Use specific import
 from app import models, schemas # Keep models import if needed elsewhere
 from app.services.llm_service import llm_service
-from app.services.google_calendar import get_todays_calendar_events as get_calendar_events
-from app.services.google_calendar import get_google_calendar_service
 from app.services.entity_recognition_service import entity_recognition_service
+
+# Import calendar service functions from both providers
+from app.services.google_calendar import get_todays_calendar_events as get_google_calendar_events
+from app.services.google_calendar import get_google_calendar_service
+from app.services.microsoft_outlook_service import get_todays_calendar_events as get_microsoft_calendar_events
+from app.services.microsoft_outlook_service import get_microsoft_outlook_service
 
 logger = logging.getLogger(__name__)
 
@@ -69,33 +73,103 @@ class BriefingService:
 
         return summary, highlighted_summary
 
-    async def _get_calendar_summary(self, user: models.User) -> Optional[str]:
-        """Fetches and summarizes today's calendar events."""
-        try:
-            # First, get the calendar service object
-            service = await get_google_calendar_service(user=user, db=None)
+    async def _get_available_calendar_sources(self, user: models.User) -> List[str]:
+        """
+        Determine which calendar sources are available for the user.
+        
+        Args:
+            user: User model with potential calendar tokens
+            
+        Returns:
+            List of available sources in order of preference
+        """
+        sources = []
+        
+        # Check for Google Calendar credentials
+        if user.google_access_token and user.google_refresh_token:
+            sources.append("google")
+            
+        # Check for Microsoft Outlook credentials
+        if user.microsoft_access_token and user.microsoft_refresh_token:
+            sources.append("microsoft")
+            
+        # If we have both, Google is already first due to append order
+        # This establishes the default preference order
+        
+        return sources
 
-            if not service:
-                return None
-
-            # Now pass the service object to fetch events
-            events = await get_calendar_events(service=service)
-
-            if not events:
-                return None # No events today
-
-            # Format events into a simple list string
-            event_lines = []
-            for event in events[:5]: # Limit number of events shown
-                start_time_str = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
-                summary = event.get('summary', '(No Title)')
-                time_str = "All-day" if 'date' in event.get('start', {}) else datetime.fromisoformat(start_time_str).strftime('%I:%M %p')
-                event_lines.append(f"- {time_str}: {summary}")
-
-            return "\n".join(event_lines)
-        except Exception as e:
-            logger.error(f"Failed to get calendar summary for user {user.id}: {e}")
+    async def _get_calendar_summary(self, user: models.User, preferred_source: Optional[str] = None) -> Optional[str]:
+        """
+        Fetches and summarizes today's calendar events from the appropriate service.
+        
+        Args:
+            user: User model with calendar credentials
+            preferred_source: Optional preferred calendar source ("google" or "microsoft")
+            
+        Returns:
+            String summary of calendar events or None if no events/error
+        """
+        # Determine available calendar sources
+        available_sources = await self._get_available_calendar_sources(user)
+        
+        if not available_sources:
+            logger.warning(f"No calendar sources available for user {user.id}")
             return None
+            
+        # If preferred source is specified and available, use that first
+        if preferred_source and preferred_source in available_sources:
+            # Move preferred source to the front
+            available_sources = [s for s in available_sources if s != preferred_source]
+            available_sources.insert(0, preferred_source)
+        
+        # Try sources in order until one succeeds
+        for source in available_sources:
+            try:
+                if source == "google":
+                    # Try Google Calendar
+                    service = await get_google_calendar_service(user=user, db=None)
+                    if service:
+                        events = await get_google_calendar_events(service=service)
+                        if events:
+                            # Format events into a simple list string
+                            event_lines = []
+                            for event in events[:5]:  # Limit number of events shown
+                                start_time_str = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
+                                summary = event.get('summary', '(No Title)')
+                                time_str = "All-day" if 'date' in event.get('start', {}) else datetime.fromisoformat(start_time_str).strftime('%I:%M %p')
+                                event_lines.append(f"- {time_str}: {summary} [Google]")
+                            return "\n".join(event_lines)
+                            
+                elif source == "microsoft":
+                    # Try Microsoft Outlook
+                    service = await get_microsoft_outlook_service(user=user, db=None)
+                    if service:
+                        events = await get_microsoft_calendar_events(service)
+                        if events:
+                            # Format events into a simple list string
+                            event_lines = []
+                            for event in events[:5]:  # Limit number of events shown
+                                # Microsoft uses "subject" instead of "summary"
+                                start_time = event.get('start', {}).get('dateTime')
+                                subject = event.get('subject', '(No Title)')
+                                
+                                # Format time string
+                                if start_time:
+                                    time_str = datetime.fromisoformat(start_time.replace('Z', '+00:00')).strftime('%I:%M %p')
+                                else:
+                                    time_str = "All-day"
+                                    
+                                # Add online meeting information if available
+                                meeting_tag = " [Teams]" if event.get('isOnlineMeeting', False) else " [Outlook]"
+                                event_lines.append(f"- {time_str}: {subject}{meeting_tag}")
+                            return "\n".join(event_lines)
+            
+            except Exception as e:
+                logger.error(f"Failed to get calendar summary for user {user.id} from {source}: {e}")
+                continue  # Try next source
+        
+        # If we get here, all sources failed
+        return None
 
     async def _get_activity_summary(self, db: AsyncSession, user: models.User) -> Optional[str]:
         """Fetches and summarizes recent user activity."""

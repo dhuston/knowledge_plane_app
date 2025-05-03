@@ -180,8 +180,11 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   // Memoize projectOverlaps to prevent unnecessary re-renders
-  const memoizedOverlaps = useMemo(() => projectOverlaps, [projectOverlaps]);
-  const memoizedGetProjectName = useCallback(getProjectNameById, [getProjectNameById]);
+  const memoizedOverlaps = useMemo(() => projectOverlaps, [JSON.stringify(projectOverlaps)]);
+  // Memoize the getProjectNameById function to prevent unnecessary re-renders
+  const memoizedGetProjectName = useCallback((id: string) => {
+    return getProjectNameById ? getProjectNameById(id) : undefined;
+  }, [getProjectNameById]);
   
   // Delayed execution for non-critical UI elements
   const shouldLoadSecondary = useDelayedExecution(300);
@@ -360,13 +363,21 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           // Cache the result
           cacheEntity(cacheKey, relationships);
         } else {
-          // Placeholder for future API call
-          // const response = await apiClient.get<Relationship[]>(`/${selectedNode.type}s/${selectedNode.id}/relationships`);
-          // setRelationships(response.data || []);
-          setRelationships([]);
-          
-          // Cache empty result too
-          cacheEntity(cacheKey, []);
+          // Make API call to fetch relationships
+          try {
+            const response = await apiClient.get<Relationship[]>(`/${selectedNode.type.toLowerCase()}s/${selectedNode.id}/relationships`);
+            const relationshipsData = response.data || [];
+            setRelationships(relationshipsData);
+            
+            // Cache the result
+            cacheEntity(cacheKey, relationshipsData);
+          } catch (error) {
+            console.error(`Failed to fetch relationships for ${selectedNode.type} ${selectedNode.id}:`, error);
+            setRelationships([]);
+            
+            // Cache empty result when there's an error
+            cacheEntity(cacheKey, []);
+          }
         }
       } catch (err) {
         console.error('Error fetching relationships:', err);
@@ -407,7 +418,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           return;
         }
         
-        // Try to use real API if available
+        // Try to use real API
         try {
           const response = await apiClient.get(`/activities?entityType=${selectedNode.type.toLowerCase()}&entityId=${selectedNode.id}`);
           if (response && response.data) {
@@ -418,71 +429,19 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             
             setIsActivityLoading(false);
             return;
-          } 
-        } catch (apiErr) {
-          // Silent fail and fall back to mock data
-          console.debug('API not available for activity history, using mock data');
-        }
-        
-        // Enhanced mock data with more activities to demonstrate timeline - now properly typed
-        const mockActivities: Activity[] = [
-          { 
-            id: '1', 
-            type: 'update', 
-            message: 'Updated status to Active', 
-            timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(), // 1 hour ago
-            user: 'John Doe' 
-          },
-          { 
-            id: '2', 
-            type: 'comment', 
-            message: 'Added a new comment about implementation approach', 
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
-            user: 'Jane Smith' 
-          },
-          { 
-            id: '3', 
-            type: 'link', 
-            message: 'Linked to Project X for alignment', 
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-            user: 'Alex Johnson' 
-          },
-          { 
-            id: '4', 
-            type: 'create', 
-            message: 'Created entity', 
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-            user: 'System' 
           }
-        ];
-        
-        // Add entity-specific mock activities based on node type
-        if (selectedNode.type === MapNodeTypeEnum.PROJECT) {
-          mockActivities.push(
-            { 
-              id: '5', 
-              type: 'update', 
-              message: 'Updated project timeline', 
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), 
-              user: 'Project Manager' 
-            }
-          );
-        } else if (selectedNode.type === MapNodeTypeEnum.TEAM) {
-          mockActivities.push(
-            { 
-              id: '6', 
-              type: 'update', 
-              message: 'Added new team member', 
-              timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(), 
-              user: 'Team Lead' 
-            }
-          );
+        } catch (apiErr) {
+          console.warn('Failed to fetch activity history from API:', apiErr);
+          // Do not fall back to mock data - return empty array instead
+          setActivityHistory([]);
+          cacheEntity(cacheKey, []);
+          setIsActivityLoading(false);
+          return;
         }
         
-        setActivityHistory(mockActivities);
-        
-        // Cache the mock activities too
-        cacheEntity(cacheKey, mockActivities);
+        // If API doesn't return data (but no error), set empty activities
+        setActivityHistory([]);
+        cacheEntity(cacheKey, []);
       } catch (err) {
         console.error('Error fetching activity history:', err);
         setActivityHistory([]);
@@ -873,6 +832,9 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           <PanelTabs 
             activeTab={activeTab} 
             onTabChange={handleTabChange}
+            animationVariant="enhanced"
+            indicatorStyle="bar"
+            dataTestId="context-panel-tabs"
           />
         </motion.div>
 
@@ -890,13 +852,16 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
               tabId="details"
               key="details-panel"
               keepMounted={true}
+              animationVariant="fade"
+              transitionDuration={0.4}
+              maintainHeight={false}
+              data-testid="details-panel"
             >
-              <motion.div
-                key={`details-${selectedNode.id}`}
-                initial="hidden"
-                animate={isPanelMounted ? "visible" : "hidden"}
-                exit="exit"
-                variants={entityTransitionVariants}
+              <AnimatedTransition
+                in={isPanelMounted && activeTab === 'details'}
+                variant="panelEntry"
+                unmountOnExit={false}
+                transitionKey={`details-${selectedNode.id}`}
               >
                 <VStack 
                   spacing={6} 
@@ -904,17 +869,18 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                   id="panel-details"
                 >
                   {/* Entity-specific details */}
-                  <motion.div 
-                    variants={contentVariants}
-                    custom={0}
+                  <AnimatedTransition 
+                    in={true}
+                    variant="staggerItems"
+                    customIndex={0}
                     key={`entity-panel-${selectedNode.id}`}
                   >
                     {renderEntityPanel()}
-                  </motion.div>
+                  </AnimatedTransition>
                   
                   {/* ML-based entity suggestions only shown in details tab if feature flag is enabled */}
                   {flags.enableSuggestions && shouldLoadSecondary && (
-                    <motion.div variants={contentVariants} custom={1}>
+                    <AnimatedTransition in={true} variant="staggerItems" customIndex={1}>
                       <Suspense fallback={<LoadingFallback />}>
                         <LazyEntitySuggestionsContainer
                           entityId={selectedNode.id}
@@ -927,12 +893,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                           }}
                         />
                       </Suspense>
-                    </motion.div>
+                    </AnimatedTransition>
                   )}
                   
                   {/* Recently viewed entities - only shown when we have navigation history */}
                   {navHistory.length > 1 && shouldLoadTertiary && (
-                    <motion.div variants={contentVariants} custom={2}>
+                    <AnimatedTransition in={true} variant="staggerItems" customIndex={2}>
                       <Suspense fallback={<LoadingFallback />}>
                         <LazyRecentlyViewedEntities 
                           items={navHistory} 
@@ -941,23 +907,22 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                           currentEntityId={selectedNode.id}
                         />
                       </Suspense>
-                    </motion.div>
+                    </AnimatedTransition>
                   )}
 
                   {/* Action Buttons */}
-                  <motion.div 
-                    variants={contentVariants} 
-                    custom={3}
-                    initial="hidden"
-                    animate="visible"
+                  <AnimatedTransition 
+                    in={true}
+                    variant="staggerItems" 
+                    customIndex={3}
                   >
                     <ActionButtons 
                       entityType={selectedNode.type} 
                       entityId={selectedNode.id} 
                     />
-                  </motion.div>
+                  </AnimatedTransition>
                 </VStack>
-              </motion.div>
+              </AnimatedTransition>
             </LazyPanel>
             
             {/* Related Tab Content - lazily loaded */}
@@ -965,13 +930,15 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
               active={activeTab === 'related'}
               tabId="related"
               key="related-panel"
+              animationVariant="fade"
+              transitionDuration={0.4}
+              data-testid="related-panel"
             >
-              <motion.div
-                key={`related-${selectedNode.id}`}
-                initial="hidden"
-                animate="visible"
-                variants={contentVariants}
-                custom={0}
+              <AnimatedTransition
+                in={activeTab === 'related'}
+                variant="contentFade"
+                unmountOnExit={false}
+                transitionKey={`related-${selectedNode.id}`}
               >
                 <VStack 
                   spacing={6} 
@@ -984,7 +951,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                     entityType={selectedNode.type}
                   />
                 </VStack>
-              </motion.div>
+              </AnimatedTransition>
             </LazyPanel>
             
             {/* Activity Tab Content - lazily loaded */}
@@ -992,13 +959,15 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
               active={activeTab === 'activity'}
               tabId="activity"
               key="activity-panel"
+              animationVariant="fade"
+              transitionDuration={0.4}
+              data-testid="activity-panel"
             >
-              <motion.div
-                key={`activity-${selectedNode.id}`}
-                initial="hidden" 
-                animate="visible"
-                variants={contentVariants}
-                custom={0}
+              <AnimatedTransition
+                in={activeTab === 'activity'}
+                variant="contentFade"
+                unmountOnExit={false}
+                transitionKey={`activity-${selectedNode.id}`}
               >
                 <VStack 
                   spacing={6} 
@@ -1010,7 +979,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                     isLoading={isActivityLoading} 
                   />
                 </VStack>
-              </motion.div>
+              </AnimatedTransition>
             </LazyPanel>
           </AnimatePresence>
         </Box>
