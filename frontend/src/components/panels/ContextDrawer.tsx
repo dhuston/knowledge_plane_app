@@ -2,15 +2,18 @@
  * ContextDrawer.tsx
  * A drawer-based implementation of the context panel that slides out from the right
  * Uses NodeSelectionContext for consistent node selection behavior
+ * Enhanced to support expanded/collapsed view modes
  */
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Drawer,
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
   DrawerOverlay,
-  useColorModeValue
+  useColorModeValue,
+  useBreakpointValue,
+  useDisclosure
 } from '@chakra-ui/react';
 import ContextPanel from './ContextPanel';
 import { useNodeSelection } from '../../context/NodeSelectionContext';
@@ -20,28 +23,66 @@ import { MapNodeTypeEnum } from '../../types/map';
 interface ContextDrawerProps {
   projectOverlaps?: Record<string, string[]>;
   getProjectNameById?: (id: string) => string | undefined;
+  defaultContainerWidth?: number;
+  allowExpand?: boolean; // Whether to allow expanding the panel
 }
 
 const ContextDrawer: React.FC<ContextDrawerProps> = ({
   projectOverlaps = {},
-  getProjectNameById
+  getProjectNameById,
+  defaultContainerWidth = 480,
+  allowExpand = true
 }) => {
   const { 
-  selectedNode, 
-  isDrawerOpen, 
-  closeDrawer, 
-  selectNode, 
-  getRelatedNode,
-  storeRelatedNode
-} = useNodeSelection();
+    selectedNode, 
+    isDrawerOpen, 
+    closeDrawer, 
+    selectNode, 
+    getRelatedNode,
+    storeRelatedNode
+  } = useNodeSelection();
+  
   const bgColor = useColorModeValue('white', 'gray.800');
+  
+  // State for expanded view
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
+  
+  // Calculate drawer size based on breakpoints and expanded state
+  const baseDrawerSize = useBreakpointValue({ 
+    base: "full", 
+    sm: "full", 
+    md: isPanelExpanded ? "full" : "lg", 
+    lg: isPanelExpanded ? "5xl" : "xl" 
+  });
+  
+  // Reset expanded state when drawer is closed
+  useEffect(() => {
+    if (!isDrawerOpen) {
+      setIsPanelExpanded(false);
+    }
+  }, [isDrawerOpen]);
+  
+  // Handle expand/collapse events from the context panel
+  const handleToggleExpand = useCallback((isExpanded: boolean) => {
+    if (allowExpand) {
+      setIsPanelExpanded(isExpanded);
+    }
+  }, [allowExpand]);
+  
+  // Resize the container based on available screen size
+  const containerWidth = useBreakpointValue({
+    base: window.innerWidth - 40,
+    sm: window.innerWidth - 60,
+    md: defaultContainerWidth,
+    lg: defaultContainerWidth
+  }) || defaultContainerWidth;
 
   return (
     <Drawer
       isOpen={isDrawerOpen}
       placement="right"
       onClose={closeDrawer}
-      size="md"
+      size={baseDrawerSize}
       blockScrollOnMount={false}
     >
       <DrawerOverlay />
@@ -51,8 +92,15 @@ const ContextDrawer: React.FC<ContextDrawerProps> = ({
         backgroundColor={bgColor}
         boxShadow="lg"
         borderTopLeftRadius="md"
+        transition="all 0.3s ease-in-out"
       >
-        <DrawerCloseButton position="absolute" top="12px" right="12px" zIndex={10} />
+        <DrawerCloseButton 
+          position="absolute" 
+          top="12px" 
+          right="12px" 
+          zIndex={10}
+          aria-label="Close drawer"
+        />
         <DrawerBody padding={0}>  
           {selectedNode && (
             <ContextPanel 
@@ -60,6 +108,9 @@ const ContextDrawer: React.FC<ContextDrawerProps> = ({
               onClose={closeDrawer}
               projectOverlaps={projectOverlaps}
               getProjectNameById={getProjectNameById}
+              initialExpandedState={isPanelExpanded}
+              onToggleExpand={handleToggleExpand}
+              containerWidth={containerWidth}
               // Pass the selectNode function from context
               // This ensures consistent behavior across the app
               onNodeClick={(nodeId) => {

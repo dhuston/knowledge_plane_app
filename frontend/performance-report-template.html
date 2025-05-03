@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biosphere Alpha Performance Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #1a73e8;
+        }
+        .summary {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .metric-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-good {
+            border-left: 5px solid #00c853;
+        }
+        .metric-warning {
+            border-left: 5px solid #ffab00;
+        }
+        .metric-poor {
+            border-left: 5px solid #d50000;
+        }
+        .chart-container {
+            margin: 20px 0;
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Biosphere Alpha Performance Report</h1>
+    <p class="summary">This report shows the performance metrics for the Biosphere Alpha application. Tests were run on <span class="date">{{DATE}}</span>.</p>
+
+    <h2>Summary</h2>
+    <div class="metric-card metric-{{LCP_STATUS}}">
+        <h3>Largest Contentful Paint (LCP)</h3>
+        <p>{{LCP_VALUE}} (Target: &lt; 2.5s)</p>
+        <p>{{LCP_DESCRIPTION}}</p>
+    </div>
+
+    <div class="metric-card metric-{{FID_STATUS}}">
+        <h3>First Input Delay (FID)</h3>
+        <p>{{FID_VALUE}} (Target: &lt; 100ms)</p>
+        <p>{{FID_DESCRIPTION}}</p>
+    </div>
+
+    <div class="metric-card metric-{{CLS_STATUS}}">
+        <h3>Cumulative Layout Shift (CLS)</h3>
+        <p>{{CLS_VALUE}} (Target: &lt; 0.1)</p>
+        <p>{{CLS_DESCRIPTION}}</p>
+    </div>
+
+    <div class="metric-card metric-{{FCP_STATUS}}">
+        <h3>First Contentful Paint (FCP)</h3>
+        <p>{{FCP_VALUE}} (Target: &lt; 1.8s)</p>
+        <p>{{FCP_DESCRIPTION}}</p>
+    </div>
+
+    <h2>Map Component Performance</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Component</th>
+                <th>Render Time (ms)</th>
+                <th>Interaction Time (ms)</th>
+                <th>Memory Usage (MB)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>LivingMap (Empty)</td>
+                <td>{{MAP_EMPTY_RENDER}}</td>
+                <td>{{MAP_EMPTY_INTERACTION}}</td>
+                <td>{{MAP_EMPTY_MEMORY}}</td>
+                <td>{{MAP_EMPTY_STATUS}}</td>
+            </tr>
+            <tr>
+                <td>LivingMap (100 nodes)</td>
+                <td>{{MAP_SMALL_RENDER}}</td>
+                <td>{{MAP_SMALL_INTERACTION}}</td>
+                <td>{{MAP_SMALL_MEMORY}}</td>
+                <td>{{MAP_SMALL_STATUS}}</td>
+            </tr>
+            <tr>
+                <td>LivingMap (1000 nodes)</td>
+                <td>{{MAP_LARGE_RENDER}}</td>
+                <td>{{MAP_LARGE_INTERACTION}}</td>
+                <td>{{MAP_LARGE_MEMORY}}</td>
+                <td>{{MAP_LARGE_STATUS}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>API Performance</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Endpoint</th>
+                <th>Average Response (ms)</th>
+                <th>95th Percentile (ms)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>/api/v1/map/data (default)</td>
+                <td>{{MAP_DEFAULT_AVG}}</td>
+                <td>{{MAP_DEFAULT_95}}</td>
+                <td>{{MAP_DEFAULT_STATUS}}</td>
+            </tr>
+            <tr>
+                <td>/api/v1/map/data (spatial)</td>
+                <td>{{MAP_SPATIAL_AVG}}</td>
+                <td>{{MAP_SPATIAL_95}}</td>
+                <td>{{MAP_SPATIAL_STATUS}}</td>
+            </tr>
+            <tr>
+                <td>/api/v1/map/data (filtered)</td>
+                <td>{{MAP_FILTERED_AVG}}</td>
+                <td>{{MAP_FILTERED_95}}</td>
+                <td>{{MAP_FILTERED_STATUS}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Recommendations</h2>
+    <ul id="recommendations">
+        <!-- Will be filled based on test results -->
+        <li>Optimize LivingMap component rendering performance</li>
+        <li>Implement pagination for large data sets</li>
+        <li>Add Redis caching for frequently accessed map data</li>
+    </ul>
+
+    <!-- Chart placeholders that would be populated by the actual test run -->
+    <h2>Performance Charts</h2>
+    <div class="chart-container">
+        <p><em>Core Web Vitals chart will be displayed here</em></p>
+    </div>
+    <div class="chart-container">
+        <p><em>Map component performance chart will be displayed here</em></p>
+    </div>
+
+    <script>
+        // This would be replaced by actual data from test runs
+        document.querySelector('.date').textContent = new Date().toLocaleDateString();
+    </script>
+</body>
+</html>

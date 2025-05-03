@@ -103,6 +103,9 @@ interface ContextPanelProps {
   projectOverlaps?: Record<string, string[]>;
   getProjectNameById?: (id: string) => string | undefined;
   onNodeClick?: (nodeId: string | null) => void; // Optional callback for node clicks
+  initialExpandedState?: boolean; // Whether the panel should start expanded
+  onToggleExpand?: (isExpanded: boolean) => void; // Callback when panel is expanded/collapsed
+  containerWidth?: number; // Width of the container for responsive layouts
 }
 
 // Cache for panel data at component level
@@ -176,7 +179,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   selectedNode,
   onClose,
   projectOverlaps = {},
-  getProjectNameById = () => undefined
+  getProjectNameById = () => undefined,
+  initialExpandedState = false,
+  onToggleExpand,
+  containerWidth = 400
 }) => {
   const [entityData, setEntityData] = useState<EntityDataType | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -185,6 +191,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [isRelationshipsLoading, setIsRelationshipsLoading] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(initialExpandedState);
   // Suggestions are now handled directly by the EntitySuggestionsContainer component
   const [activeTab, setActiveTab] = useState<PanelTabType>('details');
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([]);
@@ -192,6 +199,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const apiClient = useApiClient();
   const { flags } = useFeatureFlags();
   const isMounted = useIsMounted();
+  const toast = useToast();
   
   // Track which tabs have been viewed for optimization
   const viewedTabsRef = useRef<Set<PanelTabType>>(new Set(['details']));
@@ -540,6 +548,29 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     viewedTabsRef.current.add(tab);
   }, []);
   
+  // Handle expanding/collapsing the panel
+  const handleToggleExpand = useCallback(() => {
+    const newExpandedState = !isExpanded;
+    setIsExpanded(newExpandedState);
+    
+    // Call the parent callback if provided
+    if (onToggleExpand) {
+      onToggleExpand(newExpandedState);
+    }
+    
+    // Show a toast notification for better UX
+    if (process.env.NODE_ENV === 'development') {
+      toast({
+        title: newExpandedState ? 'Panel expanded' : 'Panel collapsed',
+        status: 'info',
+        duration: 1500,
+        isClosable: true,
+        position: 'bottom-right',
+        variant: 'subtle',
+      });
+    }
+  }, [isExpanded, onToggleExpand, toast]);
+  
   // Set up event listeners
   useEffect(() => {
     // Add event listeners for custom events
@@ -557,23 +588,35 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const renderEntityPanel = useCallback(() => {
     if (!selectedNode || !entityData) return null;
 
+    // Use Profiler for performance tracking in development
+    const withProfiler = (id: string, component: JSX.Element): JSX.Element => {
+      if (process.env.NODE_ENV === 'development') {
+        return (
+          <React.Profiler id={id} onRender={(id, phase, actualDuration) => {
+            if (actualDuration > 10) console.debug(`Slow render (${actualDuration.toFixed(1)}ms): ${id}, ${phase}`);
+          }}>
+            {component}
+          </React.Profiler>
+        );
+      }
+      return component;
+    };
+
     // Using type guards to ensure proper typing with memoization
     if (isUserEntity(entityData) && selectedNode.type === MapNodeTypeEnum.USER) {
-      return (
-        <React.Profiler id="UserPanel" onRender={(id, phase, actualDuration) => {
-          if (actualDuration > 10) console.debug(`Slow render (${actualDuration.toFixed(1)}ms): ${id}, ${phase}`);
-        }}>
-          <UserPanel data={entityData} selectedNode={selectedNode} />
-        </React.Profiler>
+      return withProfiler("UserPanel", 
+        <UserPanel data={entityData} selectedNode={selectedNode} />
       );
     } 
     
     if (isTeamEntity(entityData) && selectedNode.type === MapNodeTypeEnum.TEAM) {
-      return <TeamPanel data={entityData} selectedNode={selectedNode} />;
+      return withProfiler("TeamPanel",
+        <TeamPanel data={entityData} selectedNode={selectedNode} />
+      );
     }
     
     if (isProjectEntity(entityData) && selectedNode.type === MapNodeTypeEnum.PROJECT) {
-      return (
+      return withProfiler("ProjectPanel",
         <ProjectPanel 
           data={entityData} 
           selectedNode={selectedNode}
@@ -584,11 +627,25 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     }
     
     if (isGoalEntity(entityData) && selectedNode.type === MapNodeTypeEnum.GOAL) {
-      return <GoalPanel data={entityData} selectedNode={selectedNode} />;
+      return withProfiler("GoalPanel",
+        <GoalPanel data={entityData} selectedNode={selectedNode} />
+      );
+    }
+    
+    if (isDepartmentEntity(entityData) && selectedNode.type === MapNodeTypeEnum.DEPARTMENT) {
+      return withProfiler("DepartmentPanel",
+        <DepartmentPanel data={entityData} selectedNode={selectedNode} />
+      );
+    }
+    
+    if (isKnowledgeAssetEntity(entityData) && selectedNode.type === MapNodeTypeEnum.KNOWLEDGE_ASSET) {
+      return withProfiler("KnowledgeAssetPanel",
+        <KnowledgeAssetPanel data={entityData} selectedNode={selectedNode} />
+      );
     }
     
     // Default fallback for other entity types
-    return (
+    return withProfiler("EntityDetails",
       <EntityDetails 
         data={entityData}
         selectedNode={selectedNode}
@@ -795,7 +852,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
       transition={{ enter: { duration: 0.3, ease: "easeOut" } }}
     >
       <Box
-        width="100%"
+        width={isExpanded ? "100%" : `${containerWidth}px`}
         height="100%"
         bg={bgColor}
         borderLeft="1px solid"
@@ -813,7 +870,9 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           boxShadow: "none"
         }}
         position="relative"
-        transition="background-color 0.3s ease-in-out"
+        transition="all 0.3s ease-in-out"
+        maxW={isExpanded ? "100%" : `${Math.min(containerWidth, 600)}px`}
+        boxShadow={isExpanded ? "lg" : "sm"}
       >
         {/* Entity type accent background */}
         <Box
@@ -834,11 +893,28 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           transition={{ duration: 0.3, ease: "easeOut" }}
         >
           <Box>
-            <PanelHeader 
-              label={selectedNode.label}
-              type={selectedNode.type}
-              onClose={onClose}
-            />
+            <HStack justify="space-between" alignItems="center">
+              <PanelHeader 
+                label={selectedNode.label}
+                type={selectedNode.type}
+                onClose={onClose}
+              />
+              
+              <Tooltip 
+                label={isExpanded ? "Collapse panel" : "Expand panel"} 
+                placement="top"
+                hasArrow
+              >
+                <IconButton
+                  aria-label={isExpanded ? "Collapse panel" : "Expand panel"}
+                  icon={isExpanded ? <FiMinimize2 /> : <FiMaximize2 />}
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleToggleExpand}
+                  mr={2}
+                />
+              </Tooltip>
+            </HStack>
             
             {/* Navigation breadcrumb - only show if we have navigation history */}
             {navHistory.length > 1 && (

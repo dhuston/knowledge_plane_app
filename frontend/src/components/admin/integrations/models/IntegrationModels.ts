@@ -4,6 +4,34 @@
  */
 
 /**
+ * Integration Types Enum
+ */
+export enum IntegrationType {
+  CALENDAR = 'calendar',
+  EMAIL = 'email',
+  DOCUMENT = 'document',
+  CHAT = 'chat',
+  PROJECT = 'project',
+  RESEARCH = 'research',
+  OTHER = 'other'
+}
+
+/**
+ * Integration Status Enum
+ */
+export enum IntegrationStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  ERROR = 'error',
+  CONFIGURING = 'configuring'
+}
+
+/**
+ * Authentication Types
+ */
+export type AuthType = 'oauth2' | 'api_key' | 'basic_auth';
+
+/**
  * Base type for credential configuration
  */
 export interface BaseCredentialConfig {
@@ -53,6 +81,14 @@ export interface BasicAuthCredentialConfig extends BaseCredentialConfig {
 export type CredentialConfig = OAuth2CredentialConfig | ApiKeyCredentialConfig | BasicAuthCredentialConfig;
 
 /**
+ * Authentication configuration
+ */
+export interface AuthConfig {
+  type: AuthType;
+  configuration: CredentialConfig;
+}
+
+/**
  * Integration configuration schema property
  */
 export interface ConfigSchemaProperty {
@@ -80,7 +116,7 @@ export interface ConfigSchema {
 /**
  * Integration type information
  */
-export interface IntegrationType {
+export interface IntegrationTypeInfo {
   id: string;
   name: string;
   description: string;
@@ -89,7 +125,7 @@ export interface IntegrationType {
   supportedEntityTypes: string[];
   configSchema: ConfigSchema;
   credentialSchema: ConfigSchema;
-  authTypes: ('oauth2' | 'api_key' | 'basic_auth')[];
+  authTypes: AuthType[];
 }
 
 /**
@@ -132,22 +168,32 @@ export interface IntegrationLogEntry {
 }
 
 /**
- * Integration instance status
- */
-export type IntegrationStatus = 'active' | 'inactive' | 'error' | 'configuring';
-
-/**
  * Integration instance
  */
 export interface Integration {
   id: string;
   name: string;
   description?: string;
-  type: string;
+  type: IntegrationType | string;
   status: IntegrationStatus;
-  config: Record<string, any>;
+  config?: Record<string, any>;
+  authTypes?: AuthType[];
+  authConfig?: AuthConfig;
   lastSync?: string;
-  schedule?: string;
+  logoUrl?: string;
+  version?: string;
+  
+  // Sync settings
+  syncEnabled?: boolean;
+  syncFrequency?: number;
+  
+  // Advanced settings
+  customEndpoint?: string;
+  timeout?: number;
+  maxRetries?: number;
+  debugMode?: boolean;
+  
+  // Metrics and history
   metrics?: IntegrationMetrics;
   createdAt: string;
   updatedAt?: string;
@@ -192,5 +238,5 @@ export interface IntegrationCategory {
   name: string;
   description?: string;
   icon?: string;
-  types: IntegrationType[];
+  types: IntegrationTypeInfo[];
 }

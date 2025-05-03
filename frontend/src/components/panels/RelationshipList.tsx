@@ -195,7 +195,7 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
     });
   }, [filteredRelationships, sortBy]);
   
-  // Group relationships based on selected option
+  // Group relationships based on selected option with improved categorization
   const groupedRelationships = useMemo(() => {
     if (groupBy === 'none') {
       return { 'All Relationships': sortedRelationships };
@@ -203,6 +203,7 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
     
     const groups: Record<string, EnhancedRelationship[]> = {};
     
+    // Group relationships first
     sortedRelationships.forEach(rel => {
       let key = 'OTHER';
       
@@ -225,6 +226,72 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
       }
       groups[key].push(rel);
     });
+    
+    // Sort the keys for consistent ordering
+    // Special ordering for relationship types to ensure logical grouping
+    if (groupBy === 'type') {
+      const orderedKeys = [
+        'REPORTS_TO', 
+        'LEADS', 
+        'MEMBER_OF',
+        'PARTICIPATES_IN',
+        'OWNS', 
+        'ALIGNED_TO',
+        'PARENT_OF',
+        'RELATED_TO',
+        'OTHER'
+      ];
+      
+      // Create a new ordered object
+      const orderedGroups: Record<string, EnhancedRelationship[]> = {};
+      
+      // First add keys in our preferred order if they exist
+      orderedKeys.forEach(key => {
+        if (groups[key] && groups[key].length > 0) {
+          orderedGroups[key] = groups[key];
+        }
+      });
+      
+      // Then add any remaining keys
+      Object.keys(groups).forEach(key => {
+        if (!orderedKeys.includes(key)) {
+          orderedGroups[key] = groups[key];
+        }
+      });
+      
+      return orderedGroups;
+    }
+    
+    // For node types, ensure a logical order
+    if (groupBy === 'nodeType') {
+      const orderedKeys = [
+        'USER',
+        'TEAM',
+        'PROJECT',
+        'GOAL',
+        'DEPARTMENT',
+        'KNOWLEDGE_ASSET',
+        'UNKNOWN'
+      ];
+      
+      const orderedGroups: Record<string, EnhancedRelationship[]> = {};
+      
+      // Add keys in our preferred order
+      orderedKeys.forEach(key => {
+        if (groups[key] && groups[key].length > 0) {
+          orderedGroups[key] = groups[key];
+        }
+      });
+      
+      // Add any remaining keys
+      Object.keys(groups).forEach(key => {
+        if (!orderedKeys.includes(key)) {
+          orderedGroups[key] = groups[key];
+        }
+      });
+      
+      return orderedGroups;
+    }
     
     return groups;
   }, [sortedRelationships, groupBy]);

@@ -44,6 +44,9 @@ black = "^25.1.0"
 pytest = "^8.0.0"
 pytest-cov = "^4.1.0"
 pytest-asyncio = "^0.23.5"
+locust = "^2.23.1"
+matplotlib = "^3.8.0"
+pytest-benchmark = "^4.0.0"
 
 [tool.ruff]
 # Enable Pyflakes `F`, Pycodestyle `E`, and import `I` rules

@@ -19,12 +19,13 @@ from app.services.microsoft_outlook_service import (
 
 
 class MockResponse:
-    """Mock for aiohttp ClientResponse"""
-    def __init__(self, status: int, data: Dict[str, Any]):
-        self.status = status
+    """Mock for httpx Response"""
+    def __init__(self, status_code: int, data: Dict[str, Any]):
+        self.status_code = status_code
         self._data = data
+        self.text = json.dumps(data)
 
-    async def json(self):
+    def json(self):
         return self._data
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -62,9 +63,9 @@ def expired_token_user():
 
 @pytest.fixture
 def mock_client():
-    """Create a mock aiohttp client session."""
+    """Create a mock httpx AsyncClient."""
     mock = AsyncMock()
-    mock.closed = False
+    mock.is_closed = False
     return mock
 
 
@@ -84,7 +85,7 @@ async def test_refresh_microsoft_token_success():
         "expires_in": 3600
     }
     
-    with patch("aiohttp.ClientSession.post") as mock_post:
+    with patch("httpx.AsyncClient.post") as mock_post:
         mock_post.return_value = MockResponse(200, mock_token_response)
         
         # Act
@@ -113,7 +114,7 @@ async def test_refresh_microsoft_token_failure():
         "error_description": "The refresh token is invalid"
     }
     
-    with patch("aiohttp.ClientSession.post") as mock_post:
+    with patch("httpx.AsyncClient.post") as mock_post:
         mock_post.return_value = MockResponse(400, mock_error_response)
         
         # Act & Assert
@@ -145,7 +146,7 @@ async def test_get_microsoft_outlook_service_with_valid_token(mock_user, mock_cl
     # Arrange
     mock_db = AsyncMock()
     
-    with patch("aiohttp.ClientSession", return_value=mock_client) as mock_session:
+    with patch("httpx.AsyncClient", return_value=mock_client) as mock_session:
         # Need to mock the get method specifically
         mock_client.get.return_value = MockResponse(200, {"displayName": "Test User"})
         
@@ -166,7 +167,7 @@ async def test_get_microsoft_outlook_service_with_expired_token(expired_token_us
     # Arrange
     mock_db = AsyncMock()
     
-    with patch("aiohttp.ClientSession", return_value=mock_client), \
+    with patch("httpx.AsyncClient", return_value=mock_client), \
          patch("app.services.microsoft_outlook_service.refresh_microsoft_token") as mock_refresh:
         
         mock_refresh.return_value = ("new-access-token", datetime.now(timezone.utc) + timedelta(hours=1))
@@ -188,7 +189,7 @@ async def test_get_microsoft_outlook_service_failed_auth(mock_user, mock_client)
     # Arrange
     mock_db = AsyncMock()
     
-    with patch("aiohttp.ClientSession", return_value=mock_client):
+    with patch("httpx.AsyncClient", return_value=mock_client):
         # Mock a 401 error from the API
         mock_client.get.return_value = MockResponse(401, {
             "error": {

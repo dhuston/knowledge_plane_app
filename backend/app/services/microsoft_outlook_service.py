@@ -81,7 +81,7 @@ async def refresh_microsoft_token(user: User) -> Tuple[str, datetime]:
         raise MicrosoftTokenRefreshError(f"Unexpected error during refresh: {e}") from e
 
 
-async def get_microsoft_outlook_service(user: User, db: AsyncSession = None) -> Optional[aiohttp.ClientSession]:
+async def get_microsoft_outlook_service(user: User, db: AsyncSession = None) -> Optional[httpx.AsyncClient]:
     """
     Create a Microsoft Graph API client session with authenticated headers.
     
@@ -90,7 +90,7 @@ async def get_microsoft_outlook_service(user: User, db: AsyncSession = None) -> 
         db: Optional database session for updating tokens
         
     Returns:
-        Authenticated aiohttp.ClientSession or None if authentication fails
+        Authenticated httpx.AsyncClient or None if authentication fails
     """
     logger.info(f"Creating Microsoft Outlook service for user {user.id}")
     
@@ -126,33 +126,33 @@ async def get_microsoft_outlook_service(user: User, db: AsyncSession = None) -> 
         return None
     
     # Create authenticated client session
-    client = aiohttp.ClientSession(headers={
+    headers = {
         "Authorization": f"Bearer {user.microsoft_access_token}",
         "Content-Type": "application/json"
-    })
+    }
+    client = httpx.AsyncClient(headers=headers)
     
     # Test that the token works
     try:
-        async with client.get(f"{MICROSOFT_GRAPH_BASE_URL}/me") as response:
-            if response.status != 200:
-                error_text = await response.text()
-                logger.error(f"Microsoft authentication failed: {response.status} - {error_text}")
-                await client.close()
-                return None
+        response = await client.get(f"{MICROSOFT_GRAPH_BASE_URL}/me", timeout=30.0)
+        if response.status_code != 200:
+            logger.error(f"Microsoft authentication failed: {response.status_code} - {response.text}")
+            await client.aclose()
+            return None
             
-            me_data = await response.json()
-            logger.info(f"Successfully authenticated as {me_data.get('displayName')} ({me_data.get('userPrincipalName')})")
+        me_data = response.json()
+        logger.info(f"Successfully authenticated as {me_data.get('displayName')} ({me_data.get('userPrincipalName')})")
     
     except Exception as e:
         logger.exception(f"Error testing Microsoft API connection: {e}")
-        await client.close()
+        await client.aclose()
         return None
     
     return client
 
 
 async def _get_calendar_events(
-    client: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     start_time: str = None,
     end_time: str = None
 ) -> List[Dict[str, Any]]:
@@ -169,10 +169,10 @@ async def _get_calendar_events(
     """
     try:
         # Build query parameters
-        query_params = []
+        params = {}
         if start_time and end_time:
-            query_params.append(f"startDateTime={start_time}")
-            query_params.append(f"endDateTime={end_time}")
+            params["startDateTime"] = start_time
+            params["endDateTime"] = end_time
         
         # Add select fields to reduce response size
         select_fields = [
@@ -180,35 +180,34 @@ async def _get_calendar_events(
             "location", "isOnlineMeeting", "onlineMeeting", "organizer", 
             "attendees"
         ]
-        query_params.append(f"$select={','.join(select_fields)}")
+        params["$select"] = ",".join(select_fields)
         
         # Order by start time
-        query_params.append("$orderby=start/dateTime")
+        params["$orderby"] = "start/dateTime"
         
-        # Build URL with query parameters
+        # Build URL for calendar view
         url = f"{MICROSOFT_GRAPH_BASE_URL}/me/calendarView"
-        if query_params:
-            url += "?" + "&".join(query_params)
         
-        logger.debug(f"Fetching calendar events from: {url}")
+        logger.debug(f"Fetching calendar events from: {url} with params: {params}")
         
-        # Fetch events
-        async with client.get(url) as response:
-            if response.status != 200:
-                logger.error(f"Failed to get calendar events: {response.status}")
-                return []
-            
-            data = await response.json()
-            events = data.get("value", [])
-            logger.info(f"Retrieved {len(events)} calendar events")
-            return events
+        # Fetch events using httpx
+        response = await client.get(url, params=params, timeout=30.0)
+        
+        if response.status_code != 200:
+            logger.error(f"Failed to get calendar events: {response.status_code}")
+            return []
+        
+        data = response.json()
+        events = data.get("value", [])
+        logger.info(f"Retrieved {len(events)} calendar events")
+        return events
     
     except Exception as e:
         logger.exception(f"Error fetching calendar events: {e}")
         return []
 
 
-async def get_todays_calendar_events(client: aiohttp.ClientSession) -> List[Dict[str, Any]]:
+async def get_todays_calendar_events(client: httpx.AsyncClient) -> List[Dict[str, Any]]:
     """
     Get today's calendar events for the authenticated user.
     
@@ -239,7 +238,7 @@ async def get_todays_calendar_events(client: aiohttp.ClientSession) -> List[Dict
 
 
 async def get_calendar_events_range(
-    client: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     start_date: datetime,
     end_date: datetime
 ) -> List[Dict[str, Any]]:

@@ -22,10 +22,10 @@ import {
 } from '@chakra-ui/react';
 import { FiPlus, FiRefreshCw } from 'react-icons/fi';
 import { useApiClient } from '../../../hooks/useApiClient';
-import { Integration, IntegrationType, IntegrationCategory } from './models/IntegrationModels';
+import { Integration, IntegrationType, IntegrationStatus, IntegrationCategory } from './models/IntegrationModels';
 import IntegrationCard from './IntegrationCard';
 import NewIntegrationModal from './modals/NewIntegrationModal';
-import IntegrationDetailModal from './modals/IntegrationDetailModal';
+import { IntegrationDetailModal } from './IntegrationDetailModal';
 
 /**
  * Integration Dashboard component for displaying and managing integrations
@@ -392,13 +392,14 @@ const IntegrationDashboard: React.FC = () => {
       />
       
       {/* Integration Detail Modal */}
-      <IntegrationDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={onDetailModalClose}
-        integration={selectedIntegration}
-        onUpdateIntegration={handleUpdateIntegration}
-        onDeleteIntegration={handleDeleteIntegration}
-      />
+      {selectedIntegration && (
+        <IntegrationDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={onDetailModalClose}
+          integration={selectedIntegration}
+          onSave={(updatedIntegration) => handleUpdateIntegration(updatedIntegration.id, updatedIntegration)}
+        />
+      )}
     </Box>
   );
 };
