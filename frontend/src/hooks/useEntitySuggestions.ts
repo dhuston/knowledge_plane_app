@@ -70,7 +70,7 @@ export const useEntitySuggestions = (
    */
   const fetchSuggestions = useCallback(async () => {
     // Don't fetch if entityId is null/empty
-    if (!entityId) {
+    if (entityId === null || entityId === undefined || entityId === '') {
       setSuggestions([]);
       return;
     }
@@ -175,7 +175,7 @@ export const useEntitySuggestions = (
 
   // Fetch suggestions when entityId or options change
   useEffect(() => {
-    if (entityId) {
+    if (entityId !== null && entityId !== undefined && entityId !== '') {
       fetchSuggestions();
     } else {
       clearSuggestions();

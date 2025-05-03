@@ -57,7 +57,7 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
   const tabsRef = useRef<Map<PanelTabType, HTMLButtonElement | null>>(new Map());
   
   // Track the active indicator position
-  const [indicatorStyle, setIndicatorStyle] = React.useState({
+  const [indicatorPosition, setIndicatorPosition] = React.useState({
     left: 0,
     width: 0,
     opacity: 0
@@ -69,7 +69,7 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
     if (activeTabEl) {
       // Add a small delay to allow for any layout shifts
       setTimeout(() => {
-        setIndicatorStyle({
+        setIndicatorPosition({
           left: activeTabEl.offsetLeft,
           width: activeTabEl.offsetWidth,
           opacity: 1
@@ -85,7 +85,7 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
       
       // If this is the active tab, initialize the indicator
       if (tab === activeTab) {
-        setIndicatorStyle({
+        setIndicatorPosition({
           left: el.offsetLeft,
           width: el.offsetWidth,
           opacity: 1
@@ -170,9 +170,9 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
             height: '2px',
             backgroundColor: activeColor,
             bottom: '0px',
-            left: indicatorStyle.left,
-            width: indicatorStyle.width,
-            opacity: indicatorStyle.opacity,
+            left: indicatorPosition.left,
+            width: indicatorPosition.width,
+            opacity: indicatorPosition.opacity,
           }}
           transition={{ 
             type: 'spring', 
@@ -180,9 +180,9 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
             damping: 30 
           }}
           animate={{ 
-            left: indicatorStyle.left,
-            width: indicatorStyle.width,
-            opacity: indicatorStyle.opacity
+            left: indicatorPosition.left,
+            width: indicatorPosition.width,
+            opacity: indicatorPosition.opacity
           }}
           data-testid="tab-indicator"
         />
@@ -197,7 +197,7 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
             backgroundColor: pillBg,
             bottom: '10%',
             left: 0,
-            width: indicatorStyle.width,
+            width: indicatorPosition.width,
             borderRadius: '100px',
             zIndex: 0,
           }}
@@ -207,9 +207,9 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
             damping: 28 
           }}
           animate={{ 
-            left: indicatorStyle.left,
-            width: indicatorStyle.width,
-            opacity: indicatorStyle.opacity
+            left: indicatorPosition.left,
+            width: indicatorPosition.width,
+            opacity: indicatorPosition.opacity
           }}
           data-testid="tab-indicator-pill"
         />
@@ -232,9 +232,9 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
             damping: 28 
           }}
           animate={{ 
-            left: indicatorStyle.left - 8, // Add some padding
-            width: indicatorStyle.width + 16, // Add some padding
-            opacity: indicatorStyle.opacity
+            left: indicatorPosition.left - 8, // Add some padding
+            width: indicatorPosition.width + 16, // Add some padding
+            opacity: indicatorPosition.opacity
           }}
           data-testid="tab-indicator-highlight"
         />

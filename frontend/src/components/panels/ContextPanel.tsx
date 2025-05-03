@@ -19,6 +19,7 @@ import {
   Center,
   Text
 } from '@chakra-ui/react';
+import ErrorDisplay from '../common/ErrorDisplay';
 import { motion, AnimatePresence, keyframes } from 'framer-motion';
 import { useFeatureFlags } from '../../utils/featureFlags';
 import { useApiClient } from '../../hooks/useApiClient';
@@ -31,6 +32,11 @@ import {
   useDelayedExecution,
   areEqual
 } from '../../utils/performance';
+import { 
+  extractErrorMessage, 
+  logError, 
+  createApiError 
+} from '../../utils/errorHandling';
 
 // Import entity panels
 import UserPanel from './entity-panels/UserPanel';
@@ -320,7 +326,14 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
       } catch (err: any) {
         console.error(`Error fetching ${selectedNode.type} data:`, err);
         if (isMounted()) {
-          setError(err.message || `Failed to load ${selectedNode.type} details`);
+          // Log the error with context
+          logError(err, `ContextPanel-${selectedNode.type}`);
+          
+          // Set friendly error message
+          setError(extractErrorMessage(
+            err, 
+            `Failed to load ${selectedNode.type} details. Please try again later.`
+          ));
         }
       } finally {
         if (isMounted()) {
@@ -372,7 +385,9 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             // Cache the result
             cacheEntity(cacheKey, relationshipsData);
           } catch (error) {
-            console.error(`Failed to fetch relationships for ${selectedNode.type} ${selectedNode.id}:`, error);
+            // Use our error handling utilities for better logging
+            logError(error, `ContextPanel-Relationships-${selectedNode.type}`);
+            
             setRelationships([]);
             
             // Cache empty result when there's an error
@@ -380,7 +395,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           }
         }
       } catch (err) {
-        console.error('Error fetching relationships:', err);
+        logError(err, 'ContextPanel-Relationships');
         setRelationships([]);
       } finally {
         if (isMounted()) {
@@ -431,7 +446,8 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
             return;
           }
         } catch (apiErr) {
-          console.warn('Failed to fetch activity history from API:', apiErr);
+          logError(apiErr, `ContextPanel-ActivityHistory-${selectedNode.type}`);
+          
           // Do not fall back to mock data - return empty array instead
           setActivityHistory([]);
           cacheEntity(cacheKey, []);
@@ -443,7 +459,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
         setActivityHistory([]);
         cacheEntity(cacheKey, []);
       } catch (err) {
-        console.error('Error fetching activity history:', err);
+        logError(err, 'ContextPanel-ActivityHistory');
         setActivityHistory([]);
       } finally {
         if (isMounted()) {
@@ -641,21 +657,23 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           borderLeft="1px solid"
           borderColor={borderColor}
         >
-          <motion.div
-            initial={{ x: -5, opacity: 0.8 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 100 }}
-          >
-            <Alert 
-              status="error" 
-              variant="left-accent" 
-              borderRadius="md"
-              boxShadow="sm"
-            >
-              <AlertIcon />
-              {error}
-            </Alert>
-          </motion.div>
+          <ErrorDisplay 
+            error={error}
+            onRetry={() => {
+              if (selectedNode) {
+                // Trigger a refresh by temporarily clearing and then re-selecting the node
+                const nodeToRefresh = {...selectedNode};
+                setEntityData(null);
+                setError(null);
+                setTimeout(() => {
+                  if (onNodeClick) {
+                    onNodeClick(nodeToRefresh.id);
+                  }
+                }, 100);
+              }
+            }}
+            variant="left-accent"
+          />
         </Box>
       </SlideFade>
     );

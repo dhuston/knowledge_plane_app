@@ -1,9 +1,10 @@
 /**
  * EntitySuggestions.tsx
  * Enhanced component that displays AI-generated entity connection suggestions
- * with improved visualization and interaction
+ * with improved visualization, animations, and interaction
  */
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Box, 
   Heading, 
@@ -150,7 +151,7 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
   const confidenceMed = useColorModeValue('orange.50', 'orange.900');
   const confidenceLow = useColorModeValue('red.50', 'red.900');
   
-  if (!suggestions || suggestions.length === 0) return null;
+  if (suggestions === undefined || suggestions.length === 0) return null;
   
   // Apply filters
   const filteredSuggestions = activeFilters.length > 0
@@ -176,17 +177,33 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
   
   // Compact view (badges)
   const renderCompactView = () => (
-    <Wrap spacing={2}>
-      {visibleSuggestions.map(suggestion => {
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="suggestions-compact-container"
+    >
+      <Wrap spacing={2}>
+        {visibleSuggestions.map((suggestion, index) => {
         const colorScheme = getNodeColor(suggestion.type);
         const Icon = getNodeIcon(suggestion.type);
         
         return (
-          <WrapItem key={suggestion.id}>
-            <Tag
+          <motion.div
+            key={suggestion.id}
+            variants={tagVariants}
+            whileHover={{ 
+              y: -3, 
+              scale: 1.05, 
+              transition: { duration: 0.2 } 
+            }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <WrapItem>
+              <Tag
               size="md"
               borderRadius="full"
-              variant={highlightPriority && suggestion.priority === 'high' ? "solid" : "subtle"}
+              variant={(highlightPriority && suggestion.priority !== undefined && suggestion.priority === 'high') ? "solid" : "subtle"}
               colorScheme={colorScheme}
               cursor="pointer"
               onClick={() => onSuggestionClick(suggestion.id, suggestion.label)}
@@ -198,14 +215,14 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
               }}
               tabIndex={0}
               role="button"
-              aria-label={`Connect to ${suggestion.label}${suggestion.reason ? `: ${suggestion.reason}` : ''}`}
-              boxShadow={suggestion.priority === 'high' ? 'sm' : undefined}
+              aria-label={`Connect to ${suggestion.label}${suggestion.reason !== undefined ? `: ${suggestion.reason}` : ''}`}
+              boxShadow={(suggestion.priority !== undefined && suggestion.priority === 'high') ? 'sm' : undefined}
               transition="all 0.2s"
               _hover={{ transform: 'translateY(-1px)', boxShadow: 'sm' }}
             >
               <TagLeftIcon boxSize="12px" as={Icon} />
               <TagLabel>{suggestion.label}</TagLabel>
-              {suggestion.reason && (
+              {suggestion.reason !== undefined && (
                 <Popover trigger="hover" placement="top">
                   <PopoverTrigger>
                     <Box display="inline-flex" ml={1} alignItems="center">
@@ -219,43 +236,111 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
                 </Popover>
               )}
             </Tag>
-          </WrapItem>
+            </WrapItem>
+          </motion.div>
         );
       })}
     </Wrap>
+    </motion.div>
   );
   
+  // Animation variants for suggestions
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.07,
+        delayChildren: 0.05
+      }
+    }
+  };
+  
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { 
+        type: "spring",
+        stiffness: 400,
+        damping: 25,
+        duration: 0.4
+      }
+    }
+  };
+  
+  const listItemVariants = {
+    hidden: { opacity: 0, x: -10 },
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: { 
+        type: "spring",
+        stiffness: 500,
+        damping: 28,
+        duration: 0.3
+      }
+    }
+  };
+  
+  const tagVariants = {
+    hidden: { opacity: 0, scale: 0.85 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: { 
+        type: "spring",
+        stiffness: 500,
+        damping: 25,
+        duration: 0.3
+      }
+    }
+  };
+
   // Card view (detailed cards)
   const renderCardView = () => (
-    <SimpleGrid columns={{ base: 1, sm: 2, md: 2, lg: 3 }} spacing={3}>
-      {visibleSuggestions.map(suggestion => {
+    <motion.div 
+      variants={containerVariants} 
+      initial="hidden" 
+      animate="visible"
+      className="suggestions-card-container"
+    >
+      <SimpleGrid columns={{ base: 1, sm: 2, md: 2, lg: 3 }} spacing={3}>
+        {visibleSuggestions.map((suggestion, index) => {
         const colorScheme = getNodeColor(suggestion.type);
         const Icon = getNodeIcon(suggestion.type);
         
         // Determine background based on priority or confidence
         let bgColor = cardBg;
-        if (highlightPriority && suggestion.priority) {
+        if (highlightPriority && suggestion.priority !== undefined) {
           if (suggestion.priority === 'high') bgColor = confidenceGood;
           else if (suggestion.priority === 'medium') bgColor = confidenceMed;
           else if (suggestion.priority === 'low') bgColor = confidenceLow;
-        } else if (suggestion.confidence) {
+        } else if (suggestion.confidence !== undefined) {
           if (suggestion.confidence > 0.8) bgColor = confidenceGood;
           else if (suggestion.confidence > 0.4) bgColor = confidenceMed;
           else bgColor = confidenceLow;
         }
         
         return (
-          <Card 
+          <motion.div 
             key={suggestion.id}
-            bg={bgColor}
-            borderWidth="1px"
-            borderColor={borderColor}
-            borderRadius="md"
-            overflow="hidden"
-            transition="all 0.2s"
-            _hover={{ transform: 'translateY(-2px)', shadow: 'md' }}
-            size="sm"
+            variants={itemVariants}
+            custom={index}
+            layout
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            whileTap={{ scale: 0.98 }}
           >
+            <Card 
+              bg={bgColor}
+              borderWidth="1px"
+              borderColor={borderColor}
+              borderRadius="md"
+              overflow="hidden"
+              size="sm"
+            >
             <CardBody p={3}>
               <HStack spacing={3} align="center" mb={2}>
                 {suggestion.type === MapNodeTypeEnum.USER ? (
@@ -278,17 +363,17 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
                   <Text fontWeight="medium" fontSize="sm">{suggestion.label}</Text>
                   <Text fontSize="xs" color={textSecondary}>
                     {suggestion.type.replace('_', ' ').toLowerCase()}
-                    {suggestion.mutualConnections && suggestion.mutualConnections > 0 && 
+                    {(suggestion.mutualConnections !== undefined && suggestion.mutualConnections > 0) && 
                       ` • ${suggestion.mutualConnections} mutual`}
                   </Text>
                 </VStack>
               </HStack>
               
-              {suggestion.reason && (
+              {suggestion.reason !== undefined && (
                 <Text fontSize="xs" color={textSecondary} noOfLines={2} pl={1}>{suggestion.reason}</Text>
               )}
               
-              {suggestion.tags && suggestion.tags.length > 0 && (
+              {(suggestion.tags !== undefined && suggestion.tags.length > 0) && (
                 <Wrap mt={2} spacing={1}>
                   {suggestion.tags.slice(0, 2).map((tag, i) => (
                     <Tag size="sm" key={i} colorScheme={colorScheme} variant="subtle">
@@ -310,7 +395,7 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
                 View
               </Button>
               
-              {onFeedback && (
+              {onFeedback !== undefined && (
                 <HStack spacing={1}>
                   <Tooltip label="This suggestion is helpful">
                     <IconButton
@@ -340,36 +425,50 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
               )}
             </CardFooter>
           </Card>
+          </motion.div>
         );
       })}
     </SimpleGrid>
+    </motion.div>
   );
   
   // List view
   const renderListView = () => (
-    <VStack spacing={1} align="stretch">
-      {visibleSuggestions.map(suggestion => {
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="suggestions-list-container"
+    >
+      <VStack spacing={1} align="stretch">
+        {visibleSuggestions.map((suggestion, index) => {
         const colorScheme = getNodeColor(suggestion.type);
         const Icon = getNodeIcon(suggestion.type);
         
         return (
-          <Flex
+          <motion.div
             key={suggestion.id}
-            p={2}
-            borderRadius="md"
-            cursor="pointer"
-            alignItems="center"
-            _hover={{ bg: hoverBg }}
-            onClick={() => onSuggestionClick(suggestion.id, suggestion.label)}
-            bgColor={highlightPriority && suggestion.priority === 'high' ? highlightBg : undefined}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                onSuggestionClick(suggestion.id, suggestion.label);
-                e.preventDefault();
-              }
-            }}
+            variants={listItemVariants}
+            custom={index}
+            whileHover={{ x: 5, transition: { duration: 0.2 } }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Flex
+              p={2}
+              borderRadius="md"
+              cursor="pointer"
+              alignItems="center"
+              _hover={{ bg: hoverBg }}
+              onClick={() => onSuggestionClick(suggestion.id, suggestion.label)}
+              bgColor={(highlightPriority && suggestion.priority !== undefined && suggestion.priority === 'high') ? highlightBg : undefined}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  onSuggestionClick(suggestion.id, suggestion.label);
+                  e.preventDefault();
+                }
+              }}
           >
             <Box 
               borderRadius="full" 
@@ -392,7 +491,7 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
             
             <Box flex="1">
               <Text fontSize="sm" fontWeight="medium">{suggestion.label}</Text>
-              {suggestion.reason && <Text fontSize="xs" color={textSecondary}>{suggestion.reason}</Text>}
+              {suggestion.reason !== undefined && <Text fontSize="xs" color={textSecondary}>{suggestion.reason}</Text>}
             </Box>
             
             <IconButton
@@ -402,36 +501,54 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
               variant="ghost"
             />
           </Flex>
+          </motion.div>
         );
       })}
     </VStack>
+    </motion.div>
   );
   
   return (
-    <Box 
-      mt={4} 
-      borderWidth="1px" 
-      borderRadius="md" 
-      borderColor={borderColor}
-      aria-labelledby="suggestions-heading"
-      overflow="hidden"
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ 
+        duration: 0.5,
+        type: "spring", 
+        stiffness: 300, 
+        damping: 25 
+      }}
     >
-      {/* Header */}
-      <Flex 
-        p={3} 
-        bg={headerBg} 
-        justifyContent="space-between" 
-        alignItems="center" 
-        onClick={onToggle} 
-        cursor="pointer"
+      <Box 
+        mt={4} 
+        borderWidth="1px" 
+        borderRadius="md" 
+        borderColor={borderColor}
+        aria-labelledby="suggestions-heading"
+        overflow="hidden"
       >
+        {/* Header */}
+        <motion.div
+          whileHover={{ 
+            backgroundColor: hoverBg,
+            transition: { duration: 0.2 }
+          }}
+        >
+          <Flex 
+            p={3} 
+            bg={headerBg} 
+            justifyContent="space-between" 
+            alignItems="center" 
+            onClick={onToggle} 
+            cursor="pointer"
+          >
         <HStack>
           <Icon as={isOpen ? FiChevronUp : FiChevronDown} />
           <Heading size="xs" id="suggestions-heading">{title}</Heading>
           <Badge colorScheme="blue" ml={1}>{filteredSuggestions.length}</Badge>
         </HStack>
         
-        {availableTypes.length > 1 && (
+        {(availableTypes.length > 1) && (
           <Popover closeOnBlur={true} placement="bottom-end">
             <PopoverTrigger>
               <IconButton
@@ -440,7 +557,7 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
                 size="xs"
                 variant="ghost"
                 onClick={(e) => e.stopPropagation()}
-                colorScheme={activeFilters.length > 0 ? "blue" : undefined}
+                colorScheme={(activeFilters.length > 0) ? "blue" : undefined}
               />
             </PopoverTrigger>
             <PopoverContent width="200px">
@@ -457,10 +574,10 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
                       borderRadius="md"
                       cursor="pointer"
                       onClick={() => toggleFilter(type)}
-                      bg={activeFilters.includes(type) ? `${getNodeColor(type)}.50` : undefined}
+                      bg={(activeFilters.includes(type)) ? `${getNodeColor(type)}.50` : undefined}
                       _hover={{ bg: hoverBg }}
                       _dark={{
-                        bg: activeFilters.includes(type) ? `${getNodeColor(type)}.900` : undefined,
+                        bg: (activeFilters.includes(type)) ? `${getNodeColor(type)}.900` : undefined,
                       }}
                     >
                       <Icon 
@@ -471,13 +588,13 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
                       <Text fontSize="sm">{type.replace('_', ' ').toLowerCase()}</Text>
                       <Box flex="1" />
                       <Icon 
-                        as={activeFilters.includes(type) ? FiCheck : undefined} 
+                        as={(activeFilters.includes(type)) ? FiCheck : undefined} 
                         color={`${getNodeColor(type)}.500`} 
                       />
                     </Flex>
                   ))}
                   
-                  {activeFilters.length > 0 && (
+                  {(activeFilters.length > 0) && (
                     <>
                       <Divider my={1} />
                       <Button 
@@ -496,40 +613,65 @@ const EntitySuggestions: React.FC<EntitySuggestionsProps> = ({
           </Popover>
         )}
       </Flex>
+      </motion.div>
       
-      <Collapse in={isOpen} animateOpacity>
-        <Box p={3}>
-          {/* Info text about suggestions */}
-          <Box mb={3}>
-            <Flex alignItems="center">
-              <Icon as={FiInfo} color={textSecondary} mr={1} />
-              <Text fontSize="xs" color={textSecondary} fontStyle="italic">
-                These suggestions are based on your activity and organizational patterns.
-              </Text>
-            </Flex>
-          </Box>
-          
-          {/* Suggestions based on view mode */}
-          {viewMode === 'cards' ? renderCardView() : 
-           viewMode === 'list' ? renderListView() : 
-           renderCompactView()}
-          
-          {/* Show more/less button */}
-          {filteredSuggestions.length > maxShown && (
-            <Button 
-              size="xs" 
-              width="full" 
-              variant="ghost" 
-              mt={3}
-              leftIcon={showAll ? <FiChevronUp /> : <FiChevronDown />}
-              onClick={() => setShowAll(!showAll)}
-            >
-              {showAll ? 'Show Less' : `Show All (${filteredSuggestions.length})`}
-            </Button>
-          )}
-        </Box>
-      </Collapse>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+          >
+            <Box p={3}>
+              {/* Info text about suggestions */}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+              >
+                <Box mb={3}>
+                  <Flex alignItems="center">
+                    <Icon as={FiInfo} color={textSecondary} mr={1} />
+                    <Text fontSize="xs" color={textSecondary} fontStyle="italic">
+                      These suggestions are based on your activity and organizational patterns.
+                    </Text>
+                  </Flex>
+                </Box>
+              </motion.div>
+              
+              {/* Suggestions based on view mode */}
+              {viewMode === 'cards' ? renderCardView() : 
+              viewMode === 'list' ? renderListView() : 
+              renderCompactView()}
+              
+              {/* Show more/less button with animation */}
+              {(filteredSuggestions.length > maxShown) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button 
+                    size="xs" 
+                    width="full" 
+                    variant="ghost" 
+                    mt={3}
+                    leftIcon={showAll ? <FiChevronUp /> : <FiChevronDown />}
+                    onClick={() => setShowAll(!showAll)}
+                  >
+                    {showAll ? 'Show Less' : `Show All (${filteredSuggestions.length})`}
+                  </Button>
+                </motion.div>
+              )}
+            </Box>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Box>
+    </motion.div>
   );
 };
 

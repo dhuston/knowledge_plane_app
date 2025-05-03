@@ -51,7 +51,7 @@ const EntitySuggestionsContainer: React.FC<EntitySuggestionsContainerProps> = ({
   // Handle suggestion click
   const handleSuggestionClick = useCallback((suggestionId: string, label: string) => {
     // Call the provided callback if it exists
-    if (onSuggestionClick) {
+    if (onSuggestionClick !== undefined) {
       onSuggestionClick(suggestionId, label);
     }
   }, [onSuggestionClick]);
@@ -84,12 +84,12 @@ const EntitySuggestionsContainer: React.FC<EntitySuggestionsContainerProps> = ({
   }, [submitFeedback, toast]);
 
   // Don't show anything if there's no entity selected
-  if (!entityId) {
+  if (entityId === null || entityId === undefined) {
     return null;
   }
 
   // Show loading state
-  if (isLoading && suggestions.length === 0) {
+  if (isLoading === true && suggestions.length === 0) {
     return (
       <Box mt={4} p={4} borderWidth="1px" borderRadius="md">
         <Center>
@@ -101,7 +101,7 @@ const EntitySuggestionsContainer: React.FC<EntitySuggestionsContainerProps> = ({
   }
 
   // Show error state
-  if (error && !isLoading && suggestions.length === 0) {
+  if (error !== undefined && isLoading !== true && suggestions.length === 0) {
     return (
       <Box mt={4} p={4} borderWidth="1px" borderRadius="md">
         <Text fontSize="sm" color="red.500">Unable to load suggestions</Text>
@@ -110,7 +110,7 @@ const EntitySuggestionsContainer: React.FC<EntitySuggestionsContainerProps> = ({
   }
 
   // Show empty state
-  if (!isLoading && suggestions.length === 0) {
+  if (isLoading !== true && suggestions.length === 0) {
     return null;
   }
 

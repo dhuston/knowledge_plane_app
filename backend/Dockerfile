@@ -46,6 +46,12 @@ WORKDIR $APP_HOME
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libpq-dev \
     ca-certificates \
+    # Dependencies for GeoAlchemy2 and spatial extensions
+    binutils \
+    libproj-dev \
+    gdal-bin \
+    libgdal-dev \
+    libgeos-dev \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

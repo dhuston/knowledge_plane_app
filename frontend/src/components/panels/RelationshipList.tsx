@@ -134,20 +134,12 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
       const nodeId = rel.target || '';
       const nodeType = rel.target_type || MapNodeTypeEnum.USER;
       
-      // Generate random strength for demo (in real app, this would come from API)
-      const strength = Math.random();
-      const frequency = Math.random();
-      const lastInteraction = new Date(
-        Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-      ).toISOString();
-      
+      // Use real data from API if available, otherwise use defaults
+      // No random mock data - properties are only populated if they exist in the API response
       return {
         ...rel,
         nodeId,
-        nodeType,
-        strength,
-        frequency,
-        lastInteraction
+        nodeType
       };
     });
   }, [relationships]);
@@ -176,11 +168,26 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
         case 'alphabetical':
           return (a.label || a.name || '').localeCompare(b.label || b.name || '');
         case 'recent':
-          return new Date(b.lastInteraction || '').getTime() -
-                new Date(a.lastInteraction || '').getTime();
+          // If no lastInteraction data available, just use alphabetical
+          if (!a.lastInteraction && !b.lastInteraction) {
+            return (a.label || a.name || '').localeCompare(b.label || b.name || '');
+          }
+          // If only one has the data, prioritize that one
+          if (!a.lastInteraction) return 1;
+          if (!b.lastInteraction) return -1;
+          // Both have lastInteraction data
+          return new Date(b.lastInteraction).getTime() - new Date(a.lastInteraction).getTime();
         case 'strength':
+          // If no strength data available, just use alphabetical
+          if (a.strength === undefined && b.strength === undefined) {
+            return (a.label || a.name || '').localeCompare(b.label || b.name || '');
+          }
           return (b.strength || 0) - (a.strength || 0);
         case 'frequency':
+          // If no frequency data available, just use alphabetical
+          if (a.frequency === undefined && b.frequency === undefined) {
+            return (a.label || a.name || '').localeCompare(b.label || b.name || '');
+          }
           return (b.frequency || 0) - (a.frequency || 0);
         default:
           return 0;
@@ -331,17 +338,27 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
   
   // Format date string for display
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, { 
-      month: 'short', 
-      day: 'numeric',
-      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-    });
+    // No more default display for missing dates
+    if (!dateString) return null;
+    
+    try {
+      const date = new Date(dateString);
+      // Validate the date is actually valid (not Invalid Date)
+      if (isNaN(date.getTime())) return null;
+      
+      return date.toLocaleDateString(undefined, { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+      });
+    } catch (e) {
+      return null;
+    }
   };
   
   // Get visual strength indicator
   const getStrengthIndicator = (strength?: number) => {
+    // Only show strength indicator if actual data is available
     if (strength === undefined) return null;
     
     return (
@@ -597,7 +614,7 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
             {getRelationshipName(nodeType)}
           </Text>
           
-          {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
+          {getStrengthIndicator(rel.strength)}
         </VStack>
       </Box>
     );
@@ -849,11 +866,11 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
             }
           }}
           borderLeftWidth="3px"
-          borderLeftColor={rel.strength && rel.strength > 0.7 ? 
+          borderLeftColor={(rel.strength !== undefined && rel.strength > 0.7) ? 
             `${colorScheme}.500` : 
             "transparent"
           }
-          pl={rel.strength && rel.strength > 0.7 ? 2 : 3}
+          pl={(rel.strength !== undefined && rel.strength > 0.7) ? 2 : 3}
         >
           {/* Entity icon */}
           <GridItem>
@@ -879,7 +896,7 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
                   {rel.label || rel.name || 'Unknown'}
                 </Text>
                 
-                {rel.strength && rel.strength > 0.8 && (
+                {rel.strength !== undefined && rel.strength > 0.8 && (
                   <Tooltip label="Strong relationship">
                     <Icon as={FiStar} boxSize={3} color="yellow.500" ml={1} />
                   </Tooltip>
@@ -891,7 +908,7 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
                   {getRelationshipName(nodeType)}
                 </Text>
                 
-                {rel.lastInteraction && (
+                {rel.lastInteraction && formatDate(rel.lastInteraction) && (
                   <HStack spacing={1}>
                     <Icon as={FiCalendar} boxSize={3} color="gray.500" />
                     <Text fontSize="xs" color="gray.500">
@@ -901,7 +918,7 @@ const RelationshipList: React.FC<RelationshipListProps> = ({
                 )}
               </HStack>
               
-              {rel.strength !== undefined && getStrengthIndicator(rel.strength)}
+              {getStrengthIndicator(rel.strength)}
             </VStack>
           </GridItem>
           

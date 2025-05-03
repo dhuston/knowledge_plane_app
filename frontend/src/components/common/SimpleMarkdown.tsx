@@ -1,9 +1,11 @@
 /**
  * SimpleMarkdown.tsx
  * A component for rendering markdown-like content without external dependencies
- * Enhanced with support for more markdown features and better content rendering
+ * Enhanced with support for more markdown features, better content rendering,
+ * and smooth animations for improved user experience
  */
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { 
   Box, 
   BoxProps, 
@@ -36,6 +38,7 @@ import {
   Button,
   Divider,
   chakra,
+  useToast,
 } from '@chakra-ui/react';
 import { 
   FiMaximize, 
@@ -793,23 +796,51 @@ const SimpleMarkdown: React.FC<SimpleMarkdownProps> = ({
     return parts;
   };
   
-  // Handle closing any open code blocks or tables at the end
-  useEffect(() => {
-    if (inCodeBlock) {
-      result.push(renderCodeBlock(codeBlockContent, currentCodeLanguage));
-    }
-    
-    if (inTable && tableRows.length > 0) {
-      result.push(renderTable(tableRows));
-    }
-  }, []);
+  // The useEffect for handling closing code blocks and tables has been removed
+  // as these variables are only available within the renderContent function
   
+  // Animation variants for content elements
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+        delayChildren: 0.1,
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    }
+  };
+  
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    }
+  };
+
   return (
     <>
       <Box {...boxProps}>
-        <VStack align="stretch" spacing={0}>
-          {renderContent()}
-        </VStack>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <VStack align="stretch" spacing={0}>
+            {renderContent().map((element, index) => (
+              <motion.div key={index} variants={itemVariants}>
+                {element}
+              </motion.div>
+            ))}
+          </VStack>
+        </motion.div>
       </Box>
       
       {/* Enhanced image modal with caption and controls */}

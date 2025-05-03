@@ -5,7 +5,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import EntitySuggestionsContainer from '../EntitySuggestionsContainer';
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, useToast } from '@chakra-ui/react';
 import * as useEntitySuggestionsModule from '../../../../hooks/useEntitySuggestions';
 import { MapNodeTypeEnum } from '../../../../types/map';
 
@@ -16,6 +16,15 @@ jest.mock('../../../../hooks/useEntitySuggestions', () => {
     __esModule: true,
     ...actual,
     useEntitySuggestions: jest.fn(),
+  };
+});
+
+// Mock the toast function
+jest.mock('@chakra-ui/react', () => {
+  const originalModule = jest.requireActual('@chakra-ui/react');
+  return {
+    ...originalModule,
+    useToast: jest.fn().mockReturnValue(jest.fn()),
   };
 });
 
@@ -53,6 +62,7 @@ const mockSuggestions = [
 describe('EntitySuggestionsContainer', () => {
   const mockSubmitFeedback = jest.fn().mockResolvedValue(undefined);
   const mockRefresh = jest.fn();
+  const mockToast = jest.fn();
   
   beforeEach(() => {
     jest.clearAllMocks();
@@ -65,6 +75,7 @@ describe('EntitySuggestionsContainer', () => {
       submitFeedback: mockSubmitFeedback,
       clearSuggestions: jest.fn(),
     });
+    (useToast as jest.Mock).mockReturnValue(mockToast);
   });
 
   it('should render suggestions when data is available', () => {
@@ -164,6 +175,7 @@ describe('EntitySuggestionsContainer', () => {
     
     await waitFor(() => {
       expect(mockSubmitFeedback).toHaveBeenCalledWith('user1', true);
+      expect(mockToast).toHaveBeenCalled();
     });
     
     // Find and click the thumbs down button
@@ -171,6 +183,31 @@ describe('EntitySuggestionsContainer', () => {
     
     await waitFor(() => {
       expect(mockSubmitFeedback).toHaveBeenCalledWith('user1', false);
+      expect(mockToast).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('should show toast error when feedback submission fails', async () => {
+    mockSubmitFeedback.mockRejectedValueOnce(new Error('Feedback error'));
+    
+    render(
+      <ChakraProvider>
+        <EntitySuggestionsContainer 
+          entityId="entity123" 
+          viewMode="cards" 
+        />
+      </ChakraProvider>
+    );
+
+    // Find and click the thumbs up button
+    fireEvent.click(screen.getAllByLabelText('This suggestion is helpful')[0]);
+    
+    await waitFor(() => {
+      expect(mockSubmitFeedback).toHaveBeenCalledWith('user1', true);
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'Feedback error',
+        status: 'error'
+      }));
     });
   });
 
@@ -186,5 +223,35 @@ describe('EntitySuggestionsContainer', () => {
     );
 
     expect(screen.getByText('Custom Title')).toBeInTheDocument();
+  });
+
+  it('should respect maxShown property', () => {
+    const manyMockSuggestions = Array.from({ length: 10 }).map((_, i) => ({
+      id: `id${i}`,
+      type: MapNodeTypeEnum.USER,
+      label: `User ${i}`,
+      priority: i < 3 ? 'high' : i < 7 ? 'medium' : 'low',
+    }));
+
+    (useEntitySuggestionsModule.useEntitySuggestions as jest.Mock).mockReturnValue({
+      suggestions: manyMockSuggestions,
+      isLoading: false,
+      error: null,
+      refresh: mockRefresh,
+      submitFeedback: mockSubmitFeedback,
+      clearSuggestions: jest.fn(),
+    });
+
+    render(
+      <ChakraProvider>
+        <EntitySuggestionsContainer 
+          entityId="entity123" 
+          maxShown={3}
+        />
+      </ChakraProvider>
+    );
+
+    // Should show "Show All" button when there are more than maxShown suggestions
+    expect(screen.getByText('Show All (10)')).toBeInTheDocument();
   });
 });

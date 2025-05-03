@@ -27,14 +27,23 @@ class MapEdgeTypeEnum(str, Enum):
     # Add more as needed
 
 
+class MapNodePosition(BaseModel):
+    """Detailed position information for map nodes"""
+    x: float
+    y: float
+    z: Optional[float] = None  # For potential 3D visualization in future
+
+
 class MapNode(BaseModel):
     id: str  # Using string ID for react-flow compatibility
     type: MapNodeTypeEnum
     label: str
     # Store raw entity data for the briefing panel
     data: Dict[str, Any] = {}
-    # Optional hint for initial positioning, backend might not set this initially
-    position: Optional[Dict[str, int]] = None
+    # Position data with proper structure
+    position: Optional[MapNodePosition] = None
+    # Cluster information (if part of a visual cluster)
+    cluster_id: Optional[str] = None
 
 
 class MapEdge(BaseModel):
@@ -49,6 +58,17 @@ class MapEdge(BaseModel):
     label: Optional[str] = None
 
 
+class PaginationMetadata(BaseModel):
+    """Pagination information for map data queries"""
+    has_more: bool = False
+    next_cursor: Optional[str] = None
+    total_count: Optional[int] = None
+    page_number: Optional[int] = None
+    page_size: Optional[int] = None
+
+
 class MapData(BaseModel):
+    """Map data response with nodes and edges, and optional pagination metadata"""
     nodes: List[MapNode]
-    edges: List[MapEdge] 
+    edges: List[MapEdge]
+    pagination: Optional[PaginationMetadata] = None 

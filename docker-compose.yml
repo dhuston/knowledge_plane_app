@@ -39,7 +39,7 @@ services:
           memory: 1G
 
   db:
-    image: postgres:15-alpine # Use PostgreSQL 15
+    image: postgis/postgis:15-3.4-alpine # Use PostgreSQL 15 with PostGIS extension
     volumes:
       - postgres_data:/var/lib/postgresql/data/ # Persist data
     ports:

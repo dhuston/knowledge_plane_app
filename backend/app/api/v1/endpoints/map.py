@@ -1,3 +1,6 @@
+import base64
+import json
+import time
 from typing import Any, List, Optional, Set, Dict, Tuple, TypeVar, Generic
 from uuid import UUID
 
@@ -11,13 +14,14 @@ from app.crud.crud_user import user as crud_user # Specific imports
 from app.crud.crud_team import team as crud_team
 from app.crud.crud_project import project as crud_project
 from app.crud.crud_goal import goal as crud_goal
+from app.crud.crud_node import node as crud_node # Import node for spatial queries
 from app import models, schemas, crud
 # Removed: from app.api import deps
 # Import dependencies directly
 from app.db.session import get_db_session
 from app.core.security import get_current_user # Use get_current_user for now
 from app.models.project import project_participants
-from app.core.neighbour_cache import get_neighbors, set_neighbors
+from app.core.neighbour_cache import get_neighbors, set_neighbors, cache_nodes_spatial, get_nodes_in_area
 
 router = APIRouter()
 
@@ -241,10 +245,18 @@ async def get_map_data(
     # Add pagination parameters
     page: int = Query(1, description="Page number for pagination", ge=1),
     limit: int = Query(100, description="Maximum number of nodes per page", ge=10, le=1000),
-    # Add viewport parameters for Level-of-Detail (LOD) rendering
+    # Add viewport parameters for LOD and spatial filtering
     view_x: Optional[float] = Query(None, description="X coordinate of the viewport center"),
     view_y: Optional[float] = Query(None, description="Y coordinate of the viewport center"),
+    view_width: Optional[float] = Query(None, description="Width of the viewport in coordinate units"),
+    view_height: Optional[float] = Query(None, description="Height of the viewport in coordinate units"),
     view_ratio: Optional[float] = Query(None, description="Camera ratio (zoom level) of the viewport"),
+    # Add spatial query parameters
+    use_spatial: bool = Query(False, description="Whether to use spatial indexing for queries (faster for large graphs)"),
+    radius: Optional[float] = Query(None, description="Radius in coordinate units for circular spatial queries"),
+    # Enhanced pagination parameters for spatial queries
+    cursor: Optional[str] = Query(None, description="Cursor for pagination with spatial queries"),
+    next_token: Optional[str] = Query(None, description="Token for getting the next page of results"),
 ) -> Any:
     """
     Retrieve nodes and edges for the Living Map visualization,
@@ -308,7 +320,8 @@ async def get_map_data(
              return False
         node_id_str = str(entity.id)
         if node_id_str not in node_ids:
-            node_data = { # Extract relevant fields for frontend display
+            # Extract relevant fields for frontend display
+            node_data = { 
                 "name": getattr(entity, 'name', None),
                 "title": getattr(entity, 'title', None),
                 "status": getattr(entity, 'status', None),
@@ -319,12 +332,19 @@ async def get_map_data(
                 # Include due_date (for Goal or other entities that define it)
                 "due_date": getattr(entity, 'due_date', None).isoformat() if getattr(entity, 'due_date', None) is not None else None,
             }
+            
+            # Add spatial coordinates if available
+            if hasattr(entity, 'x') and entity.x is not None and hasattr(entity, 'y') and entity.y is not None:
+                position = schemas.MapNodePosition(x=entity.x, y=entity.y)
+            else:
+                position = None
             filtered_data = {k: v for k, v in node_data.items() if v is not None}
             nodes.append(schemas.MapNode(
                 id=node_id_str,
                 type=entity_type,
                 label=getattr(entity, 'name', getattr(entity, 'title', node_id_str)),
-                data=filtered_data
+                data=filtered_data,
+                position=position
             ))
             node_ids.add(node_id_str)
             return True
@@ -352,18 +372,85 @@ async def get_map_data(
     goal_ids_to_fetch = set()
     parent_goal_ids_to_fetch = set()
     
-    # Track viewport parameters for LOD-aware loading
+    # Check if cursor-based pagination is used and decode the cursor
+    cursor_data = None
+    if cursor:
+        try:
+            # Decode base64 cursor into pagination data
+            decoded_cursor = base64.b64decode(cursor).decode('utf-8')
+            cursor_data = json.loads(decoded_cursor)
+            
+            # Extract pagination parameters from cursor
+            if "page" in cursor_data:
+                page = cursor_data.get("page", page)
+            if "limit" in cursor_data:
+                limit = min(cursor_data.get("limit", limit), 1000)  # Enforce max limit
+                
+            # Extract viewport details from cursor if present
+            if "viewport" in cursor_data:
+                viewport_from_cursor = cursor_data["viewport"]
+                
+                # Use viewport data from cursor if not explicitly provided in request
+                if view_x is None and "x" in viewport_from_cursor:
+                    view_x = viewport_from_cursor["x"]
+                if view_y is None and "y" in viewport_from_cursor:
+                    view_y = viewport_from_cursor["y"]
+                if view_width is None and "width" in viewport_from_cursor:
+                    view_width = viewport_from_cursor["width"]
+                if view_height is None and "height" in viewport_from_cursor:
+                    view_height = viewport_from_cursor["height"]
+                if radius is None and "radius" in viewport_from_cursor:
+                    radius = viewport_from_cursor["radius"]
+                    
+                print(f"Using cursor-based pagination: page={page}, limit={limit}")
+        except Exception as e:
+            # Log error but don't fail - just use default pagination
+            print(f"Error decoding cursor: {str(e)}")
+    
+    # Use next_token (deprecated) for backward compatibility
+    elif next_token:
+        try:
+            decoded_token = base64.b64decode(next_token).decode('utf-8')
+            token_data = json.loads(decoded_token)
+            page = token_data.get("page", page)
+            limit = min(token_data.get("limit", limit), 1000)
+            print(f"Using next_token (deprecated): page={page}, limit={limit}")
+        except Exception as e:
+            print(f"Error decoding next_token: {str(e)}")
+    
+    # Track viewport parameters for LOD-aware and spatial loading
     viewport_details = None
-    if view_x is not None and view_y is not None and view_ratio is not None:
+    if view_x is not None and view_y is not None and (view_width is not None or view_ratio is not None):
+        # Calculate viewport dimensions for proper spatial queries
         viewport_details = {
             "x": view_x,
             "y": view_y,
-            "ratio": view_ratio,
-            # Calculate viewport bounds for spatial queries
-            "radius": 1000 / view_ratio  # Larger radius when zoomed out
         }
-        print(f"Using viewport-based filtering: center=({view_x}, {view_y}), zoom={view_ratio}")
+        
+        # Calculate appropriate query radius or viewport bounds
+        if radius is not None:
+            viewport_details["radius"] = radius
+        elif view_width is not None and view_height is not None:
+            # Use explicit viewport dimensions
+            viewport_details["width"] = view_width
+            viewport_details["height"] = view_height
+            # Set bounds for rectangular queries
+            viewport_details["min_x"] = view_x - (view_width / 2)
+            viewport_details["max_x"] = view_x + (view_width / 2)
+            viewport_details["min_y"] = view_y - (view_height / 2)
+            viewport_details["max_y"] = view_y + (view_height / 2)
+        elif view_ratio is not None:
+            # Dynamic radius based on zoom level (larger when zoomed out)
+            calculated_radius = 1000 / (view_ratio + 0.1)
+            viewport_details["radius"] = radius or calculated_radius
+            
+        print(f"Using viewport-based filtering: center=({view_x}, {view_y}), " + 
+              (f"radius={viewport_details.get('radius')}" if viewport_details.get('radius') else 
+               f"bounds=({viewport_details.get('min_x')},{viewport_details.get('min_y')}) to ({viewport_details.get('max_x')},{viewport_details.get('max_y')})"))
 
+    # Check if we can use spatial queries for this request
+    can_use_spatial = use_spatial and viewport_details is not None
+    
     if center_node_id:
         # --- Centered View Logic --- 
         print(f"Fetching centered view for node: {center_node_id}, depth: {depth}")
@@ -424,20 +511,114 @@ async def get_map_data(
                 team_ids_to_fetch.update(depth2_neighbors.get("team", set()))
                 project_ids_to_fetch.update(depth2_neighbors.get("project", set()))
                 goal_ids_to_fetch.update(depth2_neighbors.get("goal", set()))
+                
+        # If spatial indexing is enabled and we have coordinates for the center node, 
+        # also add entities based on spatial proximity
+        if can_use_spatial and hasattr(center_node, 'x') and center_node.x is not None and hasattr(center_node, 'y') and center_node.y is not None:
+            center_x, center_y = center_node.x, center_node.y
+            spatial_radius = viewport_details.get("radius", 100) if viewport_details else 100
+            
+            # Parse included types filter for spatial query
+            node_types_for_spatial = None
+            if types:
+                try:
+                    type_list = [t.strip() for t in types.split(',') if t.strip()]
+                    if type_list:
+                        node_types_for_spatial = type_list
+                except ValueError:
+                    # Ignore errors in type parsing
+                    pass
+                    
+            # Get spatial neighbors
+            spatial_neighbors = await crud_node.get_nodes_in_radius(
+                db=db,
+                tenant_id=current_user.tenant_id,
+                center_x=center_x,
+                center_y=center_y,
+                radius=spatial_radius,
+                node_types=node_types_for_spatial,
+                limit=limit * 2  # Get more initially, will filter down later
+            )
+            
+            # Add spatial neighbors to appropriate fetch sets
+            for node in spatial_neighbors:
+                if node.type == "user":
+                    user_ids_to_fetch.add(node.id)
+                elif node.type == "team":
+                    team_ids_to_fetch.add(node.id)
+                elif node.type == "project":
+                    project_ids_to_fetch.add(node.id)
+                elif node.type == "goal":
+                    goal_ids_to_fetch.add(node.id)
 
     else:
         # --- User-Centric Context or Viewport-Based Logic ---
-        if viewport_details:
-            # Use viewport for LOD-based loading when available
-            print(f"Fetching viewport-centered view at ({viewport_details['x']}, {viewport_details['y']}), zoom ratio: {viewport_details['ratio']}")
+        if viewport_details and can_use_spatial:
+            # Use spatial indexing for viewport-based queries
+            print(f"Using spatial indexing for viewport query at ({viewport_details['x']}, {viewport_details['y']})")
             
-            # Logic for viewport-based filtering:
-            # 1. Start with the user's immediate context
-            # 2. Add entities based on viewport (with spatial indexing if available)
-            # 3. Apply LOD based on zoom level
+            # Parse included types filter for spatial query
+            node_types_for_spatial = None
+            if types:
+                try:
+                    type_list = [t.strip() for t in types.split(',') if t.strip()]
+                    if type_list:
+                        node_types_for_spatial = type_list
+                except ValueError:
+                    # Ignore errors in type parsing
+                    pass
+                    
+            # Choose between radius or viewport query based on parameters
+            spatial_nodes = []
+            if "radius" in viewport_details:
+                # Perform radius-based spatial query
+                spatial_nodes = await crud_node.get_nodes_in_radius(
+                    db=db,
+                    tenant_id=current_user.tenant_id,
+                    center_x=viewport_details["x"],
+                    center_y=viewport_details["y"],
+                    radius=viewport_details["radius"],
+                    node_types=node_types_for_spatial,
+                    limit=limit
+                )
+            else:
+                # Perform viewport rectangle query
+                spatial_nodes = await crud_node.get_nodes_in_viewport(
+                    db=db,
+                    tenant_id=current_user.tenant_id,
+                    min_x=viewport_details["min_x"],
+                    min_y=viewport_details["min_y"],
+                    max_x=viewport_details["max_x"],
+                    max_y=viewport_details["max_y"],
+                    node_types=node_types_for_spatial,
+                    limit=limit
+                )
+                
+            # Process spatial results directly into fetch sets
+            for node in spatial_nodes:
+                if node.type == "user":
+                    user_ids_to_fetch.add(node.id)
+                elif node.type == "team":
+                    team_ids_to_fetch.add(node.id)
+                elif node.type == "project":
+                    project_ids_to_fetch.add(node.id)
+                elif node.type == "goal":
+                    goal_ids_to_fetch.add(node.id)
+                    
+            # Always include the user's immediate context regardless of spatial query
+            user_ids_to_fetch.add(current_user.id)
+            if current_user.manager_id:
+                user_ids_to_fetch.add(current_user.manager_id)
+            if current_user.team_id:
+                team_ids_to_fetch.add(current_user.team_id)
+                
+        elif viewport_details:
+            # Use viewport for LOD-based loading without spatial indexing
+            print(f"Fetching viewport-centered view using LOD without spatial indexing")
             
             # Load fewer entities when zoomed out
-            max_entities_per_type = min(50, int(500 / (viewport_details['ratio'] + 0.1)))
+            view_ratio = viewport_details.get('ratio', 1.0)
+            max_entities_per_type = min(50, int(500 / (view_ratio + 0.1)))
             print(f"Using LOD with max {max_entities_per_type} entities per type")
             
             # Always include the user's immediate context
@@ -445,15 +626,12 @@ async def get_map_data(
             if current_user.team_id:
                 team_ids_to_fetch.add(current_user.team_id)
             
-            # Fetch spatial data (would be optimized with spatial indexing in a real implementation)
-            # For now, we'll just use pagination as approximation
-            
             # Include important relationships like manager/team even when zoomed out
             if current_user.manager_id:
                 user_ids_to_fetch.add(current_user.manager_id)
             
             # When zoomed in, show more detail
-            if viewport_details['ratio'] < 0.8:  # More zoomed in
+            if view_ratio < 0.8:  # More zoomed in
                 if current_user.team_id:
                     # Show team members when zoomed in
                     member_ids = await crud.team.get_member_ids(db=db, team_id=current_user.team_id)
@@ -629,12 +807,19 @@ async def get_map_data(
                  if node_type_enum == schemas.MapNodeTypeEnum.TEAM_CLUSTER:
                      node_data["memberCount"] = len(users_by_team.get(entity.id, []))
                      
+                 # Add spatial coordinates if available
+                 if hasattr(entity, 'x') and entity.x is not None and hasattr(entity, 'y') and entity.y is not None:
+                     position = schemas.MapNodePosition(x=entity.x, y=entity.y)
+                 else:
+                     position = None
+                     
                  filtered_data = {k: v for k, v in node_data.items() if v is not None}
                  final_nodes_map[node_id_str] = schemas.MapNode(
                      id=node_id_str,
                      type=node_type_enum,
                      label=getattr(entity, 'name', getattr(entity, 'title', node_id_str)),
-                     data=filtered_data
+                     data=filtered_data,
+                     position=position
                  )
 
         # --- Add Edges (Simplified Re-routing) --- 
@@ -764,8 +949,72 @@ async def get_map_data(
             
     # Convert final_nodes_map values to list
     final_nodes_list = list(final_nodes_map.values())
+    
+    # Cache spatial data for nodes with position for future queries
+    if use_spatial:
+        # Extract nodes with spatial data for caching
+        nodes_with_position = []
+        for node in final_nodes_list:
+            if node.position:
+                nodes_with_position.append({
+                    "id": node.id,
+                    "x": node.position.x,
+                    "y": node.position.y,
+                    "type": node.type.value
+                })
+        
+        # Cache in Redis asynchronously if there are nodes with position
+        if nodes_with_position:
+            import asyncio
+            # Don't await - fire and forget to avoid delaying the response
+            asyncio.create_task(
+                cache_nodes_spatial(
+                    tenant_id=current_user.tenant_id,
+                    nodes=nodes_with_position,
+                    ttl=3600  # Cache for 1 hour
+                )
+            )
 
-    return schemas.MapData(nodes=final_nodes_list, edges=edges)
+    # Prepare pagination metadata
+    pagination_metadata = None
+    
+    # Only add pagination info if we might have more results
+    if len(final_nodes_list) >= limit or page > 1:
+        import base64
+        import json
+        
+        # Create cursor for the next page if needed
+        next_cursor = None
+        if len(final_nodes_list) >= limit:
+            # Create an opaque cursor for the next page
+            cursor_data = {
+                "page": page + 1,
+                "limit": limit,
+                "timestamp": int(time.time()),
+            }
+            
+            # Add viewport details if available for consistent spatial pagination
+            if viewport_details:
+                cursor_data["viewport"] = viewport_details
+                
+            # Encode cursor as base64 for safe transmission
+            next_cursor = base64.b64encode(
+                json.dumps(cursor_data).encode('utf-8')
+            ).decode('ascii')
+        
+        pagination_metadata = schemas.PaginationMetadata(
+            has_more=len(final_nodes_list) >= limit,
+            next_cursor=next_cursor,
+            total_count=None,  # We don't compute total count for performance reasons
+            page_number=page,
+            page_size=limit
+        )
+
+    return schemas.MapData(
+        nodes=final_nodes_list, 
+        edges=edges,
+        pagination=pagination_metadata
+    )
 
 # --- Simplified Helper Functions for Node/Edge Adding (Internal to get_map_data) ---
 # These are needed because the original helpers relied on the global nodes/edges/node_ids lists
