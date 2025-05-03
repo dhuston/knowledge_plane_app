@@ -5,7 +5,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Tuple, Union
 
-import aiohttp
+# Using httpx instead of aiohttp for better compatibility
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -53,22 +54,27 @@ async def refresh_microsoft_token(user: User) -> Tuple[str, datetime]:
             "scope": "https://graph.microsoft.com/.default"
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(MICROSOFT_TOKEN_URL, data=refresh_data) as response:
-                if response.status != 200:
-                    error_data = await response.json()
-                    logger.error(f"Microsoft token refresh failed for user {user.id}: {error_data}")
-                    raise MicrosoftTokenRefreshError(f"Microsoft API error: {error_data}")
-                
-                token_data = await response.json()
-                
-                # Extract the new token and expiry time
-                new_token = token_data.get("access_token")
-                expires_in = token_data.get("expires_in", 3600)  # Default to 1 hour
-                expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-                
-                logger.info(f"Successfully refreshed Microsoft token for user {user.id}, expires at {expiry}")
-                return new_token, expiry
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                MICROSOFT_TOKEN_URL, 
+                data=refresh_data,
+                timeout=30.0  # Set a reasonable timeout
+            )
+            
+            if response.status_code != 200:
+                error_data = response.json()
+                logger.error(f"Microsoft token refresh failed for user {user.id}: {error_data}")
+                raise MicrosoftTokenRefreshError(f"Microsoft API error: {error_data}")
+            
+            token_data = response.json()
+            
+            # Extract the new token and expiry time
+            new_token = token_data.get("access_token")
+            expires_in = token_data.get("expires_in", 3600)  # Default to 1 hour
+            expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            
+            logger.info(f"Successfully refreshed Microsoft token for user {user.id}, expires at {expiry}")
+            return new_token, expiry
     
     except Exception as e:
         logger.exception(f"Unexpected error refreshing Microsoft token for user {user.id}: {e}")

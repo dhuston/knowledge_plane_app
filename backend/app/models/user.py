@@ -23,9 +23,12 @@ class User(Base):
     avatar_url = Column(String, nullable=True)
     online_status = Column(Boolean(), default=False)
 
-    # SSO / External ID
-    auth_provider = Column(String, nullable=True) # e.g., 'google'
+    # Authentication
+    auth_provider = Column(String, nullable=True) # e.g., 'google', 'microsoft', 'password'
     auth_provider_id = Column(String, unique=True, index=True, nullable=True) # ID from provider
+    hashed_password = Column(Text, nullable=True) # For password-based authentication
+    password_reset_token = Column(String, nullable=True) # For password resets
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     manager_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True) # Self-referencing FK

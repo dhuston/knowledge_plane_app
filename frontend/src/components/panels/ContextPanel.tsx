@@ -1,6 +1,7 @@
 /**
  * ContextPanel.tsx
  * Performance-optimized panel that displays details about selected nodes
+ * Enhanced with improved modularity, rich content support, and better performance
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import {
@@ -17,7 +18,14 @@ import {
   useDisclosure,
   usePrefersReducedMotion,
   Center,
-  Text
+  Text,
+  Portal,
+  useToast,
+  Tooltip,
+  IconButton,
+  HStack,
+  Flex,
+  Divider
 } from '@chakra-ui/react';
 import ErrorDisplay from '../common/ErrorDisplay';
 import { motion, AnimatePresence, keyframes } from 'framer-motion';
@@ -30,13 +38,16 @@ import {
   useLazyLoad, 
   useIsMounted, 
   useDelayedExecution,
-  areEqual
+  areEqual,
+  measurePerformance
 } from '../../utils/performance';
 import { 
   extractErrorMessage, 
   logError, 
-  createApiError 
+  createApiError,
+  withErrorBoundary
 } from '../../utils/errorHandling';
+import { FiExternalLink, FiMaximize2, FiMinimize2, FiInfo } from 'react-icons/fi';
 
 // Import entity panels
 import UserPanel from './entity-panels/UserPanel';
@@ -44,6 +55,8 @@ import TeamPanel from './entity-panels/TeamPanel';
 import ProjectPanel from './entity-panels/ProjectPanel';
 import GoalPanel from './entity-panels/GoalPanel';
 import EntityDetails from './EntityDetails';
+import DepartmentPanel from './entity-panels/DepartmentPanel';
+import KnowledgeAssetPanel from './entity-panels/KnowledgeAssetPanel';
 
 // Import common components
 import RelationshipList from './RelationshipList';
@@ -51,6 +64,8 @@ import ActivityTimeline from './ActivityTimeline';
 import ActionButtons from './ActionButtons';
 import LazyPanel from '../common/LazyPanel';
 import AnimatedTransition from '../common/AnimatedTransition';
+import SafeMarkdown from '../common/SafeMarkdown';
+import SimpleMarkdown from '../common/SimpleMarkdown';
 
 // Import extracted components
 import PanelHeader from './header/PanelHeader';

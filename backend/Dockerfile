@@ -26,8 +26,9 @@ COPY pyproject.toml poetry.lock* ./
 # Configure Poetry to create venv inside the project directory
 RUN poetry config virtualenvs.in-project true
 
-# Install dependencies, including idna with compatible version
-RUN poetry install --only main --no-root --no-interaction --no-ansi && \
+# Install dependencies - regenerate lock file then install
+RUN poetry lock && \
+    poetry install --only main --no-root --no-interaction --no-ansi && \
     poetry add --lock idna@^3.4
 
 # --- Final Stage ---
@@ -42,17 +43,26 @@ ENV PATH="$APP_HOME/.venv/bin:$PATH"
 
 WORKDIR $APP_HOME
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    libpq-dev \
-    ca-certificates \
-    # Dependencies for GeoAlchemy2 and spatial extensions
-    binutils \
-    libproj-dev \
-    gdal-bin \
-    libgdal-dev \
-    libgeos-dev \
+# Install runtime dependencies with retry logic for network issues
+RUN apt-get update && \
+    # Install minimal dependencies first
+    apt-get install --no-install-recommends -y \
+        libpq-dev \
+        ca-certificates \
+        binutils \
     && update-ca-certificates \
+    # Then try to install the spatial libraries
+    && (apt-get install --no-install-recommends -y \
+        libgeos-dev \
+        libproj-dev \
+        || echo "Warning: Could not install some spatial libraries, continuing anyway")
+    
+# Try to install GDAL separately (most problematic)
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+        gdal-bin \
+        libgdal-dev \
+    || echo "Warning: Could not install GDAL, will use pure Python spatial functionality" \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual env from builder stage

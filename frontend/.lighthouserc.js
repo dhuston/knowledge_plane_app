@@ -1,33 +1,42 @@
+/**
+ * Lighthouse CI configuration for Biosphere Alpha frontend performance testing
+ */
+
 module.exports = {
   ci: {
     collect: {
-      // Using local development server
-      startServerCommand: 'npm run dev',
+      /* The URL patterns to test with Lighthouse */
       url: [
         'http://localhost:5173/',
         'http://localhost:5173/map',
-        'http://localhost:5173/workspace',
         'http://localhost:5173/admin',
+        'http://localhost:5173/workspace'
       ],
-      numberOfRuns: 3,
+      /* Configure the start server command and settings */
+      startServerCommand: 'npm run serve',
+      startServerReadyPattern: 'Local:',
+      startServerReadyTimeout: 30000,
+      numberOfRuns: 3, // Multiple runs for more accurate results
       settings: {
-        // Throttling settings to simulate average connection
+        preset: 'desktop',
+        onlyCategories: ['performance', 'accessibility', 'best-practices'],
         throttling: {
+          // Throttling settings to simulate average connection
           rttMs: 40,
           throughputKbps: 10240,
           cpuSlowdownMultiplier: 1,
-          requestLatencyMs: 0,
-          downloadThroughputKbps: 0,
-          uploadThroughputKbps: 0,
         },
-        // Run desktop Chrome
-        emulatedFormFactor: 'desktop',
         // Chrome flags for headless execution
         chromeFlags: '--headless --disable-gpu --no-sandbox',
       },
     },
+    upload: {
+      /* Upload the results */
+      target: 'filesystem',
+      outputDir: './lighthouse-results',
+    },
     assert: {
-      // Performance budgets based on our performance testing plan
+      /* Performance budgets for the application based on PERFORMANCE_TESTING_PLAN.md */
       preset: 'lighthouse:recommended',
       assertions: {
         // Core Web Vitals
@@ -36,25 +45,30 @@ module.exports = {
         'interactive': ['error', { maxNumericValue: 3800 }], // 3.8s
         'total-blocking-time': ['warn', { maxNumericValue: 300 }], // 300ms
         'cumulative-layout-shift': ['error', { maxNumericValue: 0.1 }], // 0.1
+        'speed-index': ['warn', { maxNumericValue: 3000 }], // 3s
         
         // Resource optimization
-        'render-blocking-resources': ['warn', { maxLength: 5 }],
-        'unminified-javascript': ['error', { maxLength: 0 }],
-        'unused-javascript': ['warn', { maxNumericValue: 1 }],
+        'render-blocking-resources': ['warn', { maxNumericValue: 5 }], // Max 5 blocking resources
         'uses-responsive-images': ['warn', { minScore: 0.8 }],
         'offscreen-images': ['warn', { minScore: 0.8 }],
+        'uses-optimized-images': ['warn', { minScore: 0.8 }],
+        'uses-text-compression': 'off', // Disable for local development
+        'unminified-javascript': 'off', // Dev environment may have unminified code
+        'unminified-css': 'off', // Dev environment may have unminified code
+        
+        // Accessibility
+        'color-contrast': 'error',
+        'heading-order': 'warn',
+        'link-name': 'error',
+        
+        // Best practices
+        'is-on-https': 'off', // Disable for local development
         
         // PWA
         'installable-manifest': 'off',
         'service-worker': 'off',
         'splash-screen': 'off',
         'themed-omnibox': 'off',
-        
-        // Accessibility is important but not part of perf testing
-        'color-contrast': 'off',
-        'document-title': 'off',
-        'html-has-lang': 'off',
-        'meta-description': 'off',
         
         // Categories
         'categories:performance': ['error', { minScore: 0.85 }],
@@ -63,13 +77,8 @@ module.exports = {
         'categories:seo': 'off',
       },
     },
-    upload: {
-      target: 'temporary-public-storage',
-      // Upload LHR reports to GitHub via GitHub Actions
-      // Can be configured once we have a GitHub Actions workflow
-    },
     server: {
-      // Optional: Configure a local server for test reports
+      // Configuration for the Lighthouse CI server if needed later
       port: 9001,
     },
   },

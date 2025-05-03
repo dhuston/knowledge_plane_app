@@ -8,6 +8,8 @@ class TenantBase(BaseModel):
     name: Optional[str] = None
     domain: Optional[str] = None
     sso_config: Optional[dict] = None
+    settings: Optional[dict] = None
+    is_active: Optional[bool] = True
 
 # Properties to receive on tenant creation
 class TenantCreate(TenantBase):

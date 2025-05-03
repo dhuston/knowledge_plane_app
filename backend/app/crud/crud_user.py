@@ -52,6 +52,12 @@ async def update_user(db: AsyncSession, *, db_obj: UserModel, obj_in: Union[User
         # Get data from the Pydantic model
         update_data = obj_in.model_dump(exclude_unset=True) 
     
+    # Handle password separately if it's provided
+    if "password" in update_data:
+        from app.core.auth import get_password_hash
+        hashed_password = get_password_hash(update_data.pop("password"))
+        setattr(db_obj, "hashed_password", hashed_password)
+    
     # Iterate over the fields in the update data
     for field, value in update_data.items():
         # Check if the SQLAlchemy model has this attribute
@@ -124,6 +130,18 @@ class CRUDUser():
             stmt = stmt.options(*options)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
+        
+    async def update_last_login(self, db: AsyncSession, *, user_id: UUID) -> None:
+        """Update the last login timestamp for a user."""
+        from datetime import datetime, timezone
+        stmt = (
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(last_login_at=datetime.now(timezone.utc))
+            .execution_options(synchronize_session="fetch")
+        )
+        await db.execute(stmt)
+        await db.commit()
 
     async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[UserModel]:
         # TODO: Add relationship loading option?

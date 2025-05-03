@@ -2,28 +2,32 @@ from typing import Any, Optional, Tuple
 from datetime import timedelta, timezone, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
-from fastapi.responses import RedirectResponse
-from fastapi.security import OAuth2PasswordRequestForm # If we ever add password flow
+from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from authlib.integrations.starlette_client import OAuthError
 from uuid import UUID
 import logging
-from pydantic import BaseModel # Import BaseModel from pydantic
+import os
+from pydantic import BaseModel, EmailStr
 from jose import jwt
 
 from app.crud.crud_user import user as crud_user
 from app.crud.crud_tenant import tenant as crud_tenant
 from app import models, schemas
-from app.core import security
+from app.core import security, auth
+from app.core.auth import AuthError, authenticate_password, get_demo_login_token, get_auth_mode
 from app.core.config import settings
-from app.core.security import create_access_token, get_oauth_client, CREDENTIALS_EXCEPTION # Updated imports
+from app.core.security import create_access_token, get_oauth_client, CREDENTIALS_EXCEPTION
 from app.core.security import get_current_user
 from app.db.session import get_db_session
 from app.schemas import UserCreate, UserUpdate, TenantCreate
+from app.schemas.auth import PasswordLoginRequest, DemoUserCreate, AuthMode
+from app.schemas.token import Token
 from app.services.google_calendar import refresh_google_access_token, GoogleTokenRefreshError
 
 # Define Pydantic model for refresh token request body
-class RefreshTokenRequest(BaseModel): # Inherit from pydantic.BaseModel
+class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 router = APIRouter()
@@ -34,6 +38,148 @@ logger = logging.getLogger(__name__)
 # Construct the redirect URI based on settings
 # Note: This assumes your backend runs on localhost:8001 for local dev as per docker-compose
 GOOGLE_REDIRECT_URI = f"http://localhost:8001{settings.API_V1_STR}/auth/callback/google"
+
+@router.get("/mode", response_model=AuthMode)
+async def get_auth_mode_info():
+    """Get information about the current authentication mode configuration."""
+    return auth.get_auth_mode()
+
+
+@router.post("/login/password", response_model=Token)
+async def login_password(
+    login_data: PasswordLoginRequest,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Authenticate with email and password.
+    
+    Returns an access token if authentication is successful.
+    """
+    try:
+        # Authenticate with email and password
+        user, token = await authenticate_password(
+            db=db,
+            email=login_data.email,
+            password=login_data.password
+        )
+        
+        logger.info(f"Password login successful for user {user.email}")
+        return token
+        
+    except AuthError as e:
+        logger.warning(f"Password login failed: {e.message}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.message
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during password login: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during authentication"
+        )
+        
+        
+@router.get("/demo-login", response_model=Token)
+async def demo_login(db: AsyncSession = Depends(get_db_session)):
+    """
+    Get a token for demo login without credentials.
+    Only works in demo mode.
+    """
+    try:
+        # Check if we're in demo mode
+        auth_mode = auth.get_auth_mode()
+        if auth_mode.mode != "demo":
+            logger.warning("Demo login attempted outside demo mode")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Demo login is only available in demo mode"
+            )
+            
+        # Get or create demo user and tokens
+        token = await get_demo_login_token(db)
+        return token
+        
+    except AuthError as e:
+        logger.warning(f"Demo login failed: {e.message}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.message
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during demo login: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during authentication"
+        )
+
+
+@router.post("/register", response_model=Token)
+async def register_demo_user(
+    user_data: DemoUserCreate,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Register a new user with password authentication.
+    Only allowed in demo mode or if explicitly enabled in production.
+    
+    Returns login tokens if registration is successful.
+    """
+    try:
+        # Check auth mode
+        auth_mode = auth.get_auth_mode()
+        if auth_mode.mode != "demo" and not os.environ.get("ALLOW_USER_REGISTRATION", "false").lower() == "true":
+            logger.warning(f"User registration attempted but not enabled: {user_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User registration is not enabled"
+            )
+            
+        # Check if user already exists
+        existing_user = await crud_user.get_by_email(db, email=user_data.email)
+        if existing_user:
+            logger.warning(f"Registration attempted for existing user: {user_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this email already exists"
+            )
+            
+        # Create the user with password authentication
+        user = await auth.create_demo_user(
+            db=db,
+            email=user_data.email,
+            password=user_data.password,
+            name=user_data.name,
+            **{k: v for k, v in user_data.model_dump().items() 
+               if k not in ("email", "password", "name")}
+        )
+        
+        # Generate tokens
+        access_token = security.create_access_token(subject=user.id, tenant_id=user.tenant_id)
+        refresh_token = security.create_access_token(
+            subject=user.id,
+            tenant_id=user.tenant_id,
+            expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+        
+        logger.info(f"User registered successfully: {user.email}")
+        return Token(access_token=access_token, token_type="bearer", refresh_token=refresh_token)
+        
+    except AuthError as e:
+        logger.warning(f"User registration failed: {e.message}")
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.message
+        )
+    except HTTPException:
+        # Pass through HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during user registration: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during registration"
+        )
 
 @router.get("/login/google")
 async def login_google(request: Request):
