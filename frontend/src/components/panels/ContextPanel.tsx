@@ -28,7 +28,7 @@ import {
   Divider
 } from '@chakra-ui/react';
 import ErrorDisplay from '../common/ErrorDisplay';
-import { motion, AnimatePresence, keyframes } from 'framer-motion';
+import { motion, AnimatePresence, keyframes, Variants } from 'framer-motion';
 import { useFeatureFlags } from '../../utils/featureFlags';
 import { useApiClient } from '../../hooks/useApiClient';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
@@ -61,17 +61,20 @@ import KnowledgeAssetPanel from './entity-panels/KnowledgeAssetPanel';
 // Import common components
 import RelationshipList from './RelationshipList';
 import ActivityTimeline from './ActivityTimeline';
-import ActionButtons from './ActionButtons';
 import LazyPanel from '../common/LazyPanel';
 import AnimatedTransition from '../common/AnimatedTransition';
+import { EnhancedAnimatedTransition, AnimatedContainer } from '../common/EnhancedAnimatedTransition';
 import SafeMarkdown from '../common/SafeMarkdown';
 import SimpleMarkdown from '../common/SimpleMarkdown';
+import { EnhancedEntityActions } from '../actions/EnhancedEntityActions';
+import animations from './animations';
 
 // Import extracted components
 import PanelHeader from './header/PanelHeader';
 import PanelTabs, { PanelTabType } from './tabs/PanelTabs';
 import { EntitySuggestion } from './suggestions/EntitySuggestions';
 import EntitySuggestionsContainer from './suggestions/EntitySuggestionsContainer';
+import EnhancedEntitySuggestions from './suggestions/EnhancedEntitySuggestions';
 import BreadcrumbNav, { NavHistoryItem } from './header/BreadcrumbNav';
 import RecentlyViewedEntities from './suggestions/RecentlyViewedEntities';
 
@@ -90,6 +93,7 @@ import {
 
 // Lazily load heavier components
 const LazyEntitySuggestionsContainer = lazy(() => import('./suggestions/EntitySuggestionsContainer'));
+const LazyEnhancedEntitySuggestions = lazy(() => import('./suggestions/EnhancedEntitySuggestions'));
 const LazyRecentlyViewedEntities = lazy(() => import('./suggestions/RecentlyViewedEntities'));
 
 // Constants for performance tuning
@@ -846,10 +850,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   }, [relationships]);
   
   return (
-    <ScaleFade 
-      in={true} 
-      initialScale={0.92}
-      transition={{ enter: { duration: 0.3, ease: "easeOut" } }}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.92 }} 
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.92 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      style={{ width: '100%', height: '100%' }}
     >
       <Box
         width={isExpanded ? "100%" : `${containerWidth}px`}
@@ -977,37 +983,56 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                   align="stretch"
                   id="panel-details"
                 >
-                  {/* Entity-specific details */}
-                  <AnimatedTransition 
+                  {/* Entity-specific details with enhanced animations */}
+                  <EnhancedAnimatedTransition 
                     in={true}
-                    variant="staggerItems"
+                    variant="entityCard"
+                    entityType={selectedNode.type}
                     customIndex={0}
                     key={`entity-panel-${selectedNode.id}`}
                   >
-                    {renderEntityPanel()}
-                  </AnimatedTransition>
+                    <AnimatedContainer entityType={selectedNode.type} isActive={true}>
+                      {renderEntityPanel()}
+                    </AnimatedContainer>
+                  </EnhancedAnimatedTransition>
                   
-                  {/* ML-based entity suggestions only shown in details tab if feature flag is enabled */}
+                  {/* ML-based entity suggestions with enhanced animations */}
                   {flags.enableSuggestions && shouldLoadSecondary && (
-                    <AnimatedTransition in={true} variant="staggerItems" customIndex={1}>
+                    <EnhancedAnimatedTransition in={true} variant="slideInUp" customIndex={1} delay={0.1}>
                       <Suspense fallback={<LoadingFallback />}>
-                        <LazyEntitySuggestionsContainer
-                          entityId={selectedNode.id}
-                          onSuggestionClick={handleSuggestionClick}
-                          viewMode="compact"
-                          options={{
-                            maxResults: 8,
-                            excludeIds: navHistory.map(item => item.nodeId),
-                            refreshOnFeedback: true
-                          }}
-                        />
+                        {flags.enableMachineLearning ? (
+                          <LazyEnhancedEntitySuggestions
+                            entityId={selectedNode.id}
+                            entityType={selectedNode.type}
+                            onSuggestionClick={(id, type, label) => {
+                              if (handleSuggestionClick) {
+                                handleSuggestionClick({ id, type, label });
+                              }
+                            }}
+                            maxSuggestions={8}
+                            excludeIds={navHistory.map(item => item.nodeId)}
+                            viewMode="compact"
+                            title="AI-Powered Suggestions"
+                          />
+                        ) : (
+                          <LazyEntitySuggestionsContainer
+                            entityId={selectedNode.id}
+                            onSuggestionClick={handleSuggestionClick}
+                            viewMode="compact"
+                            options={{
+                              maxResults: 8,
+                              excludeIds: navHistory.map(item => item.nodeId),
+                              refreshOnFeedback: true
+                            }}
+                          />
+                        )}
                       </Suspense>
-                    </AnimatedTransition>
+                    </EnhancedAnimatedTransition>
                   )}
                   
-                  {/* Recently viewed entities - only shown when we have navigation history */}
+                  {/* Recently viewed entities with enhanced animations */}
                   {navHistory.length > 1 && shouldLoadTertiary && (
-                    <AnimatedTransition in={true} variant="staggerItems" customIndex={2}>
+                    <EnhancedAnimatedTransition in={true} variant="fadeSlideIn" customIndex={2} delay={0.2}>
                       <Suspense fallback={<LoadingFallback />}>
                         <LazyRecentlyViewedEntities 
                           items={navHistory} 
@@ -1016,20 +1041,33 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                           currentEntityId={selectedNode.id}
                         />
                       </Suspense>
-                    </AnimatedTransition>
+                    </EnhancedAnimatedTransition>
                   )}
 
-                  {/* Action Buttons */}
-                  <AnimatedTransition 
+                  {/* Enhanced Entity-Specific Action Buttons with advanced animations */}
+                  <EnhancedAnimatedTransition 
                     in={true}
-                    variant="staggerItems" 
+                    variant="scaleIn" 
                     customIndex={3}
+                    delay={0.3}
                   >
-                    <ActionButtons 
+                    <EnhancedEntityActions 
                       entityType={selectedNode.type} 
-                      entityId={selectedNode.id} 
+                      entityId={selectedNode.id}
+                      entityName={selectedNode.label}
+                      permissions={{
+                        canEdit: true,  // These would ideally come from a permissions service
+                        canDelete: true,
+                        canShare: true,
+                        isAdmin: false,
+                        isOwner: false
+                      }}
+                      onActionComplete={(action, result) => {
+                        // This could trigger a refresh of the entity data if needed
+                        console.log(`Action ${action} completed:`, result);
+                      }}
                     />
-                  </AnimatedTransition>
+                  </EnhancedAnimatedTransition>
                 </VStack>
               </AnimatedTransition>
             </LazyPanel>
@@ -1093,7 +1131,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           </AnimatePresence>
         </Box>
       </Box>
-    </ScaleFade>
+    </motion.div>
   );
 };
 

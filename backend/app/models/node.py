@@ -77,13 +77,59 @@ USE_SPATIAL = os.environ.get("USE_SPATIAL_FEATURES", "true").lower() in ("true",
 GEOMETRY_AVAILABLE = False
 
 try:
+    # First check for system libraries which are required by GeoAlchemy2
+    import sys
+    import ctypes
+    import importlib.util
+    
+    # Check for the GeoAlchemy2 package without importing it first
+    geoalchemy_spec = importlib.util.find_spec("geoalchemy2")
+    if geoalchemy_spec is None:
+        raise ImportError("GeoAlchemy2 package is not installed")
+    
+    # Check for key system libraries
+    missing_libs = []
+    system_libs = []
+    for lib_name in ["libgeos_c.so", "libproj.so", "libgdal.so"]:
+        try:
+            lib = ctypes.cdll.LoadLibrary(lib_name)
+            system_libs.append(lib_name)
+        except Exception as lib_err:
+            missing_libs.append(lib_name)
+    
+    if missing_libs:
+        logger.warning(f"Missing system libraries: {', '.join(missing_libs)}")
+    
+    # Now attempt the actual import
     logger.info("Attempting to import GeoAlchemy2...")
     from geoalchemy2 import Geometry
-    logger.info("GeoAlchemy2 imported successfully")
+    logger.info(f"GeoAlchemy2 imported successfully (System libs found: {', '.join(system_libs)})")
     GEOMETRY_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Error importing GeoAlchemy2: {str(e)}")
     logger.warning("Spatial features will be disabled - the position column will not be available")
+    
+    # Additional diagnostics to help troubleshoot the issue
+    try:
+        import sys
+        logger.info(f"Python path: {sys.path}")
+        
+        # Check for shapely which is a dependency
+        try:
+            import shapely
+            logger.info(f"Shapely version: {shapely.__version__}")
+        except ImportError:
+            logger.warning("Shapely not found - this is a dependency of GeoAlchemy2")
+        
+        # Check if we can see the package but just not import it
+        try:
+            import pip
+            result = pip._internal.main(['list'])
+            logger.info("Pip packages: " + str(result))
+        except:
+            pass
+    except Exception as diag_err:
+        logger.warning(f"Error during diagnostics: {diag_err}")
     
     # Create a dummy Geometry class that just returns None
     class DummyGeometry:
@@ -96,6 +142,8 @@ except ImportError as e:
         raise ImportError(f"GeoAlchemy2 required but not available: {str(e)}")
     else:
         Geometry = DummyGeometry()
+        # Set USE_SPATIAL to False to be consistent
+        os.environ["USE_SPATIAL_FEATURES"] = "false"
 
 from app.db.base_class import Base
 

@@ -70,44 +70,93 @@ RUN apt-get update && \
     echo "=== SYSTEM INFORMATION ===" && \
     lsb_release -a && \
     echo "=== INSTALLED SYSTEM PACKAGES ===" && \
-    dpkg -l | grep -E 'libgeos|libproj|libgdal' && \
+    dpkg -l | grep -E 'libgeos|libproj|libgdal' || echo "No spatial libraries found" && \
     echo "=== SYSTEM LIBRARY PATHS ===" && \
-    ldconfig -p | grep -E 'libgeos|libproj|libgdal' && \
-    # Explicitly install GeoAlchemy2
-    /app/.venv/bin/pip install --no-cache-dir geoalchemy2 && \
-    echo "=== INSTALLED PYTHON PACKAGES ===" && \
-    /app/.venv/bin/pip list | grep -E 'geoalchemy|SQLAlchemy|shapely|GDAL' && \
+    ldconfig -p | grep -E 'libgeos|libproj|libgdal' || echo "No spatial libraries in path" && \
     # Cleanup
     rm -rf /var/lib/apt/lists/*
 
 # Copy virtual env from builder stage
 COPY --from=builder /app/.venv $APP_HOME/.venv
 
+# Install geoalchemy2 explicitly in our venv now that it's available
+RUN $APP_HOME/.venv/bin/pip install --no-cache-dir geoalchemy2 shapely && \
+    echo "=== INSTALLED PYTHON PACKAGES ===" && \
+    $APP_HOME/.venv/bin/pip list | grep -E 'geoalchemy|SQLAlchemy|shapely|GDAL' || echo "No spatial Python packages found"
+
 # Copy application code AND Alembic config/scripts
 COPY ./alembic.ini $APP_HOME/alembic.ini
 COPY ./scripts $APP_HOME/scripts
 COPY ./app $APP_HOME/app
 
+# Create a more reliable dependency check script
+COPY <<'EOF' /app/check_deps.py
+#!/usr/bin/env python3
+import sys
+import os
+import site
+import importlib.util
+import subprocess
+
+# Add the venv site-packages to path to make sure we find the right packages
+venv_paths = ["/app/.venv/lib/python3.12/site-packages", 
+             "/app/.venv/lib/site-packages"]
+
+for path in venv_paths:
+    if os.path.exists(path) and path not in sys.path:
+        sys.path.insert(0, path)
+        print(f"Added path: {path}")
+
+# Print Python version and environment
+print(f"Python version: {sys.version}")
+print(f"Python executable: {sys.executable}")
+print(f"sys.path: {sys.path}")
+
+# Check critical packages
+packages = ["geoalchemy2", "sqlalchemy", "shapely", "alembic"]
+for pkg in packages:
+    spec = importlib.util.find_spec(pkg)
+    if spec:
+        try:
+            module = importlib.import_module(pkg)
+            version = getattr(module, "__version__", "unknown")
+            location = getattr(module, "__file__", "unknown")
+            print(f"✓ {pkg}: version={version}, location={location}")
+        except Exception as e:
+            print(f"✗ Error importing {pkg}: {str(e)}")
+    else:
+        print(f"✗ {pkg} not found in sys.path")
+
+# Check system libraries
+try:
+    print("\nSystem libraries:")
+    subprocess.run(["ldconfig", "-p"], check=False)
+except Exception as e:
+    print(f"Error checking system libraries: {str(e)}")
+
+# Try importing GeoAlchemy2 components
+print("\nGeoAlchemy2 components:")
+try:
+    import geoalchemy2
+    from geoalchemy2 import Geometry
+    print("✓ Successfully imported GeoAlchemy2 Geometry")
+except Exception as e:
+    print(f"✗ Failed to import GeoAlchemy2 Geometry: {str(e)}")
+EOF
+
+# Set execute permission on the script
+RUN chmod +x /app/check_deps.py
+
 # Create a non-root user
 RUN adduser --uid 5678 --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser $APP_HOME
 
-# Switch to non-root user
-USER appuser
-
 # Expose port
 EXPOSE 8000
 
-# Create dependency check script
-RUN echo '#!/usr/bin/env python3' > /app/check_deps.py && \
-    echo 'import sys; print("Python:", sys.version)' >> /app/check_deps.py && \
-    echo 'import importlib.util; print("GeoAlchemy2 available:", importlib.util.find_spec("geoalchemy2") is not None)' >> /app/check_deps.py && \
-    echo 'import os; sys.path.append("/app/.venv/lib/python3.12/site-packages")' >> /app/check_deps.py && \
-    echo 'try: import geoalchemy2; print("GeoAlchemy2 version:", getattr(geoalchemy2, "__version__", "unknown")); print("GeoAlchemy2 path:", geoalchemy2.__file__)' >> /app/check_deps.py && \
-    echo 'except ImportError as e: print("GeoAlchemy2 import error:", e)' >> /app/check_deps.py && \
-    echo 'try: import shapely; print("Shapely version:", shapely.__version__)' >> /app/check_deps.py && \
-    echo 'except ImportError as e: print("Shapely import error:", e)' >> /app/check_deps.py && \
-    chmod +x /app/check_deps.py
+# Switch to non-root user
+USER appuser
 
 # Run dependency check and then start the application
-CMD python3 /app/check_deps.py && uvicorn app.main:app --host 0.0.0.0 --port 8000
+CMD /app/.venv/bin/python /app/check_deps.py && \
+    /app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000

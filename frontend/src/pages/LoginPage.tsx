@@ -129,11 +129,33 @@ export default function LoginPage() {
     setIsDemoLoading(true);
     
     try {
+      // Log the full URL for debugging
+      console.log(`Demo login URL: ${API_BASE_URL}/api/v1/auth/demo-login`);
+      
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/demo-login`);
       
+      // Log the response status and headers for debugging
+      console.log(`Demo login response status: ${response.status}`);
+      console.log(`Demo login response headers:`, Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: "Demo login failed" }));
-        throw new Error(errorData.detail || `HTTP error ${response.status}`);
+        let errorDetail = "Demo login failed";
+        try {
+          // Try to get JSON error message
+          const errorData = await response.json();
+          errorDetail = errorData.detail || `HTTP error ${response.status}`;
+          console.log("Error data:", errorData);
+        } catch (parseError) {
+          // If parsing fails, try to get text response
+          try {
+            const errorText = await response.text();
+            console.log("Error text response:", errorText || "(empty response)");
+            errorDetail = errorText || `HTTP error ${response.status}`;
+          } catch (textError) {
+            console.log("Failed to parse error response as text");
+          }
+        }
+        throw new Error(errorDetail);
       }
       
       const data = await response.json();
