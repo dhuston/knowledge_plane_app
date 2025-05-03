@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ChakraProvider } from '@chakra-ui/react';
 import { IntegrationDetailModal } from '../IntegrationDetailModal';
 import { IntegrationType, IntegrationStatus } from '../models/IntegrationModels';
-import userEvent from '@testing-library/user-event';
 
 // Mock functions
 const mockOnClose = jest.fn();
@@ -81,8 +80,6 @@ describe('AuthSelector Integration with DetailModal', () => {
   });
   
   test('Saving integration with auth configuration works correctly', async () => {
-    const user = userEvent.setup();
-    
     render(
       <ChakraProvider>
         <IntegrationDetailModal
@@ -95,13 +92,21 @@ describe('AuthSelector Integration with DetailModal', () => {
     );
     
     // Fill in basic info
-    await user.type(screen.getByLabelText('Display Name'), ' Updated');
+    const nameInput = screen.getByLabelText('Display Name');
+    fireEvent.change(nameInput, { target: { value: 'Test Integration Updated' } });
     
     // Fill in OAuth2 credentials
-    await user.type(screen.getByLabelText('Client ID'), 'test-client-id');
-    await user.type(screen.getByLabelText('Client Secret'), 'test-client-secret');
-    await user.type(screen.getByLabelText('Authorization URL'), 'https://auth.example.com/authorize');
-    await user.type(screen.getByLabelText('Token URL'), 'https://auth.example.com/token');
+    const clientIdInput = screen.getByLabelText('Client ID');
+    fireEvent.change(clientIdInput, { target: { value: 'test-client-id' } });
+    
+    const clientSecretInput = screen.getByLabelText('Client Secret');
+    fireEvent.change(clientSecretInput, { target: { value: 'test-client-secret' } });
+    
+    const authUrlInput = screen.getByLabelText('Authorization URL');
+    fireEvent.change(authUrlInput, { target: { value: 'https://auth.example.com/authorize' } });
+    
+    const tokenUrlInput = screen.getByLabelText('Token URL');
+    fireEvent.change(tokenUrlInput, { target: { value: 'https://auth.example.com/token' } });
     
     // Save the configuration
     fireEvent.click(screen.getByText('Save Configuration'));

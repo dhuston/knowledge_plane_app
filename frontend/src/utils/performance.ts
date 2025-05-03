@@ -1,6 +1,174 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Perfume from 'perfume.js';
-import { ThresholdTier } from 'perfume.js/types/types';
+
+// Define ThresholdTier enum directly since the types import is not available
+enum ThresholdTier {
+  instant = 0, // <= 100ms
+  quick = 100, // <= 300ms
+  moderate = 300, // <= 1000ms
+  slow = 1000 // > 1000ms
+}
+
+// Global cache for entities
+const entityCache = new Map<string, any>();
+const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes default expiry
+
+/**
+ * Cache an entity by key
+ * 
+ * @param key The cache key
+ * @param data The data to cache
+ * @param expiry Optional expiry time in milliseconds
+ */
+export function cacheEntity(key: string, data: any, expiry: number = CACHE_EXPIRY): void {
+  entityCache.set(key, {
+    data,
+    timestamp: Date.now(),
+    expiry: expiry
+  });
+}
+
+/**
+ * Get an entity from the cache
+ * 
+ * @param key The cache key
+ * @returns The cached data or null if not found or expired
+ */
+export function getCachedEntity(key: string): any {
+  const cached = entityCache.get(key);
+  
+  // Check if cache exists and is not expired
+  if (cached && (Date.now() - cached.timestamp) < cached.expiry) {
+    return cached.data;
+  }
+  
+  // Remove expired entry
+  if (cached) {
+    entityCache.delete(key);
+  }
+  
+  return null;
+}
+
+/**
+ * Hook to check if a component is still mounted
+ * Prevents state updates on unmounted components
+ */
+export function useIsMounted(): () => boolean {
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
+  return () => isMounted.current;
+}
+
+/**
+ * Hook for lazy loading or delayed execution
+ * Returns true after the specified delay
+ * 
+ * @param delay Delay in milliseconds
+ * @returns Boolean indicating if the delay has passed
+ */
+export function useDelayedExecution(delay: number): boolean {
+  const [ready, setReady] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setReady(true);
+    }, delay);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [delay]);
+  
+  return ready;
+}
+
+/**
+ * Hook for lazy loading components based on viewport visibility
+ * 
+ * @param threshold Visibility threshold (0-1)
+ * @param rootMargin Root margin for IntersectionObserver
+ * @returns [ref, isVisible] tuple
+ */
+export function useLazyLoad(threshold: number = 0.1, rootMargin: string = '0px'): [React.RefObject<HTMLDivElement>, boolean] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold, rootMargin }
+    );
+    
+    const currentRef = ref.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+    
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [threshold, rootMargin]);
+  
+  return [ref, isVisible];
+}
+
+/**
+ * Compare objects for deep equality
+ * 
+ * @param obj1 First object to compare
+ * @param obj2 Second object to compare
+ * @returns True if objects are equal
+ */
+export function areEqual(obj1: any, obj2: any): boolean {
+  if (obj1 === obj2) return true;
+  if (obj1 === null || obj2 === null || typeof obj1 !== 'object' || typeof obj2 !== 'object') return false;
+  
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  
+  if (keys1.length !== keys2.length) return false;
+  
+  for (const key of keys1) {
+    if (!obj2.hasOwnProperty(key)) return false;
+    if (!areEqual(obj1[key], obj2[key])) return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Measure performance of a function
+ * 
+ * @param name Name of the operation
+ * @param fn Function to measure
+ * @param args Arguments to pass to the function
+ * @returns Result of the function
+ */
+export function measurePerformance<T>(name: string, fn: (...args: any[]) => T, ...args: any[]): T {
+  const start = performance.now();
+  const result = fn(...args);
+  const duration = performance.now() - start;
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.info(`[Performance] ${name}: ${duration.toFixed(2)}ms`);
+  }
+  
+  return result;
+}
 
 /**
  * Threshold tiers for performance metrics based on our performance testing plan
@@ -119,18 +287,31 @@ const analyticsTracker = (options: any) => {
 /**
  * Initialize Perfume.js for performance monitoring
  */
-export const perfume = new Perfume({
-  analyticsTracker,
-  maxMeasureTime: 10000,
-  // Enable Core Web Vitals monitoring
-  enableCWV: true,
-  // Use our custom steps
-  steps: PERFORMANCE_STEPS,
-  // Log warnings for slow metrics
-  warning: true,
-  // Enable server-side performance collection (if implemented)
-  enableServerTiming: true
-});
+export const perfume = Perfume && typeof Perfume === 'function' 
+  ? new (Perfume as any)({
+      analyticsTracker,
+      maxMeasureTime: 10000,
+      // Enable Core Web Vitals monitoring
+      enableCWV: true,
+      // Use our custom steps
+      steps: PERFORMANCE_STEPS,
+      // Log warnings for slow metrics
+      warning: true,
+      // Enable server-side performance collection (if implemented)
+      enableServerTiming: true
+    }) 
+  : {
+      // Stub implementation if Perfume initialization fails
+      start: (metricName: string) => console.log(`[Perfume stub] Started: ${metricName}`),
+      end: (metricName: string) => console.log(`[Perfume stub] Ended: ${metricName}`),
+      endPaint: (metricName: string, status?: string) => console.log(`[Perfume stub] EndPaint: ${metricName}, status: ${status || 'success'}`),
+      onFCP: (cb: (data: any) => void) => {},
+      onFID: (cb: (data: any) => void) => {},
+      onLCP: (cb: (data: any) => void) => {},
+      onCLS: (cb: (data: any) => void) => {},
+      onTTI: (cb: (data: any) => void) => {},
+      onTBT: (cb: (data: any) => void) => {},
+    };
 
 /**
  * Custom hooks for component performance tracking
@@ -260,7 +441,8 @@ export function useMemoizedCalculation<T>(
     } else {
       ref.current.value = calculate();
     }
-    ref.current.deps = deps;
+    // Create a copy of deps to avoid readonly issues
+    ref.current.deps = [...deps];
   }
   
   return ref.current.value;
