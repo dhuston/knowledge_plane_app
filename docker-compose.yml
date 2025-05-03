@@ -19,8 +19,12 @@ services:
     environment:
       - RUNNING_IN_DOCKER=true
       - OPENAI_API_KEY=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
-      # Set to "false" if you want the app to run without GeoAlchemy2/spatial features
+      # Using the PostgreSQL image without PostGIS, so we need to disable spatial features
       - USE_SPATIAL_FEATURES=false
+      # Development settings for proper DB usage
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - BYPASS_DB_FOR_DEMO=false
     depends_on:
       db:
         condition: service_healthy # Wait for DB to be ready
@@ -41,9 +45,11 @@ services:
           memory: 1G
 
   db:
-    image: postgis/postgis:15-3.4-alpine # Use PostgreSQL 15 with PostGIS extension
+    image: postgres:15 # Standard PostgreSQL 15 image
+    platform: linux/arm64/v8  # Match your host platform
     volumes:
       - postgres_data:/var/lib/postgresql/data/ # Persist data
+      - /tmp/schema_setup.sql:/docker-entrypoint-initdb.d/schema_setup.sql # Initialize schema
     ports:
       - "5433:5432" # Expose DB on host port 5433 (avoid conflict with local install)
     environment:

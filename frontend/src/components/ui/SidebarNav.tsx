@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   VStack,
   Icon,
-  Tooltip,
   Box,
   Divider,
   useColorModeValue,
@@ -14,6 +13,7 @@ import {
   Collapse,
   useDisclosure,
 } from '@chakra-ui/react';
+import { StyledTooltip } from '../common/StyledTooltip';
 import {
   FiHome,
   FiUsers,
@@ -146,7 +146,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     if (!isExpanded && !isChild) {
       return (
         <Box key={item.path} position="relative" w="full">
-          <Tooltip
+          <StyledTooltip
             label={item.label}
             placement="right"
             hasArrow
@@ -166,7 +166,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               _active={{ bg: activeBgColor }}
               w="full"
             />
-          </Tooltip>
+          </StyledTooltip>
 
           {/* Badge indicator */}
           {item.badge && (
@@ -290,7 +290,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     if (!isExpanded) {
       return (
         <VStack spacing={2} w="full">
-          <Tooltip label="Command Center View" placement="right" hasArrow>
+          <StyledTooltip label="Command Center View" placement="right" hasArrow>
             <IconButton
               aria-label="Command Center View"
               icon={<Icon as={FiHome} boxSize={5} />}
@@ -305,9 +305,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               w="full"
               onClick={() => onViewChange('command-center')}
             />
-          </Tooltip>
+          </StyledTooltip>
 
-          <Tooltip label="Map Focus View" placement="right" hasArrow>
+          <StyledTooltip label="Map Focus View" placement="right" hasArrow>
             <IconButton
               aria-label="Map Focus View"
               icon={<Icon as={FiMap} boxSize={5} />}
@@ -322,9 +322,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               w="full"
               onClick={() => onViewChange('map-focus')}
             />
-          </Tooltip>
+          </StyledTooltip>
 
-          <Tooltip label="Grid View" placement="right" hasArrow>
+          <StyledTooltip label="Grid View" placement="right" hasArrow>
             <IconButton
               aria-label="Grid View"
               icon={<Icon as={FiGrid} boxSize={5} />}
@@ -339,9 +339,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               w="full"
               onClick={() => onViewChange('grid')}
             />
-          </Tooltip>
+          </StyledTooltip>
 
-          <Tooltip label="Command Palette (⌘K)" placement="right" hasArrow>
+          <StyledTooltip label="Command Palette (⌘K)" placement="right" hasArrow>
             <IconButton
               aria-label="Command Palette"
               icon={<Icon as={FiCommand} boxSize={5} />}
@@ -356,9 +356,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               w="full"
               onClick={() => {/* Open command palette */}}
             />
-          </Tooltip>
+          </StyledTooltip>
 
-          <Tooltip label="Search (⌘F)" placement="right" hasArrow>
+          <StyledTooltip label="Search (⌘F)" placement="right" hasArrow>
             <IconButton
               aria-label="Search"
               icon={<Icon as={FiSearch} boxSize={5} />}
@@ -373,7 +373,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               w="full"
               onClick={() => {/* Open search */}}
             />
-          </Tooltip>
+          </StyledTooltip>
         </VStack>
       );
     }

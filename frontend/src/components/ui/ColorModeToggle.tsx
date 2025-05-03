@@ -6,8 +6,9 @@
  */
 
 import React from 'react';
-import { IconButton, useColorMode, useColorModeValue, Tooltip } from '@chakra-ui/react';
+import { IconButton, useColorMode, useColorModeValue } from '@chakra-ui/react';
 import { MdLightMode, MdDarkMode } from 'react-icons/md';
+import { StyledTooltip } from '../common/StyledTooltip';
 
 interface ColorModeToggleProps {
   /**
@@ -66,9 +67,9 @@ const ColorModeToggle: React.FC<ColorModeToggleProps> = ({
   // Conditionally wrap with tooltip
   if (showTooltip) {
     return (
-      <Tooltip label={tooltipLabel} hasArrow placement="bottom">
+      <StyledTooltip label={tooltipLabel} hasArrow placement="bottom">
         {toggle}
-      </Tooltip>
+      </StyledTooltip>
     );
   }
   

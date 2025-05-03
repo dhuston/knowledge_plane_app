@@ -21,7 +21,6 @@ import {
   Text,
   Portal,
   useToast,
-  Tooltip,
   IconButton,
   HStack,
   Flex,
@@ -68,6 +67,7 @@ import SafeMarkdown from '../common/SafeMarkdown';
 import SimpleMarkdown from '../common/SimpleMarkdown';
 import { EnhancedEntityActions } from '../actions/EnhancedEntityActions';
 import animations from './animations';
+import { StyledTooltip } from '../common/StyledTooltip';
 
 // Import extracted components
 import PanelHeader from './header/PanelHeader';
@@ -906,7 +906,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                 onClose={onClose}
               />
               
-              <Tooltip 
+              <StyledTooltip 
                 label={isExpanded ? "Collapse panel" : "Expand panel"} 
                 placement="top"
                 hasArrow
@@ -919,7 +919,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                   onClick={handleToggleExpand}
                   mr={2}
                 />
-              </Tooltip>
+              </StyledTooltip>
             </HStack>
             
             {/* Navigation breadcrumb - only show if we have navigation history */}

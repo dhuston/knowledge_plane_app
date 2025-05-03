@@ -60,7 +60,8 @@ services:
           memory: 512M
 
   db:
-    image: postgres:15-alpine # Use PostgreSQL 15
+    image: postgres:15 # Standard PostgreSQL 15 image
+    platform: linux/arm64/v8  # Match your host platform
     volumes:
       - postgres_data:/var/lib/postgresql/data/ # Persist data
     ports:

@@ -14,32 +14,42 @@ router = APIRouter()
 
 @router.get("/me")
 async def read_users_me(
-    current_user: models.User = Depends(security.get_current_user)
+    current_user: models.User = Depends(security.get_current_user_or_dev)
 ):
     """Fetch the current logged in user."""
-    # The dependency already fetched the user from DB
+    import os
+    import logging
+    
+    logger = logging.getLogger(__name__)
     from fastapi.responses import JSONResponse
     
-    # Skip Pydantic validation which is causing issues with UUID4 validation
-    # Create a simple dict with the user data directly
-    user_data = {
-        "id": str(current_user.id),
-        "email": current_user.email,
-        "name": current_user.name,
-        "title": current_user.title,
-        "avatar_url": current_user.avatar_url,
-        "online_status": current_user.online_status or False,
-        "tenant_id": str(current_user.tenant_id),
-        "team_id": str(current_user.team_id) if current_user.team_id else None,
-        "manager_id": str(current_user.manager_id) if current_user.manager_id else None,
-        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
-        "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None,
-        "auth_provider": current_user.auth_provider,
-        "auth_provider_id": current_user.auth_provider_id
-    }
-    
-    # Let the middleware handle CORS headers
-    return JSONResponse(content=user_data)
+    try:
+        # Skip Pydantic validation which is causing issues with UUID4 validation
+        # Create a simple dict with the user data directly
+        user_data = {
+            "id": str(current_user.id),
+            "email": current_user.email,
+            "name": current_user.name,
+            "title": current_user.title,
+            "avatar_url": current_user.avatar_url,
+            "online_status": current_user.online_status or False,
+            "tenant_id": str(current_user.tenant_id),
+            "team_id": str(current_user.team_id) if current_user.team_id else None,
+            "manager_id": str(current_user.manager_id) if current_user.manager_id else None,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+            "updated_at": current_user.updated_at.isoformat() if current_user.updated_at else None,
+            "auth_provider": current_user.auth_provider,
+            "auth_provider_id": current_user.auth_provider_id
+        }
+        
+        # Log successful user fetch
+        logger.info(f"Successfully fetched user data for {current_user.email}")
+        
+        # Let the middleware handle CORS headers
+        return JSONResponse(content=user_data)
+    except Exception as e:
+        logger.error(f"Error in read_users_me: {str(e)}")
+        raise
 
 # Endpoint to get a specific user by ID
 @router.get("/{user_id}", response_model=schemas.UserRead)

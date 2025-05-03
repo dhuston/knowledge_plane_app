@@ -19,6 +19,7 @@ import time
 import json
 import sys
 import uuid
+import requests
 from datetime import datetime, timedelta
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession

@@ -265,45 +265,100 @@ async def get_demo_login_token(db: AsyncSession) -> Token:
     Returns:
         Token object with access and refresh tokens
     """
-    # Check if we're in demo mode
-    auth_mode = get_auth_mode()
-    if auth_mode.mode != "demo":
-        logger.warning("Demo auto-login attempted but not in demo mode")
-        raise AuthError("Auto-login is only available in demo mode", 403)
-    
-    # Get or create demo tenant
-    demo_tenant = await tenant_crud.get_by_name(db, name="Demo Tenant")
-    if not demo_tenant:
-        demo_tenant = await tenant_crud.create_demo_tenant(db, name="Demo Tenant")
-    
-    # Get or create demo user
-    demo_user = await user_crud.get_by_email(db, email="demo@example.com")
-    
-    if not demo_user:
-        # Create a demo user with a standard password
-        user_create = UserCreate(
-            email="demo@example.com",
-            name="Demo User",
-            hashed_password=get_password_hash("demo12345"),
-            auth_provider="password",
-            title="Product Manager",
-            avatar_url="https://i.pravatar.cc/150?u=demo@example.com"
+    try:
+        # Check if we're in demo mode
+        auth_mode = get_auth_mode()
+        if auth_mode.mode != "demo":
+            logger.warning("Demo auto-login attempted but not in demo mode")
+            raise AuthError("Auto-login is only available in demo mode", 403)
+        
+        # For debugging
+        logger.info("Starting demo login process")
+        
+        # Generate a temporary demo token without database access
+        # This is used in development when the database isn't migrated
+        logger.info("Checking environment mode...")
+        is_dev_mode = os.getenv("ENVIRONMENT", "").lower() == "development" or os.getenv("DEBUG", "").lower() == "true"
+        
+        if is_dev_mode and os.getenv("BYPASS_DB_FOR_DEMO", "").lower() != "false":
+            logger.info("Development mode detected - generating temporary demo token without database")
+            # Create fake user ID and tenant ID
+            from uuid import uuid4
+            demo_user_id = uuid4()
+            demo_tenant_id = uuid4()
+            
+            # Generate tokens
+            access_token = create_access_token(
+                subject=demo_user_id, 
+                tenant_id=demo_tenant_id,
+                additional_data={"name": "Demo User", "email": "demo@example.com", "dev_mode": True}
+            )
+            refresh_token = create_access_token(
+                subject=demo_user_id,
+                tenant_id=demo_tenant_id,
+                expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+                additional_data={"name": "Demo User", "email": "demo@example.com", "dev_mode": True}
+            )
+            
+            logger.info(f"Generated dev mode token for demo user with ID {demo_user_id}")
+            
+            return Token(
+                access_token=access_token,
+                token_type="bearer",
+                refresh_token=refresh_token
+            )
+        
+        # Standard database mode
+        logger.info("Using database-based demo login")
+        
+        # Get or create demo tenant
+        logger.info("Attempting to get demo tenant")
+        demo_tenant = await tenant_crud.get_by_name(db, name="Demo Tenant")
+        if not demo_tenant:
+            logger.info("Creating new demo tenant")
+            demo_tenant = await tenant_crud.create_demo_tenant(db, name="Demo Tenant")
+        
+        # Get or create demo user
+        logger.info("Attempting to get demo user")
+        demo_user = await user_crud.get_by_email(db, email="demo@example.com")
+        
+        if not demo_user:
+            # Create a demo user with a standard password
+            logger.info("Creating new demo user")
+            user_create = UserCreate(
+                email="demo@example.com",
+                name="Demo User",
+                hashed_password=get_password_hash("demo12345"),
+                auth_provider="password",
+                title="Product Manager",
+                avatar_url="https://i.pravatar.cc/150?u=demo@example.com"
+            )
+            demo_user = await user_crud.create(db, obj_in=user_create, tenant_id=demo_tenant.id)
+        
+        # Generate tokens
+        logger.info("Generating tokens for demo user")
+        access_token = create_access_token(subject=demo_user.id, tenant_id=demo_user.tenant_id)
+        refresh_token = create_access_token(
+            subject=demo_user.id,
+            tenant_id=demo_user.tenant_id,
+            expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
-        demo_user = await user_crud.create(db, obj_in=user_create, tenant_id=demo_tenant.id)
-    
-    # Generate tokens
-    access_token = create_access_token(subject=demo_user.id, tenant_id=demo_user.tenant_id)
-    refresh_token = create_access_token(
-        subject=demo_user.id,
-        tenant_id=demo_user.tenant_id,
-        expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    )
-    
-    # Update last login timestamp
-    await user_crud.update_last_login(db, user_id=demo_user.id)
-    
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        refresh_token=refresh_token
-    )
+        
+        # Update last login timestamp
+        logger.info("Updating last login timestamp")
+        await user_crud.update_last_login(db, user_id=demo_user.id)
+        
+        logger.info("Demo login process completed successfully")
+        return Token(
+            access_token=access_token,
+            token_type="bearer",
+            refresh_token=refresh_token
+        )
+    except Exception as e:
+        # Enhanced error logging
+        logger.error(f"Error in get_demo_login_token: {str(e)}")
+        if hasattr(e, "__cause__") and e.__cause__:
+            logger.error(f"Caused by: {str(e.__cause__)}")
+        
+        # Re-raise the exception
+        raise
