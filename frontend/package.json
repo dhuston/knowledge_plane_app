@@ -20,6 +20,7 @@
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
     "@chakra-ui/react": "^2.10.7",
+    "@chakra-ui/system": "^2.6.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@react-sigma/core": "^5.0.2",
@@ -31,15 +32,17 @@
     "dompurify": "^3.2.5",
     "elkjs": "^0.10.0",
     "framer-motion": "^11.0.5",
+    "got": "^11.8.5",
     "graphology": "^0.25.4",
     "graphology-layout-forceatlas2": "^0.10.1",
     "graphology-types": "^0.24.8",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1",
+    "jspdf": "^3.0.1",
     "perfume.js": "^9.4.0",
+    "prismjs": "^1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-force-graph": "^1.47.6",
+    "react-force-graph": "^1.29.3",
     "react-force-graph-2d": "^1.27.1",
     "react-hook-form": "^7.56.1",
     "react-hot-toast": "^2.5.2",
@@ -67,7 +70,7 @@
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^2.0.5",
+    "@vitest/coverage-v8": "^3.1.2",
     "eslint": "^9.21.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.2.6",
@@ -79,7 +82,7 @@
     "puppeteer": "^22.0.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "^6.2.0",
-    "vitest": "^2.0.5"
+    "vite": "^6.3.4",
+    "vitest": "^3.1.2"
   }
 }

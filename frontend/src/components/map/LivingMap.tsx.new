@@ -1,0 +1,69 @@
+import React, { memo } from 'react';
+import MapContainer from './MapContainer';
+import type { MapNodeTypeEnum } from '../../types/map';
+import { useComponentPerformance } from '../../utils/performance';
+
+interface LivingMapProps {
+  centered?: boolean;
+  centerNodeId?: string;
+  initialFilters?: {
+    types?: MapNodeTypeEnum[];
+    statuses?: string[];
+  };
+  onNodeSelect?: (nodeId: string, nodeType: MapNodeTypeEnum) => void;
+  clusterTeams?: boolean;
+  height?: string | number;
+  enableAnalytics?: boolean;
+  enableFilters?: boolean;
+  enableLayers?: boolean;
+  customNodeRenderer?: any;
+  customEdgeRenderer?: any;
+}
+
+/**
+ * LivingMap - Main entry point component for the map visualization
+ *
+ * This component is maintained for backward compatibility and delegates
+ * to the new decomposed architecture through MapContainer.
+ */
+export const LivingMap: React.FC<LivingMapProps> = ({
+  centered = false,
+  centerNodeId,
+  initialFilters = {},
+  onNodeSelect,
+  clusterTeams = false,
+  height = '100%',
+  enableAnalytics = false,
+  enableFilters = true,
+  enableLayers = false,
+  customNodeRenderer,
+  customEdgeRenderer,
+}) => {
+  // Performance monitoring
+  const mapPerformance = useComponentPerformance('LivingMap');
+  
+  // Start performance measurement on mount
+  React.useEffect(() => {
+    mapPerformance.start();
+    return () => mapPerformance.end();
+  }, [mapPerformance]);
+  
+  return (
+    <MapContainer
+      height={height}
+      centered={centered}
+      centerNodeId={centerNodeId}
+      initialFilters={initialFilters}
+      onNodeSelect={onNodeSelect}
+      clusterTeams={clusterTeams}
+      enableAnalytics={enableAnalytics}
+      enableFilters={enableFilters}
+      enableLayers={enableLayers}
+      customNodeRenderer={customNodeRenderer}
+      customEdgeRenderer={customEdgeRenderer}
+    />
+  );
+};
+
+// Export the memorized component to prevent unnecessary re-renders
+export default memo(LivingMap);
