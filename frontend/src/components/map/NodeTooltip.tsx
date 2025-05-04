@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import {
   Box,
   Text,
@@ -174,10 +174,10 @@ const NodeTooltip: React.FC<NodeTooltipProps> = ({ node, position, onViewDetails
 
   return (
     <Box
-      position="absolute"
-      left={`${position.x}px`}
-      top={`${position.y}px`}
-      transform="translate(-50%, -100%) translateY(-10px)"
+      position="fixed" // Changed from absolute to fixed for more predictable behavior
+      left={position.x}
+      top={position.y - 10} // Small offset to position above cursor
+      transform="translate(-50%, -100%)"
       bg={bg}
       borderRadius="md"
       boxShadow="md"
@@ -187,6 +187,7 @@ const NodeTooltip: React.FC<NodeTooltipProps> = ({ node, position, onViewDetails
       maxWidth="300px"
       zIndex={1000}
       pointerEvents="auto"
+      opacity={1} // Ensure tooltip is fully visible
     >
       <VStack align="stretch" spacing={2}>
         {/* Header */}
@@ -253,7 +254,6 @@ const NodeTooltip: React.FC<NodeTooltipProps> = ({ node, position, onViewDetails
             e.preventDefault();
             e.stopPropagation();
             if (node && onViewDetails) {
-              console.log("Tooltip details clicked for", node.id);
               onViewDetails(node.id);
             }
           }}

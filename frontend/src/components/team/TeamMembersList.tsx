@@ -50,7 +50,6 @@ const TeamMembersList: React.FC<TeamMembersListProps> = ({ members, teamLead }) 
               <Avatar
                 size="md"
                 name={member.name}
-                src={member.avatar_url}
                 mb={{ base: 2, sm: 0 }}
                 mr={{ base: 0, sm: 4 }}
                 border={teamLead && teamLead.id === member.id ? "2px solid" : "none"}

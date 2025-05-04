@@ -31,7 +31,6 @@ const UserPanel: React.FC<UserPanelProps> = ({ data, selectedNode }) => {
           <Avatar 
             size="lg" 
             name={data.name || data.email || 'User'} 
-            src={data.avatar_url} 
           />
           <VStack align="flex-start" spacing={0}>
             <Heading size="md">{data.name || 'User'}</Heading>

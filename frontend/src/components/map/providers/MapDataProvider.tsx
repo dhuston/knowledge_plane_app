@@ -99,7 +99,32 @@ export const MapDataProvider: React.FC<MapDataProviderProps> = ({
       setError(null);
       
       const params = getQueryParams();
-      const response = await apiClient.get<MapData>(`/api/v1/map/data?${params.toString()}`);
+      console.log("MapDataProvider: Testing route availability...");
+      
+      let response;
+      
+      try {
+        // First try to get the debug endpoint to confirm routing works
+        console.log("Trying debug endpoint first...");
+        await apiClient.get(`/map/debug-data`);
+        console.log("Debug endpoint works! Now fetching actual map data...");
+      } catch (debugErr) {
+        console.error("Debug endpoint failed:", debugErr);
+      }
+      
+      try {
+        console.log("Attempting to fetch map data with explicit path...");
+        // Try with explicit path
+        response = await apiClient.get<MapData>(`/map/data?${params.toString()}`);
+        console.log("Map data fetch successful with path: /map/data");
+      } catch (err) {
+        console.error("Failed with `/map/data` path:", err);
+        console.log("Attempting alternate path format...");
+        
+        // Try alternate format as fallback
+        response = await apiClient.get<MapData>(`/api/v1/map/data?${params.toString()}`);
+        console.log("Map data fetch successful with alternate path: /api/v1/map/data");
+      }
       
       perfume.end('mapDataFetch');
       perfume.start('mapDataProcessing');

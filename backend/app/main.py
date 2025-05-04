@@ -1,212 +1,135 @@
-import logging # Import logging
+import logging
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import time
 
 from app.core.config import settings
-from app.api.v1.api import api_router as api_v1_router
 from app.core.tenant_context import configure_tenant_middleware
 from app.core.tenant_filter import register_tenant_events
 from app.core.security import initialize_oauth
-
-# Import API Routers
-from app.api.routers import auth as auth_router
-from app.api.routers import users as users_router
-from app.api.routers import teams as teams_router # Assuming this exists from Slice 1
-from app.api.routers import integrations as integrations_router # Assuming this exists
-from app.api.routers import map as map_router # New map router
-from app.api.routers import projects as projects_router # Import the new projects router
-from app.api.routers import goals as goals_router # Import goals router
-from app.api.routers import briefings as briefings_router
-from app.api.routers import insights as insights_router
-from app.api.routers import notes as notes_router
-from app.api.routers import stream as stream_router
+from app.core.entity_event_hooks import register_entity_event_hooks
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Temporary Header Logging Middleware ---
-# async def log_headers_middleware(request: Request, call_next):
-#     ...
-# ----------------------------------------
+# Set up debug logging for key components
+logging.getLogger('app.api.v1.endpoints.map').setLevel(logging.DEBUG)
+logging.getLogger('app.crud.crud_node').setLevel(logging.DEBUG)
+logging.getLogger('app.crud.crud_edge').setLevel(logging.DEBUG)
 
+# Import API Routers
+from app.api.routers import auth as auth_router
+from app.api.routers import users as users_router
+from app.api.routers import teams as teams_router
+from app.api.routers import integrations as integrations_router
+from app.api.routers import projects as projects_router
+from app.api.routers import goals as goals_router
+from app.api.routers import briefings as briefings_router
+from app.api.routers import insights as insights_router
+from app.api.routers import notes as notes_router
+from app.api.routers import stream as stream_router
+from app.api.routers import admin as admin_router
+from app.api.routers import notifications as notifications_router
+from app.api.v1.endpoints import map as map_router
+
+# Create the FastAPI app
 app = FastAPI(
     title="KnowledgePlane AI API",
-    # openapi_url=f"{settings.API_V1_STR}/openapi.json" # Example if using settings
     openapi_url="/api/v1/openapi.json"
 )
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize services on application startup."""
     logger.info("Starting application initialization")
-    
-    # Initialize OAuth providers
     await initialize_oauth()
-    
     logger.info("Application initialization complete")
 
-# --- Add Middlewares --- #
-
-# Configure tenant middleware (must be added before other middlewares that need tenant context)
+# Configure middleware
 configure_tenant_middleware(app)
-
-# Register tenant filter events for SQLAlchemy
 register_tenant_events()
+register_entity_event_hooks()
 
-# Add CORS Middleware to handle preflight requests earliest
-# For development, we'll allow all origins since we're having CORS issues
-from fastapi.middleware.cors import CORSMiddleware
-
-# Add CORS middleware with explicit frontend origins to support credentials
-# For production, this list should be restricted to specific domains
+# Add CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:3000",   # React dev server 
-        "http://localhost:8080",   # Alternative dev server
-        "http://127.0.0.1:5173",   # Local IP variants
-        "http://127.0.0.1:3000"    # Local IP variants
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:3000"
     ],  
-    allow_credentials=True,        # Enable credentials (cookies, auth headers)
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],           # In production, this should be restricted
-    expose_headers=["*"],          # In production, this should be restricted
-    max_age=600,                   # Cache preflight requests for 10 minutes
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
-# Add the temporary logging middleware FIRST (COMMENTED OUT)
-# app.middleware("http")(log_headers_middleware)
+# Add request logging middleware
+@app.middleware("http")
+async def log_request_details_middleware(request: Request, call_next):
+    path = request.url.path
+    query = request.url.query
+    method = request.method
+    client = request.client.host if request.client else "unknown"
+    
+    if "/notifications" in path:
+        logger.warning(f"NOTIFICATION REQUEST: {method} {path}?{query} - From: {client}")
+    else:
+        logger.info(f"REQUEST: {method} {path}?{query} - From: {client}")
+    
+    try:
+        start_time = time.time()
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        
+        if "/notifications" in path:
+            logger.warning(f"NOTIFICATION RESPONSE: {method} {path} - Status: {response.status_code} - Time: {process_time:.4f}s")
+        else:
+            logger.info(f"RESPONSE: {method} {path} - Status: {response.status_code} - Time: {process_time:.4f}s")
+        
+        if response.status_code == 404:
+            if "/notifications" in path:
+                logger.error(f"404 NOT FOUND FOR NOTIFICATION ENDPOINT: {method} {path}")
+            else:
+                logger.warning(f"404 NOT FOUND: {method} {path}")
+            
+        return response
+    except Exception as e:
+        logger.error(f"REQUEST ERROR: {method} {path} - {str(e)}")
+        raise
 
-# Add Session Middleware 
+# Add Session Middleware
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SECRET_KEY, 
-    # Configure session cookie parameters as needed (e.g., max_age, https_only)
-    # max_age=14 * 24 * 60 * 60,  # Example: 14 days
-    # https_only=True, # Recommended for production
+    secret_key=settings.SECRET_KEY,
 )
 
-# Include API Routers
-# Prefix common path for all routes under this router
+# Define API routes
 api_prefix = "/api/v1"
 
+# Register the API routers
+app.include_router(map_router.router, prefix=f"{api_prefix}/map", tags=["map"])
 app.include_router(auth_router.router, prefix=f"{api_prefix}/auth", tags=["auth"])
 app.include_router(users_router.router, prefix=f"{api_prefix}/users", tags=["users"])
 app.include_router(teams_router.router, prefix=f"{api_prefix}/teams", tags=["teams"])
 app.include_router(integrations_router.router, prefix=f"{api_prefix}/integrations", tags=["integrations"])
-app.include_router(map_router.router, prefix=f"{api_prefix}/map", tags=["map"]) # Include the map router
-app.include_router(projects_router.router, prefix=f"{api_prefix}/projects", tags=["projects"]) # Register projects router
-app.include_router(goals_router.router, prefix=f"{api_prefix}/goals", tags=["goals"]) # Register goals router
+app.include_router(projects_router.router, prefix=f"{api_prefix}/projects", tags=["projects"])
+app.include_router(goals_router.router, prefix=f"{api_prefix}/goals", tags=["goals"])
 app.include_router(briefings_router.router, prefix=f"{api_prefix}/briefings", tags=["briefings"])
 app.include_router(insights_router.router, prefix=f"{api_prefix}/insights", tags=["insights"])
 app.include_router(notes_router.router, prefix=f"{api_prefix}/notes", tags=["notes"])
 app.include_router(stream_router.router, prefix=f"{api_prefix}", tags=["stream"])
+app.include_router(admin_router.router, prefix=f"{api_prefix}/admin", tags=["admin"])
+app.include_router(notifications_router.router, prefix=f"{api_prefix}/notifications", tags=["notifications"])
 
-# Add root endpoint or additional setup if needed
+# Root endpoint
 @app.get("/")
 async def root():
-    logger.info("Root endpoint / accessed.") # Add logging here too
     return {"message": "KnowledgePlane AI API is running"}
-    
-@app.get("/api/v1/health/cors-test")
-async def cors_test():
-    """Test endpoint for CORS configuration"""
-    logger.info("CORS test endpoint accessed")
-    
-    # Create a response with status info
-    response = JSONResponse({"status": "ok", "cors": "enabled"})
-    
-    # Let the middleware handle CORS headers
-    return response
-    
-@app.get("/api/v1/auth/dev-login")
-async def dev_login(request: Request):
-    """Development-only endpoint that returns mock tokens directly without OAuth redirect"""
-    logger.info("Development login endpoint accessed")
-    
-    # Only allow in development mode
-    if not getattr(settings, "DISABLE_OAUTH", False):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not found")
-        
-    # Generate mock tokens
-    from app.core.security import create_access_token
-    from uuid import UUID
-    import json
-    from datetime import timedelta
-    
-    # Create mock IDs
-    mock_user_id = "11111111-1111-1111-1111-111111111111"
-    mock_tenant_id = "d3667ea1-079a-434e-84d2-60e84757b5d5"  # Use our actual test tenant ID
-    
-    # Create tokens with tenant_id
-    access_token = create_access_token(
-        subject=mock_user_id, 
-        tenant_id=mock_tenant_id
-    )
-    refresh_token = create_access_token(
-        subject=mock_user_id,
-        tenant_id=mock_tenant_id,
-        expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    )
-    
-    # Create the response with tokens
-    response = JSONResponse({
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer"
-    })
-    
-    # Let the middleware handle CORS headers
-    return response
-    
-@app.get("/api/v1/users/mock-me")
-async def mock_me(request: Request):
-    """Development-only endpoint that returns mock user data directly, bypassing Pydantic validation"""
-    logger.info("Mock /users/me endpoint accessed")
-    
-    # Only allow in development mode
-    if not getattr(settings, "DISABLE_OAUTH", False):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not found")
-    
-    # Get the authorization header
-    auth_header = request.headers.get('Authorization')
-    
-    # Check if authorization header exists and is valid
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
-        
-    # Extract the token
-    token = auth_header.split(' ')[1]
-    
-    try:
-        # Validate the token
-        from app.core.security import jwt, settings, ALGORITHM
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        
-        # Create a response with mock user data - don't use UUID objects since we're bypassing validation
-        # Use a format that should work with the frontend directly
-        mock_user = {
-            "id": "11111111-1111-1111-1111-111111111111",
-            "email": "dev@example.com",
-            "name": "Development User",
-            "title": "Software Developer", 
-            "avatar_url": None,
-            "online_status": True,
-            "team_id": "839b5261-9228-4955-bcb5-f52452f0cf2e",  # Research & Development team
-            "manager_id": None,
-            "tenant_id": "d3667ea1-079a-434e-84d2-60e84757b5d5",  # Use our actual test tenant ID
-            "created_at": "2025-05-01T00:00:00Z",
-            "updated_at": "2025-05-01T00:00:00Z"
-        }
-        
-        return JSONResponse(mock_user)
-        
-    except Exception as e:
-        logger.error(f"Token validation error: {e}")
-        return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)

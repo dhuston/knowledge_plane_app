@@ -1,0 +1,624 @@
+/**
+ * AnimatedTransition.tsx
+ * A fully-featured reusable component for animated transitions
+ */
+import React, { useEffect, useState, createContext, useContext } from 'react';
+import { motion, AnimatePresence, MotionProps, Variants, Variant } from 'framer-motion';
+import { Box, useColorModeValue, usePrefersReducedMotion } from '@chakra-ui/react';
+import { MapNodeTypeEnum } from '../../types/map';
+
+// Predefined animation variants
+export const transitionVariants: Record<string, any> = {
+  // Basic transitions
+  fade: {
+    initial: { opacity: 0 },
+    animate: { opacity: 1, transition: { duration: 0.3 } },
+    exit: { opacity: 0, transition: { duration: 0.2 } }
+  },
+  
+  slideUp: {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, y: 10, transition: { duration: 0.2 } }
+  },
+
+  slideDown: {
+    initial: { opacity: 0, y: -10 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+  },
+  
+  slideRight: {
+    initial: { opacity: 0, x: 20 },
+    animate: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, x: 20, transition: { duration: 0.2 } }
+  },
+  
+  slideLeft: {
+    initial: { opacity: 0, x: -20 },
+    animate: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+    exit: { opacity: 0, x: -20, transition: { duration: 0.2 } }
+  },
+  
+  // Panel transitions
+  panelInRight: {
+    initial: { opacity: 0, x: 30, boxShadow: "0 0 0 rgba(0,0,0,0)" },
+    animate: { 
+      opacity: 1, 
+      x: 0, 
+      boxShadow: "0 4px 20px rgba(0,0,0,0.1)", 
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: 30, 
+      boxShadow: "0 0 0 rgba(0,0,0,0)", 
+      transition: { 
+        duration: 0.3 
+      } 
+    }
+  },
+  
+  panelInLeft: {
+    initial: { opacity: 0, x: -30, boxShadow: "0 0 0 rgba(0,0,0,0)" },
+    animate: { 
+      opacity: 1, 
+      x: 0, 
+      boxShadow: "0 4px 20px rgba(0,0,0,0.1)", 
+      transition: { 
+        duration: 0.4,
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: -30, 
+      boxShadow: "0 0 0 rgba(0,0,0,0)", 
+      transition: { 
+        duration: 0.3 
+      } 
+    }
+  },
+  
+  scale: {
+    initial: { opacity: 0, scale: 0.95 },
+    animate: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
+    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
+  },
+  
+  contentFade: {
+    initial: { opacity: 0, y: 5 },
+    animate: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { 
+        duration: 0.4, 
+        ease: "easeOut",
+        staggerChildren: 0.1,
+        delayChildren: 0.1
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      y: 5, 
+      transition: { 
+        duration: 0.2 
+      } 
+    }
+  },
+  
+  panelEntry: {
+    initial: { opacity: 0, x: 30 },
+    animate: { 
+      opacity: 1, 
+      x: 0, 
+      transition: { 
+        duration: 0.5, 
+        type: "spring", 
+        stiffness: 100, 
+        damping: 15 
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      x: 30, 
+      transition: { 
+        duration: 0.3, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  
+  // Staggered animations
+  stagger: {
+    initial: { opacity: 0, y: 5 },
+    animate: (custom: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: custom * 0.05,
+        duration: 0.3
+      }
+    }),
+    exit: { opacity: 0, transition: { duration: 0.2 } }
+  },
+  
+  staggerItems: {
+    initial: { opacity: 0, y: 10 },
+    animate: (custom: number) => ({
+      opacity: 1, 
+      y: 0, 
+      transition: {
+        delay: custom * 0.1,
+        duration: 0.3,
+        ease: 'easeOut'
+      }
+    }),
+    exit: { opacity: 0, y: 10, transition: { duration: 0.2, ease: 'easeIn' } }
+  },
+
+  spring: {
+    initial: { opacity: 0, scale: 0.9 },
+    animate: { 
+      opacity: 1, 
+      scale: 1, 
+      transition: { 
+        type: "spring", 
+        stiffness: 260, 
+        damping: 20
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.9, 
+      transition: { 
+        duration: 0.2 
+      } 
+    }
+  },
+
+  subtle: {
+    initial: { opacity: 0.8 },
+    animate: { opacity: 1, transition: { duration: 0.2 } },
+    exit: { opacity: 0.8, transition: { duration: 0.1 } }
+  },
+  
+  tabTransition: {
+    initial: { opacity: 0, x: 10 },
+    animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, x: -10, transition: { duration: 0.2 } }
+  },
+  
+  drawer: {
+    initial: { opacity: 0, x: '100%' },
+    animate: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } },
+    exit: { opacity: 0, x: '100%', transition: { duration: 0.3 } }
+  },
+  
+  crossfade: {
+    initial: { opacity: 0, position: "absolute" },
+    animate: { opacity: 1, position: "relative", transition: { duration: 0.3 } },
+    exit: { opacity: 0, position: "absolute", transition: { duration: 0.3 } }
+  },
+  
+  entityCard: {
+    initial: { opacity: 0, y: 10, scale: 0.95 },
+    animate: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1, 
+      transition: { 
+        duration: 0.4, 
+        type: "spring", 
+        stiffness: 100, 
+        damping: 15 
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      y: 10, 
+      scale: 0.95, 
+      transition: { 
+        duration: 0.2, 
+        ease: "easeIn" 
+      } 
+    }
+  }
+};
+
+// Entity-specific animation variants
+export const entityVariants: Record<MapNodeTypeEnum, Variants> = {
+  [MapNodeTypeEnum.USER]: {
+    hidden: { opacity: 0, x: 20 },
+    visible: { 
+      opacity: 1, 
+      x: 0, 
+      transition: { 
+        duration: 0.35, 
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: -20, 
+      transition: { 
+        duration: 0.25, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.TEAM]: {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      transition: { 
+        duration: 0.4, 
+        type: "spring", 
+        stiffness: 100, 
+        damping: 15 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.95, 
+      transition: { 
+        duration: 0.25, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.PROJECT]: {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { 
+        duration: 0.45, 
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      y: 20, 
+      transition: { 
+        duration: 0.25, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.GOAL]: {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      transition: { 
+        duration: 0.5, 
+        type: "spring", 
+        stiffness: 100, 
+        damping: 12 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.95, 
+      transition: { 
+        duration: 0.3, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.DEPARTMENT]: {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1, 
+      transition: { 
+        duration: 0.5,
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      transition: { 
+        duration: 0.3, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.KNOWLEDGE_ASSET]: {
+    hidden: { opacity: 0, x: -20 },
+    visible: { 
+      opacity: 1, 
+      x: 0, 
+      transition: { 
+        duration: 0.35, 
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      x: 20, 
+      transition: { 
+        duration: 0.25, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.TEAM_CLUSTER]: {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      transition: { 
+        duration: 0.4, 
+        type: "spring", 
+        stiffness: 100, 
+        damping: 15 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 0.9, 
+      transition: { 
+        duration: 0.25, 
+        ease: "easeIn" 
+      } 
+    }
+  },
+  [MapNodeTypeEnum.UNKNOWN]: {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1, 
+      transition: { 
+        duration: 0.3, 
+        ease: "easeOut" 
+      } 
+    },
+    exit: { 
+      opacity: 0, 
+      transition: { 
+        duration: 0.2, 
+        ease: "easeIn" 
+      } 
+    }
+  }
+};
+
+// Context for sharing animation preferences
+interface AnimationContextValue {
+  animated: boolean;
+  setAnimated: (value: boolean) => void;
+  defaultDuration: number;
+}
+
+const AnimationContext = createContext<AnimationContextValue>({
+  animated: true,
+  setAnimated: () => {},
+  defaultDuration: 0.3
+});
+
+// Provider component for animation preferences
+export const AnimationProvider: React.FC<{
+  children: React.ReactNode;
+  defaultAnimated?: boolean;
+  defaultDuration?: number;
+}> = ({ 
+  children, 
+  defaultAnimated = true,
+  defaultDuration = 0.3
+}) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [animated, setAnimated] = useState(defaultAnimated && !prefersReducedMotion);
+
+  // Update animation state if user preferences change
+  useEffect(() => {
+    setAnimated(defaultAnimated && !prefersReducedMotion);
+  }, [prefersReducedMotion, defaultAnimated]);
+
+  return (
+    <AnimationContext.Provider value={{ animated, setAnimated, defaultDuration }}>
+      {children}
+    </AnimationContext.Provider>
+  );
+};
+
+// Hook to access animation preferences
+export const useAnimation = () => useContext(AnimationContext);
+
+// Custom transition options
+export interface TransitionOptions {
+  duration?: number;
+  delay?: number;
+  ease?: string;
+}
+
+// Props for the AnimatedTransition component
+export interface AnimatedTransitionProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Whether the component is visible */
+  in: boolean;
+  /** Animation variant to use */
+  variant?: string;
+  /** Entity type for specialized animations */
+  entityType?: MapNodeTypeEnum;
+  /** Custom animation variants */
+  customVariants?: { [key: string]: Variant };
+  /** Value for custom staggered animations */
+  customIndex?: number;
+  /** Custom transition options */
+  transition?: TransitionOptions;
+  /** Layout animation (for automatic positioning) */
+  layout?: boolean | string;
+  /** Whether to unmount children when not visible */
+  unmountOnExit?: boolean;
+  /** Additional props for the motion component */
+  motionProps?: MotionProps;
+  /** Key for transition tracking */
+  transitionKey?: string | number;
+  /** Whether to force animation even when reduced motion is preferred */
+  forceAnimation?: boolean;
+  /** Children to render */
+  children: React.ReactNode;
+  /** Delay for the animation */
+  delay?: number;
+  /** Duration for the animation */
+  duration?: number;
+}
+
+/**
+ * AnimatedTransition component for wrapping elements with consistent animations
+ */
+export const AnimatedTransition: React.FC<AnimatedTransitionProps> = ({
+  in: isVisible,
+  variant = 'fade',
+  entityType,
+  customVariants,
+  customIndex = 0,
+  transition,
+  layout = false,
+  unmountOnExit = true,
+  motionProps = {},
+  transitionKey,
+  forceAnimation = false,
+  children,
+  duration,
+  delay = 0,
+  ...rest
+}) => {
+  const { animated, defaultDuration } = useAnimation();
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [isShown, setIsShown] = useState<boolean>(isVisible);
+  
+  // Update internal state when visible prop changes
+  useEffect(() => {
+    if (isVisible) {
+      setIsShown(true);
+    } else if (unmountOnExit) {
+      const timer = setTimeout(() => setIsShown(false), (duration || defaultDuration) * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, unmountOnExit, duration, defaultDuration]);
+  
+  // Determine if animations should be shown
+  const shouldAnimate = forceAnimation || (animated && !prefersReducedMotion);
+  
+  // If reduced motion is preferred and not forcing animation, render simple fade
+  if (prefersReducedMotion && !forceAnimation) {
+    return (
+      <Box
+        opacity={isVisible ? 1 : 0}
+        transition={`opacity ${duration || defaultDuration}s ease`}
+        style={{ ...rest.style, display: isShown ? 'block' : 'none' }}
+        {...rest}
+      >
+        {children}
+      </Box>
+    );
+  }
+  
+  // Select the animation variants to use
+  let selectedVariant: any;
+  
+  if (customVariants) {
+    selectedVariant = customVariants; 
+  } else if (entityType) {
+    // Use entity-specific animations if provided
+    selectedVariant = entityVariants[entityType];
+  } else {
+    // Fall back to standard variants
+    selectedVariant = transitionVariants[variant] || transitionVariants.fade;
+  }
+  
+  // Convert between naming conventions if needed
+  if (selectedVariant.hidden && !selectedVariant.initial) {
+    selectedVariant = {
+      initial: selectedVariant.hidden,
+      animate: selectedVariant.visible,
+      exit: selectedVariant.exit
+    };
+  }
+  
+  // Apply custom transition options if provided
+  const finalTransition = transition ? {
+    duration: transition.duration || duration || defaultDuration,
+    delay: transition.delay || delay || 0,
+    ease: transition.ease || 'easeOut'
+  } : {
+    duration: duration || defaultDuration,
+    delay: delay || 0,
+  };
+  
+  return (
+    <AnimatePresence mode="wait">
+      {(isVisible || !unmountOnExit) && (
+        <motion.div
+          key={transitionKey || `transition-${variant}-${customIndex}`}
+          initial={shouldAnimate ? "initial" : false}
+          animate={isVisible ? "animate" : "exit"}
+          exit="exit"
+          variants={selectedVariant}
+          custom={customIndex}
+          layout={layout}
+          transition={finalTransition}
+          style={{ ...rest.style, display: isVisible ? 'block' : 'none' }}
+          {...motionProps}
+          {...rest}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+/**
+ * Animated container component with hover effects
+ */
+export const AnimatedContainer: React.FC<{
+  children: React.ReactNode;
+  entityType?: MapNodeTypeEnum;
+  isActive?: boolean;
+  hoverEffect?: boolean;
+  style?: React.CSSProperties;
+  className?: string;
+  onClick?: () => void;
+}> = ({
+  children,
+  entityType,
+  isActive = false,
+  hoverEffect = true,
+  style,
+  className,
+  onClick
+}) => {
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
+  const activeBg = useColorModeValue('blue.50', 'blue.900');
+  const prefersReducedMotion = usePrefersReducedMotion();
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      whileHover={hoverEffect && !prefersReducedMotion ? { 
+        scale: 1.02, 
+        transition: { duration: 0.2 } 
+      } : undefined}
+      onClick={onClick}
+      style={{ 
+        background: isActive ? activeBg : bgColor,
+        borderRadius: '0.375rem',
+        boxShadow: isActive ? '0 0 0 1px rgba(66, 153, 225, 0.5)' : 'none',
+        cursor: onClick ? 'pointer' : 'default',
+        ...style
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+export default AnimatedTransition;

@@ -170,15 +170,18 @@ export const fetchInsights = async (
     
     const insights = await detectPatterns(activities, contextData, patternTypes);
     
-    // 3. If we got enough insights from pattern detection, return them
-    if (insights.length >= 3) {
-      // Sort by relevance score
-      return insights.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    }
-    
-    // 4. If we got some insights but not enough, supplement with mock insights
+    // 3. If there were any insights from pattern detection, return them
     if (insights.length > 0) {
-      // Generate some additional mock insights
+      // If we have at least 3 insights, that's enough
+      if (insights.length >= 3) {
+        console.log(`Returning ${insights.length} insights from pattern detection`);
+        // Sort by relevance score
+        return insights.sort((a, b) => b.relevanceScore - a.relevanceScore);
+      }
+      
+      // If we got some insights but not enough, supplement with mock insights
+      console.log(`Got ${insights.length} insights from pattern detection, adding mock insights`);
+      // Generate some additional mock insights (aim for 5 total)
       const additionalCount = 5 - insights.length;
       const mockInsights = generateMockInsights(additionalCount, timePeriod);
       
@@ -186,7 +189,8 @@ export const fetchInsights = async (
       return [...insights, ...mockInsights].sort((a, b) => b.relevanceScore - a.relevanceScore);
     }
     
-    // 5. Fallback: If pattern detection returned no insights, use mock data
+    // 5. Fallback: If pattern detection returned no insights at all, use all mock data
+    console.log('No insights from pattern detection, using all mock data');
     const count = timePeriod === 'daily' ? 5 : timePeriod === 'weekly' ? 10 : 15;
     return generateMockInsights(count, timePeriod);
   } catch (error) {

@@ -85,10 +85,10 @@ async def delete_goal(db: AsyncSession, *, goal_id: UUID, tenant_id: UUID) -> Op
     return db_goal
 
 async def get_goals_for_team(
-    db: AsyncSession, *, team_id: UUID, tenant_id: UUID, limit: int = 100
+    db: AsyncSession, *, team_id: UUID, tenant_id: Optional[UUID] = None, limit: int = 100
 ) -> List[Row]:
     """Fetches distinct goals linked to projects owned by a specific team."""
-    stmt = (
+    query = (
         select(
             GoalModel.id,
             GoalModel.tenant_id,
@@ -104,14 +104,17 @@ async def get_goals_for_team(
             GoalModel.updated_at
         ).distinct()
         .join(ProjectModel, GoalModel.id == ProjectModel.goal_id) 
-        .where(
-            ProjectModel.owning_team_id == team_id, 
-            ProjectModel.tenant_id == tenant_id, 
-        )
-        .limit(limit)
-        .order_by(GoalModel.title)
+        .where(ProjectModel.owning_team_id == team_id)
     )
-    result = await db.execute(stmt)
+    
+    # Add tenant filtering only if tenant_id is provided
+    if tenant_id is not None:
+        query = query.where(ProjectModel.tenant_id == tenant_id)
+        
+    # Apply limit and ordering
+    query = query.limit(limit).order_by(GoalModel.title)
+    
+    result = await db.execute(query)
     return result.all() # Returns list of Row objects
 
 # --- CRUD Class using Standalone Functions --- 

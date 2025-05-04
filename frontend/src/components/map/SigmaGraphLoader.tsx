@@ -264,39 +264,13 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
       settings.gravity = 1.8;
     }
     
-    // Use initial positioning hint if available
+    // Set initial positions for nodes without defined positions
     graph.nodes().forEach((nodeId) => {
       if (!graph.hasNodeAttribute(nodeId, 'x') || !graph.hasNodeAttribute(nodeId, 'y')) {
-        const entityType = graph.getNodeAttribute(nodeId, 'entityType');
-        
-        // Apply type-based initial placement to improve convergence
-        switch(entityType) {
-          case 'user': 
-            graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 500);
-            graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 500);
-            break;
-          case 'team':
-            // Place teams in a rough circle for better team-user clustering
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 300 + Math.random() * 100;
-            graph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * radius);
-            graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * radius);
-            break;
-          case 'project':
-            // Projects in outer ring
-            const projectAngle = Math.random() * Math.PI * 2;
-            graph.setNodeAttribute(nodeId, 'x', Math.cos(projectAngle) * 600);
-            graph.setNodeAttribute(nodeId, 'y', Math.sin(projectAngle) * 600);
-            break;
-          case 'goal':
-            // Goals on right side
-            graph.setNodeAttribute(nodeId, 'x', 700 + Math.random() * 200);
-            graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 800);
-            break;
-          default:
-            graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 1000);
-            graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 1000);
-        }
+        // Use a consistent approach for all entity types - pure random positioning
+        // This prevents any predetermined layout patterns that might look like mock data
+        graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 1000);
+        graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 1000);
       }
     });
     
@@ -657,9 +631,6 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
           return newData;
         }
 
-        // Debug - checking if edges are initially hidden by something else
-        console.log(`Edge ${edge} renderState: hidden=${newData.hidden}, color=${newData.color}, size=${newData.size}`);
-        
         // Force edges to always be visible
         newData.hidden = false;
         

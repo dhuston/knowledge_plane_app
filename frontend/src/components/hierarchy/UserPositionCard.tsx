@@ -11,19 +11,20 @@ import {
   IconButton,
   VStack,
   Flex,
-  Icon
+  Icon,
+  Spinner
 } from '@chakra-ui/react';
 import { FiUser, FiUsers, FiTarget } from 'react-icons/fi';
-import { StyledTooltip } from '../common/StyledTooltip';
+import { InlineTooltip } from '../common/InlineTooltip';
 import { useAuth } from '../../context/AuthContext';
-import { useHierarchy } from './state/HierarchyContext';
+import { useHierarchy } from './HierarchyContext';
 
 export const UserPositionCard: React.FC = () => {
   // Get current user from auth context
   const { user } = useAuth();
   
   // Get hierarchy context
-  const { units, selectUnit } = useHierarchy();
+  const { units, selectUnit, isLoading } = useHierarchy();
   
   // Theme colors
   const bgColor = useColorModeValue('primary.50', 'primary.900');
@@ -47,6 +48,37 @@ export const UserPositionCard: React.FC = () => {
       selectUnit(userTeamId);
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Box
+        width="44px"
+        height="44px"
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+      >
+        <Spinner size="sm" color={useColorModeValue('primary.500', 'primary.300')} />
+      </Box>
+    );
+  }
+  
+  // No user state
+  if (!user) {
+    return (
+      <Box
+        width="44px"
+        height="44px"
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        opacity={0.5}
+      >
+        <Icon as={FiUser} fontSize="20px" />
+      </Box>
+    );
+  }
   
   return (
     <Box 
@@ -55,8 +87,8 @@ export const UserPositionCard: React.FC = () => {
       mb={4}
     >
       <VStack spacing={1}>
-        <StyledTooltip
-          label={`Your current position: ${user?.name || 'You'}`}
+        <InlineTooltip
+          label={`Your current position: ${user.name || 'You'}`}
           placement="right"
         >
           <Box
@@ -73,27 +105,20 @@ export const UserPositionCard: React.FC = () => {
             alignItems="center"
             transition="all 0.2s"
             _hover={{ transform: 'scale(1.05)' }}
+            role="button"
+            aria-label="View your profile"
           >
-            {user?.avatar_url ? (
-              <Avatar 
-                src={user.avatar_url} 
-                size="sm" 
-                name={user.name}
-                border="2px solid"
-                borderColor={avatarBorderColor}
-                opacity="0.9"
-              />
-            ) : (
-              <Avatar 
-                icon={<FiUser size="1.2rem" />} 
-                size="sm" 
-                bg={useColorModeValue('primary.100', 'primary.800')}
-                color={roleIconColor}
-                border="2px solid"
-                borderColor={avatarBorderColor}
-                opacity="0.9"
-              />
-            )}
+            <Avatar 
+              icon={<FiUser size="1.2rem" />} 
+              size="sm" 
+              bg={useColorModeValue('primary.100', 'primary.800')}
+              color={roleIconColor}
+              border="2px solid"
+              borderColor={avatarBorderColor}
+              opacity="0.9"
+              name={user.name}
+              src={user.avatar_url}
+            />
             
             {/* Location indicator badge - shows this is your position */}
             <Badge 
@@ -112,11 +137,11 @@ export const UserPositionCard: React.FC = () => {
               <Icon as={FiTarget} fontSize="8px" color="white" />
             </Badge>
           </Box>
-        </StyledTooltip>
+        </InlineTooltip>
         
         {/* Show team icon if user has a team */}
         {userTeamId && (
-          <StyledTooltip
+          <InlineTooltip
             label={units[userTeamId]?.name || 'Your team'}
             placement="right"
           >
@@ -129,7 +154,7 @@ export const UserPositionCard: React.FC = () => {
               onClick={handleTeamClick}
               color={roleIconColor}
             />
-          </StyledTooltip>
+          </InlineTooltip>
         )}
       </VStack>
     </Box>

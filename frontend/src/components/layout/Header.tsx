@@ -38,6 +38,7 @@ import ViewToggle from '../ui/ViewToggle';
 import useNotifications from '../../hooks/useNotifications';
 import NotificationBadge from '../notifications/NotificationBadge';
 import NotificationCenter from '../notifications/NotificationCenter';
+import AtomIcon from '../ui/AtomIcon';
 
 interface HeaderProps {
     onCreateProjectClick?: () => void;
@@ -90,15 +91,23 @@ const Header: React.FC<HeaderProps> = ({
                 <Flex alignItems="center" justifyContent="space-between" height="48px">
                     {/* Left section - Logo */}
                     <Box width="200px">
-                        <Heading 
-                            size="md" 
-                            color={logoColor}
-                            opacity={logoOpacity}
+                        <HStack spacing={3} align="center" 
+                            opacity={logoOpacity} 
                             transition="opacity 1.5s ease-out"
-                            fontWeight="bold"
                         >
-                            Research Biosphere
-                        </Heading>
+                            <Box display="flex" alignItems="center" justifyContent="center">
+                                <AtomIcon size={24} color="#FF5A5F" />
+                            </Box>
+                            <Heading 
+                                size="md" 
+                                color="#FF5A5F"
+                                fontWeight="bold"
+                                whiteSpace="nowrap"
+                                lineHeight="1.2"
+                            >
+                                Research Biosphere
+                            </Heading>
+                        </HStack>
                     </Box>
 
                     {/* Center section - View Toggle */}

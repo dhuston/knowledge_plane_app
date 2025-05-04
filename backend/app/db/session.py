@@ -20,6 +20,11 @@ def get_db_url():
             print(f"[Session] DEBUG: Current process running as OS user: {current_user}")
             print(f"[Session] DEBUG: UID={os.getuid()}, GID={os.getgid()}")
             print(f"[Session] DEBUG: DB User in settings: {settings.POSTGRES_USER}")
+            # Add debug info about database connection string
+            db_url = str(settings.SQLALCHEMY_DATABASE_URI)
+            # Mask password in output
+            safe_url = db_url.replace(settings.POSTGRES_PASSWORD, "********")
+            print(f"[Session] DEBUG: Using database URL: {safe_url}")
         except Exception as e:
             print(f"[Session] DEBUG: Error getting user info: {e}")
         return str(settings.SQLALCHEMY_DATABASE_URI)

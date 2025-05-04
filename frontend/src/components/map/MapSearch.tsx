@@ -2,9 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Input,
-  InputGroup,
-  InputLeftElement,
-  InputRightElement,
   IconButton,
   List,
   ListItem,
@@ -12,7 +9,6 @@ import {
   Flex,
   Badge,
   useColorModeValue,
-  Kbd,
   Collapse,
   VStack,
   HStack,
@@ -44,9 +40,10 @@ const MapSearch: React.FC<MapSearchProps> = ({
   const [selectedTypes, setSelectedTypes] = useState<MapNodeTypeEnum[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const bg = useColorModeValue('surface.500', '#363636'); // White : Lighter button color
-  const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
-  const hoverBg = useColorModeValue('secondary.400', '#464646'); // Off-white/cream : Even lighter button color
+  const bg = useColorModeValue('white', '#363636'); // White in light mode
+  const borderColor = useColorModeValue('primary.300', 'primary.600');
+  const hoverBg = useColorModeValue('gray.50', '#464646');
+  const textColor = useColorModeValue('gray.800', 'white');
 
   // Get type color based on node type
   const getTypeColor = (type: MapNodeTypeEnum): string => {
@@ -173,23 +170,24 @@ const MapSearch: React.FC<MapSearchProps> = ({
       top="16px"
       left="16px"
       zIndex={10}
-      width={isExpanded ? '300px' : '200px'}
-      transition="width 0.2s"
+      width={isExpanded ? '340px' : '260px'}
+      transition="all 0.3s ease"
     >
       <Box
         bg={bg}
         borderRadius="md"
-        boxShadow="sm"
+        boxShadow={isExpanded ? "lg" : "md"}
         border="1px solid"
         borderColor={borderColor}
         overflow="hidden"
+        transition="all 0.2s ease-in-out"
+        _hover={{
+          boxShadow: "lg",
+          transform: "translateY(-1px)"
+        }}
       >
         {/* Search Input */}
-        <InputGroup size="md">
-          <InputLeftElement pointerEvents="none">
-            <FiSearch color="gray.300" />
-          </InputLeftElement>
-
+        <Flex alignItems="center" position="relative">
           <Input
             ref={inputRef}
             placeholder={placeholder}
@@ -197,42 +195,84 @@ const MapSearch: React.FC<MapSearchProps> = ({
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsExpanded(true)}
             borderRadius="md"
+            pl="2.5rem"
             pr="4.5rem"
+            py={isExpanded ? "8px" : "6px"}
+            transition="all 0.2s ease-in-out"
+            fontSize="sm"
+            fontWeight="medium"
+            color={textColor}
+            _placeholder={{ color: 'gray.400' }}
+            _focus={{
+              boxShadow: "0 0 0 1px var(--chakra-colors-primary-300)",
+              borderColor: "primary.300"
+            }}
           />
-
-          <InputRightElement width="4.5rem">
+          
+          <FiSearch 
+            style={{ 
+              position: 'absolute', 
+              left: '10px', 
+              color: 'var(--chakra-colors-gray-400)' 
+            }} 
+          />
+          
+          <Flex position="absolute" right="8px" gap="1">
             {searchQuery && (
               <IconButton
                 aria-label="Clear search"
                 icon={<FiX />}
                 size="sm"
                 variant="ghost"
+                borderRadius="md"
                 onClick={() => setSearchQuery('')}
+                _hover={{ bg: "gray.100" }}
+                _dark={{ _hover: { bg: "gray.700" } }}
               />
             )}
-            <IconButton
-              aria-label={showAdvanced ? "Hide filters" : "Show filters"}
-              icon={showAdvanced ? <FiChevronUp /> : <FiChevronDown />}
-              size="sm"
-              variant="ghost"
+            <Box
+              as="span" 
               onClick={() => setShowAdvanced(!showAdvanced)}
-            />
-          </InputRightElement>
-        </InputGroup>
+              cursor="pointer"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              {showAdvanced ? <FiChevronUp /> : <FiChevronDown />}
+            </Box>
+          </Flex>
+        </Flex>
 
         {/* Advanced Search Options */}
         <Collapse in={showAdvanced} animateOpacity>
-          <Box p={2} borderTop="1px solid" borderColor={borderColor}>
-            <Text fontSize="xs" fontWeight="medium" mb={1}>Filter by type:</Text>
-            <Flex wrap="wrap" gap={1}>
+          <Box 
+            p={3} 
+            borderTop="1px solid" 
+            borderColor={borderColor} 
+            borderBottomLeftRadius={searchResults.length > 0 ? 0 : "md"}
+            borderBottomRightRadius={searchResults.length > 0 ? 0 : "md"}
+            bg={useColorModeValue("white", "gray.800")}
+          >
+            <Text fontSize="xs" fontWeight="semibold" mb={2}>Filter by type:</Text>
+            <Flex wrap="wrap" gap={1.5}>
               {Object.values(MapNodeTypeEnum).map((type) => (
                 <Badge
                   key={type}
                   colorScheme={selectedTypes.includes(type) ? getTypeColor(type) : 'gray'}
-                  variant={selectedTypes.includes(type) ? 'solid' : 'outline'}
+                  variant={selectedTypes.includes(type) ? 'solid' : 'subtle'}
                   cursor="pointer"
                   onClick={() => toggleNodeType(type)}
                   textTransform="capitalize"
+                  px={2}
+                  py={1}
+                  borderRadius="md"
+                  fontSize="xs"
+                  fontWeight="medium"
+                  _hover={{
+                    opacity: 0.8,
+                    transform: "scale(1.05)",
+                  }}
+                  transition="all 0.15s ease"
                 >
                   {type}
                 </Badge>
@@ -248,38 +288,45 @@ const MapSearch: React.FC<MapSearchProps> = ({
             overflowY="auto"
             borderTop="1px solid"
             borderColor={borderColor}
+            bg={useColorModeValue("white", "gray.800")}
+            borderBottomLeftRadius="md" 
+            borderBottomRightRadius="md"
+            boxShadow="sm"
           >
             {searchResults.map(({ node }) => (
               <ListItem
                 key={node.id}
-                p={2}
+                p={3}
                 cursor="pointer"
                 _hover={{ bg: hoverBg }}
+                _first={{ borderTopRadius: 0 }}
+                _last={{ borderBottomRadius: "md" }}
                 onClick={() => {
                   onNodeSelect(node.id);
                   setSearchQuery('');
                 }}
+                transition="background 0.2s"
               >
                 <Flex align="center">
-                  <Badge colorScheme={getTypeColor(node.type)} mr={2} textTransform="capitalize">
+                  <Badge 
+                    colorScheme={getTypeColor(node.type)} 
+                    mr={2} 
+                    textTransform="capitalize"
+                    py={1}
+                    px={2}
+                    borderRadius="md"
+                    fontSize="xs"
+                  >
                     {node.type}
                   </Badge>
-                  <Text>{node.label}</Text>
+                  <Text fontWeight="medium">{node.label}</Text>
                 </Flex>
               </ListItem>
             ))}
           </List>
         )}
 
-        {/* Keyboard Shortcut Hint */}
-        {!isExpanded && (
-          <HStack px={2} py={1} fontSize="xs" color="gray.500" justifyContent="flex-end">
-            <Text>Press</Text>
-            <Kbd fontSize="xs">Ctrl</Kbd>
-            <Text>+</Text>
-            <Kbd fontSize="xs">F</Kbd>
-          </HStack>
-        )}
+        {/* Empty space - removed keyboard shortcut hint */}
       </Box>
     </Box>
   );

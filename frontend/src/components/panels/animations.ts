@@ -215,17 +215,17 @@ export const panelTransitions = {
 
 // Button animations
 export const buttonEffects = {
-  hover: {
+  '&:hover': {
     transform: 'translateY(-2px)',
     boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
     transition: 'all 0.2s ease'
   },
-  click: {
+  '&:active': {
     transform: 'translateY(1px)',
     boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.1)',
     transition: 'all 0.1s ease'
   },
-  focus: {
+  '&:focus': {
     boxShadow: '0 0 0 3px rgba(66, 153, 225, 0.5)',
     transition: 'box-shadow 0.2s ease'
   }

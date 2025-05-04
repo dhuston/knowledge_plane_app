@@ -80,9 +80,9 @@ RUN apt-get update && \
 COPY --from=builder /app/.venv $APP_HOME/.venv
 
 # Install geoalchemy2 explicitly in our venv now that it's available
-RUN $APP_HOME/.venv/bin/pip install --no-cache-dir geoalchemy2 shapely && \
+RUN $APP_HOME/.venv/bin/pip install --no-cache-dir geoalchemy2 shapely setuptools && \
     echo "=== INSTALLED PYTHON PACKAGES ===" && \
-    $APP_HOME/.venv/bin/pip list | grep -E 'geoalchemy|SQLAlchemy|shapely|GDAL' || echo "No spatial Python packages found"
+    $APP_HOME/.venv/bin/pip list | grep -E 'geoalchemy|SQLAlchemy|shapely|GDAL|setuptools' || echo "No spatial Python packages found"
 
 # Copy application code AND Alembic config/scripts
 COPY ./alembic.ini $APP_HOME/alembic.ini

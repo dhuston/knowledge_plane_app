@@ -25,7 +25,7 @@ from app.core.oauth_provider import (
 logger = logging.getLogger(__name__)
 
 # Password hashing context (if using password auth later)
-# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configure Authlib OAuth client
 oauth = OAuth()
@@ -42,16 +42,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 SECRET_KEY = settings.SECRET_KEY
 
 # Define the OAuth2 scheme
-# The tokenUrl should point to where a user would theoretically get a token
-# (e.g., a password login endpoint, which we don't have yet for JWT directly).
-# For now, we get tokens via Google OAuth callback.
-# The /api/v1 prefix comes from main.py where the router is included.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token") # Placeholder URL
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token")
 
 # Pydantic model for data stored in the JWT token
 class TokenData(BaseModel):
-    sub: Optional[UUID] = None  # Use UUID instead of UUID4 for flexibility
-    tenant_id: Optional[UUID] = None  # Tenant ID for isolation
+    sub: Optional[UUID] = None
+    tenant_id: Optional[UUID] = None
 
 async def initialize_oauth() -> None:
     """Initialize OAuth providers from the registry."""
@@ -141,64 +137,40 @@ async def get_current_user(
     from jose import JWTError
 
     credentials_exception = CREDENTIALS_EXCEPTION
+
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
+        
         user_id_str: Optional[str] = payload.get("sub")
         tenant_id_str: Optional[str] = payload.get("tenant_id")
         
         if user_id_str is None:
+            logger.error("No user_id (sub) in token payload")
             raise credentials_exception
             
         try:
             user_id = UUID(user_id_str)
             tenant_id = UUID(tenant_id_str) if tenant_id_str else None
-        except ValueError:
+        except ValueError as e:
+            logger.error(f"Invalid UUID format: {e}")
             raise credentials_exception
             
         token_data = TokenData(sub=user_id, tenant_id=tenant_id)
     except JWTError as e:
+        logger.error(f"JWT decoding error: {e}")
         raise credentials_exception
         
-    # Check for development mode with disabled OAuth
-    if getattr(settings, "DISABLE_OAUTH", False) and user_id_str == "11111111-1111-1111-1111-111111111111":
-        # Create a complete mock user for development purposes with all required fields
-        from datetime import datetime, timezone
-        mock_user = UserModel(
-            id=UUID("11111111-1111-1111-1111-111111111111"),
-            email="dev@example.com",
-            name="Development User",
-            title="Software Developer",
-            avatar_url=None,
-            online_status=True,
-            tenant_id=UUID("22222222-2222-2222-2222-222222222222"),
-            auth_provider="mock",
-            auth_provider_id="mock_id",
-            created_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
-            updated_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
-            last_login_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
-            team_id=UUID("22222222-2222-2222-2222-222222222222"),
-        )
-        return mock_user
-        
     user = await crud_user.get(db, id=token_data.sub)
+    
     if user is None:
+        logger.error(f"User with ID {token_data.sub} not found in database")
+        raise credentials_exception
+    
+    # Validate that user belongs to the tenant specified in the token
+    if token_data.tenant_id and user.tenant_id and token_data.tenant_id != user.tenant_id:
+        logger.warning(f"Token tenant_id {token_data.tenant_id} doesn't match user's tenant {user.tenant_id}")
         raise credentials_exception
     
     return user
-
-
-# This function is no longer needed as we're using proper database authentication
-# It has been kept in the codebase but renamed to indicate it shouldn't be used
-async def _deprecated_get_current_user_or_dev(
-    db: AsyncSession = Depends(get_db_session),
-    token: str = Depends(oauth2_scheme)
-) -> UserModel:
-    """
-    DEPRECATED: Use get_current_user instead. 
-    This function is kept for reference but should not be used in production code.
-    """
-    # Just delegate to the standard user authentication
-    logger.info("Using standard authentication path")
-    return await get_current_user(db, token)

@@ -21,34 +21,50 @@ Biosphere Alpha (KnowledgePlane AI) helps organizations get on the same page by 
 - **Deployment:** Multi-tenant SaaS hosted on AWS
 - **Authentication:** JWT-based with support for OAuth providers
 
+## Environment Setup
+
+The project now uses a consolidated environment variable approach:
+
+1. Copy `.env.example` to `.env` in the project root
+2. Customize variables as needed
+
+For Docker Compose development, only the root `.env` file is required as variables are passed to containers.
+
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.9+
-- Node.js 16+
+- Python 3.10+
+- Node.js 18+
 - Docker & Docker Compose (for local development)
-- PostgreSQL 13+
+- PostgreSQL 15+
+
+### Running with Docker Compose
+
+```bash
+# Start all services
+docker-compose up
+
+# Start specific service
+docker-compose up backend
+```
 
 ### Backend Setup
 
-To install the backend for development:
+To run the backend locally for development:
 
 ```bash
 cd backend
-# Add the current directory to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:$(pwd)
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies with Poetry
-poetry install
-
-# Set up environment variables (copy .env.example to .env and edit)
+# Install dependencies
+pip install -e .
 
 # Run the application
-poetry run uvicorn app.main:app --reload
+uvicorn app.main:app --reload
 ```
-
-This will enable imports like `from app.models.user import User` to work correctly in your backend Python code.
 
 ### Frontend Setup
 
@@ -81,6 +97,22 @@ npm run dev
   - `/adr/` - Architecture Decision Records
   - `/implementations/` - Implementation plans
   - `/epics/` - Epic specifications
+
+## Testing
+
+### Backend Tests
+
+```bash
+cd backend
+pytest
+```
+
+### Frontend Tests
+
+```bash
+cd frontend
+npm test
+```
 
 ## Code Style
 
@@ -127,44 +159,6 @@ npm run lint:fix
 # Format code with Prettier
 npm run format
 ```
-
-## Testing
-
-### Backend Tests
-
-```bash
-cd backend
-poetry run python -m pytest
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-npm test
-```
-
-## Docker Deployment
-
-For Docker deployment:
-
-```bash
-# Build images
-docker-compose build
-
-# Run development environment
-docker-compose -f docker-compose.dev.yml up
-
-# Run production environment
-docker-compose -f docker-compose.prod.yml up
-```
-
-## Contributing
-
-1. Follow the established code style and naming conventions
-2. Write tests for new functionality
-3. Document your changes
-4. Make sure all tests pass before submitting a PR
 
 ## License
 

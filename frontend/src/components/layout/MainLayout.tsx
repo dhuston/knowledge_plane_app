@@ -37,6 +37,7 @@ import EntityActionButton from '../actions/EntityActionButton';
 import HighlightedText, { HighlightedTextSegment } from '../text/HighlightedText';
 import { useFeatureFlags } from '../../utils/featureFlags';
 import { HierarchyNavigator } from '../hierarchy/HierarchyNavigator';
+import InsightsDailySummary from '../insights/InsightsDailySummary';
 
 // Different workspace view types
 type WorkspaceViewType = 'command-center' | 'map-focus' | 'grid';
@@ -60,9 +61,6 @@ export default function MainLayout() {
   // Placeholder until overlaps feature re-implemented
   const projectOverlaps: Record<string, string[]> = {};
   const [isMapLoading, setIsMapLoading] = useState(true);
-  const [highlightedSummary, setHighlightedSummary] = useState<HighlightedTextSegment[]>([]);
-  const [isLoadingDailySummary, setIsLoadingDailySummary] = useState(true);
-
   const apiClient = useApiClient();
 
   // Theme colors - using our new color palette
@@ -118,45 +116,6 @@ export default function MainLayout() {
 
   const useWebGL = ((import.meta as unknown) as { env: Record<string, string> }).env.VITE_WEBGL_MAP === 'true';
 
-  // Fetch daily summary from the briefing endpoint
-  const fetchDailySummary = React.useCallback(async () => {
-    setIsLoadingDailySummary(true);
-    try {
-      // Make the API call to get the daily briefing
-      const response = await apiClient.get('/briefings/daily');
-
-      if (response.data && response.data.summary) {
-        // If the API returns highlighted_summary, use it
-        if (response.data.highlightedSummary && response.data.highlightedSummary.length > 0) {
-          setHighlightedSummary(response.data.highlightedSummary);
-        } else {
-          // If no highlighted summary, create a simple text segment
-          setHighlightedSummary([{
-            type: 'text',
-            content: response.data.summary
-          }]);
-        }
-      } else {
-        // Fallback if no summary is returned
-        setHighlightedSummary([{
-          type: 'text',
-          content: "Here's what's happening in your research today"
-        }]);
-      }
-    } catch (err) {
-      console.error("[MainLayout] Error fetching daily summary:", err);
-      setHighlightedSummary([{
-        type: 'text',
-        content: 'Unable to load daily summary. Please try again later.'
-      }]);
-    } finally {
-      setIsLoadingDailySummary(false);
-    }
-  }, [apiClient]);
-
-  useEffect(() => {
-    fetchDailySummary();
-  }, [fetchDailySummary]);
 
   const handleMapLoad = () => {
     setIsMapLoading(false);
@@ -267,7 +226,7 @@ export default function MainLayout() {
 
   // Render Command Center View - Simplified with rearranged components
   const renderCommandCenterView = () => (
-    <Box maxWidth="1400px" mx="auto">
+    <Box maxWidth="1400px" mx="auto" pb="120px">
       {/* Removed header section - no content needed here */}
       <Box mb={8}></Box>
 
@@ -288,34 +247,38 @@ export default function MainLayout() {
             mb={10}
           >
             <CardBody p={{ base: 10, md: 12 }}>
-              {isLoadingDailySummary ? (
-                <Center h="100px">
-                  <Spinner color="primary.500" />
-                </Center>
-              ) : (
-                <VStack align="stretch" spacing={6}>
-                  {/* Header with greeting and action button */}
-                  <Flex direction="column" width="100%">
-                    <Heading
-                      size="lg"
-                      mb={2}
-                      color="#262626" // Dark button color for light mode
-                      fontWeight="bold"
-                      _dark={{ color: "secondary.400" }} // Off-white/cream for dark mode
-                    >
-                      Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0] || 'there'}
-                    </Heading>
-                    <Text fontSize="sm" color={secondaryTextColor}>
-                      Here's what's happening in your research today
-                    </Text>
-                  </Flex>
+              <VStack align="stretch" spacing={6}>
+                {/* Header with greeting and action button */}
+                <Flex direction="column" width="100%">
+                  <Heading
+                    size="lg"
+                    mb={2}
+                    color="#262626" // Dark button color for light mode
+                    fontWeight="bold"
+                    _dark={{ color: "secondary.400" }} // Off-white/cream for dark mode
+                  >
+                    Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0] || 'there'}
+                  </Heading>
+                  <Text fontSize="sm" color={secondaryTextColor}>
+                    Here's what's happening in your research today
+                  </Text>
+                </Flex>
 
-                  {/* Display the AI-generated summary with highlighted entities */}
-                  <Box>
-                    <HighlightedText segments={highlightedSummary} />
-                  </Box>
-                </VStack>
-              )}
+                {/* Use client-side InsightsDailySummary component instead of fetching from backend */}
+                <Box>
+                  <InsightsDailySummary 
+                    maxHeight="300px"
+                    personalizationContext={{
+                      userId: user?.id,
+                      userName: user?.name,
+                      filterPreferences: {
+                        prioritizeTeamInsights: Boolean(user?.team_id),
+                        showPersonalInsights: true
+                      }
+                    }}
+                  />
+                </Box>
+              </VStack>
             </CardBody>
           </Card>
         </GridItem>
@@ -388,7 +351,7 @@ export default function MainLayout() {
           {/* Main Content */}
           <Box
             flex="1"
-            overflow="hidden"
+            overflow={workspaceView === 'map-focus' ? "hidden" : "auto"}
             bg={bgColor}
             px={workspaceView === 'map-focus' ? 0 : { base: 8, md: 16, lg: 32 }}
             py={workspaceView === 'map-focus' ? 0 : { base: 8, md: 10 }}

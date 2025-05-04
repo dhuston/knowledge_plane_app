@@ -10,8 +10,14 @@ import {
   Text, 
   Badge
 } from '@chakra-ui/react';
-import { MapNodeTypeEnum } from '../../../types/map';
-import { SearchResult } from './MapSearchBar';
+import { MapNodeTypeEnum, MapNode } from '../../../types/map';
+
+// Define SearchResult interface (previously imported from MapSearchBar)
+interface SearchResult {
+  id: string;
+  label: string;
+  type?: MapNodeTypeEnum;
+}
 
 interface SearchResultsListProps {
   results: SearchResult[];

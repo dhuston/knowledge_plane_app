@@ -25,7 +25,7 @@ import {
 import InsightDetailModal from './InsightDetailModal';
 import { Insight } from '../../types/insight';
 import { useInsights } from '../../context/InsightsContext';
-import { StyledTooltip } from '../common/StyledTooltip';
+import { InlineTooltip } from '../common/InlineTooltip';
 
 interface InsightCardProps {
   insight: Insight;
@@ -144,7 +144,7 @@ const InsightCard: React.FC<InsightCardProps> = ({ insight }) => {
           {/* Action buttons */}
           <Flex justifyContent="space-between" alignItems="center" mt="auto">
             <HStack spacing={1}>
-              <StyledTooltip label="Mark as relevant">
+              <InlineTooltip label="Mark as relevant">
                 <IconButton
                   aria-label="Mark as relevant"
                   icon={<FiThumbsUp />}
@@ -153,8 +153,8 @@ const InsightCard: React.FC<InsightCardProps> = ({ insight }) => {
                   colorScheme={insight.feedback?.isRelevant === true ? "green" : "gray"}
                   onClick={() => handleFeedback(true)}
                 />
-              </StyledTooltip>
-              <StyledTooltip label="Mark as not relevant">
+              </InlineTooltip>
+              <InlineTooltip label="Mark as not relevant">
                 <IconButton
                   aria-label="Mark as not relevant"
                   icon={<FiThumbsDown />}
@@ -163,11 +163,11 @@ const InsightCard: React.FC<InsightCardProps> = ({ insight }) => {
                   colorScheme={insight.feedback?.isRelevant === false ? "red" : "gray"}
                   onClick={() => handleFeedback(false)}
                 />
-              </StyledTooltip>
+              </InlineTooltip>
             </HStack>
             
             <HStack spacing={1}>
-              <StyledTooltip label="Save for later">
+              <InlineTooltip label="Save for later">
                 <IconButton
                   aria-label="Save insight"
                   icon={<FiSave />}
@@ -176,8 +176,8 @@ const InsightCard: React.FC<InsightCardProps> = ({ insight }) => {
                   colorScheme={insight.saved ? "blue" : "gray"}
                   onClick={() => saveInsight(insight.id)}
                 />
-              </StyledTooltip>
-              <StyledTooltip label="Dismiss">
+              </InlineTooltip>
+              <InlineTooltip label="Dismiss">
                 <IconButton
                   aria-label="Dismiss insight"
                   icon={<FiX />}
@@ -185,7 +185,7 @@ const InsightCard: React.FC<InsightCardProps> = ({ insight }) => {
                   variant="ghost"
                   onClick={() => dismissInsight(insight.id)}
                 />
-              </StyledTooltip>
+              </InlineTooltip>
             </HStack>
           </Flex>
         </Box>

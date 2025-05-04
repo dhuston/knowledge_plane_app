@@ -17,6 +17,7 @@ import {
   Icon,
 } from '@chakra-ui/react';
 import { FiChevronRight } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 
 // Import types
 import { 
@@ -50,6 +51,9 @@ export const HierarchyPopover: React.FC<HierarchyPopoverProps> = ({
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const buttonHoverBg = useColorModeValue('gray.100', 'gray.700');
   
+  // Router hook for navigation
+  const navigate = useNavigate();
+  
   // Get view button label based on unit type
   const getViewButtonLabel = () => {
     switch (unit.type) {
@@ -66,6 +70,30 @@ export const HierarchyPopover: React.FC<HierarchyPopoverProps> = ({
       default:
         return 'View Details';
     }
+  };
+
+  // Handle click to view entity details
+  const handleViewEntityClick = () => {
+    switch (unit.type) {
+      case OrganizationalUnitTypeEnum.USER:
+        navigate(`/users/${unit.id}`);
+        break;
+      case OrganizationalUnitTypeEnum.TEAM:
+        navigate(`/teams/${unit.id}`);
+        break;
+      case OrganizationalUnitTypeEnum.DEPARTMENT:
+        navigate(`/departments/${unit.id}`);
+        break;
+      case OrganizationalUnitTypeEnum.DIVISION:
+        navigate(`/divisions/${unit.id}`);
+        break;
+      case OrganizationalUnitTypeEnum.ORGANIZATION:
+        navigate(`/organization/${unit.id}`);
+        break;
+      default:
+        navigate(`/entity/${unit.id}`);
+    }
+    onClose();
   };
   
   // Render the appropriate content based on unit type
@@ -123,6 +151,8 @@ export const HierarchyPopover: React.FC<HierarchyPopoverProps> = ({
               variant="ghost"
               rightIcon={<Icon as={FiChevronRight} />}
               _hover={{ bg: buttonHoverBg }}
+              onClick={handleViewEntityClick}
+              aria-label={getViewButtonLabel()}
             >
               {getViewButtonLabel()}
             </Button>

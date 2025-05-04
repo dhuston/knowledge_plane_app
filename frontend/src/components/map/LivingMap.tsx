@@ -210,18 +210,38 @@ export const LivingMap = ({
   
   return (
     <Flex direction="column" height={height} width="100%">
-      <Flex p={2} bg={useColorModeValue('gray.100', 'gray.700')} alignItems="center">
-        <MapSearch onNodeSelect={handleNodeSelect} />
-        <MapFilterPanel 
-          filters={filters} 
-          setFilters={setFilters} 
-          clusterTeams={clusterTeams} 
-          onClusterToggle={() => {}} // Handle cluster toggle
-        />
-        <MapControls onReset={() => loadMapData()} isLoading={isLoading} />
-      </Flex>
+      <Box bg={useColorModeValue('gray.50', 'gray.800')} position="relative" zIndex={2}>
+        <Flex 
+          justifyContent="flex-end" 
+          p={2} 
+          alignItems="center" 
+          borderBottomWidth="1px"
+          borderBottomColor={useColorModeValue('gray.200', 'gray.700')}
+        >
+          <MapFilterPanel 
+            filters={filters} 
+            setFilters={setFilters} 
+            clusterTeams={clusterTeams} 
+            onClusterToggle={() => {}} // Handle cluster toggle
+          />
+          <MapControls onReset={() => loadMapData()} isLoading={isLoading} />
+        </Flex>
+      </Box>
       
       <Box flex="1" position="relative">
+        {/* The MapSearch component is now positioned absolutely within the map area */}
+        <MapSearch 
+          onNodeSelect={(nodeId) => {
+            // Find the node to get its type
+            const node = mapData.nodes.find(n => n.id === nodeId);
+            if (node) {
+              handleNodeSelect(nodeId, node.type);
+            }
+          }} 
+          nodes={mapData.nodes} 
+          placeholder="Search nodes, teams, projects..."
+        />
+        
         <SigmaGraphLoader
           nodes={mapData.nodes}
           edges={mapData.edges}

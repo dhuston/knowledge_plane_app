@@ -63,6 +63,8 @@ class CRUDNode:
         Returns:
             The created Node object
         """
+        logger.debug(f"[NODE] Creating node: type={node_type}, tenant_id={tenant_id}, props={props}")
+        
         # Create node with coordinates if provided
         db_obj = Node(
             id=uuid4(), 
@@ -76,6 +78,8 @@ class CRUDNode:
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
+        
+        logger.debug(f"[NODE] Created node with ID: {db_obj.id}, type={node_type}, tenant_id={tenant_id}")
 
         # emit delta event
         try:

@@ -280,9 +280,23 @@ async def get_demo_login_token(db: AsyncSession, tenant_id: Optional[UUID] = Non
         
         if tenant_id:
             logger.info(f"Using provided tenant ID: {tenant_id}")
+            
+            # Debug: List all tenants to check what's available
+            from sqlalchemy import select
+            from app.models.tenant import Tenant
+            
+            stmt = select(Tenant)
+            result = await db.execute(stmt)
+            all_tenants = result.scalars().all()
+            tenant_ids = [str(t.id) for t in all_tenants]
+            logger.info(f"DEBUG: Available tenants in DB: {len(all_tenants)} - IDs: {tenant_ids}")
+            
             demo_tenant = await tenant_crud.get(db, id=tenant_id)
             if not demo_tenant:
-                logger.warning(f"Tenant with ID {tenant_id} not found")
+                logger.warning(f"Tenant with ID {tenant_id} not found. Available tenant IDs: {tenant_ids}")
+                # Check authentication mode
+                auth_mode_info = get_auth_mode()
+                logger.warning(f"Current auth mode: {auth_mode_info.mode}, OAuth enabled: {auth_mode_info.oauth_enabled}")
                 raise AuthError(f"Tenant with ID {tenant_id} not found", 404)
         else:
             # Use default tenant

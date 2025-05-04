@@ -73,18 +73,9 @@ const PresenceIndicator: FC<PresenceIndicatorProps> = ({
 
   // Create user avatar component to reduce repetition
   const UserAvatar = ({ user }: { user: PresenceUser }) => (
-    user.avatar ? (
-      <img 
-        src={user.avatar} 
-        alt={user.name} 
-        className="presence-avatar" 
-        loading="lazy" // Add lazy loading for better performance
-      />
-    ) : (
-      <div className="presence-avatar presence-avatar-default">
-        {user.name.substring(0, 1).toUpperCase()}
-      </div>
-    )
+    <div className="presence-avatar presence-avatar-default">
+      {user.name.substring(0, 1).toUpperCase()}
+    </div>
   );
   
   return (

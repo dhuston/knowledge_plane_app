@@ -1,5 +1,6 @@
 import { ActivityData } from './PatternDetectionService';
 import { Insight } from '../types/insight';
+import env from '../config/env';
 
 /**
  * Service for interacting with OpenAI APIs to generate advanced insights
@@ -10,11 +11,13 @@ class OpenAIService {
   private model: string = 'gpt-4o';
 
   constructor() {
-    // Get API key from environment variables
-    this.apiKey = process.env.OPENAI_API_KEY || '';
+    // Get API key from environment variables using our config
+    this.apiKey = env.OPENAI_API_KEY || '';
     
     if (!this.apiKey) {
       console.warn('OpenAI API key not found. Advanced insights will be limited.');
+    } else {
+      console.log('OpenAI API key found. Advanced insights will be available.');
     }
   }
 
@@ -221,7 +224,11 @@ class OpenAIService {
     insights: Insight[], 
     userPreferences?: Record<string, any>
   ): Promise<string> {
-    if (!this.isAvailable() || insights.length === 0) {
+    if (!this.isAvailable()) {
+      return "No insights available to summarize.";
+    }
+    
+    if (insights.length === 0) {
       return "No insights available to summarize.";
     }
 

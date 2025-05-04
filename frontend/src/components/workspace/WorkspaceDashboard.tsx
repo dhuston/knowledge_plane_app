@@ -13,12 +13,23 @@ import { TeamActivity } from './activity/TeamActivity';
 import { TaskManagement } from './tasks/TaskManagement';
 import { QuickActions } from './actions/QuickActions';
 import { LivingMap } from '../map/LivingMap';
+import InsightsDailySummary from '../insights/InsightsDailySummary';
 
 interface WorkspaceDashboardProps {
   initialLayout?: 'standard' | 'compact' | 'expanded';
+  userId?: string;
+  teamId?: string;
+  showHeader?: boolean;
+  compact?: boolean;
 }
 
-export function WorkspaceDashboard({ initialLayout = 'standard' }: WorkspaceDashboardProps) {
+export function WorkspaceDashboard({ 
+  initialLayout = 'standard',
+  userId, 
+  teamId,
+  showHeader = true,
+  compact = false
+}: WorkspaceDashboardProps) {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
   const [layout, setLayout] = useState<'standard' | 'compact' | 'expanded'>(initialLayout);
   
@@ -71,6 +82,21 @@ export function WorkspaceDashboard({ initialLayout = 'standard' }: WorkspaceDash
             },
           }}
         >
+          {/* AI-powered insights summary - full width at top */}
+          <GridItem colSpan={12} mb={2}>
+            <InsightsDailySummary 
+              maxHeight="300px"
+              personalizationContext={{
+                userId,
+                teamId,
+                filterPreferences: {
+                  prioritizeTeamInsights: Boolean(teamId),
+                  showPersonalInsights: true
+                }
+              }}
+            />
+          </GridItem>
+          
           {/* Welcome Panel - Spans full width */}
           <GridItem colSpan={12} p={3} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
             <WelcomePanel />
@@ -80,12 +106,12 @@ export function WorkspaceDashboard({ initialLayout = 'standard' }: WorkspaceDash
           <GridItem colSpan={12} display="grid" gridTemplateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={3}>
             {/* Daily Briefing - Left column */}
             <Box bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm" p={3} maxHeight={{ lg: "520px" }} overflow="auto">
-              <DailyBriefing />
+              <DailyBriefing userId={userId} />
             </Box>
             
             {/* Team Activity - Right column */}
             <Box bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm" p={3} maxHeight={{ lg: "520px" }} overflow="auto">
-              <TeamActivity />
+              <TeamActivity teamId={teamId} />
             </Box>
           </GridItem>
           

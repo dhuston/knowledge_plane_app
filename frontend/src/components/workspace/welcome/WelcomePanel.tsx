@@ -110,7 +110,7 @@ export function WelcomePanel() {
             align="center"
           >
             <Badge colorScheme="blue" mr={3}>Priority</Badge>
-            <Text>Quarterly research review meeting at 11:00 AM with Research Team</Text>
+            <Text>Team status update meeting at 11:00 AM</Text>
           </Flex>
           
           <Flex 

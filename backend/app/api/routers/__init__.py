@@ -5,7 +5,8 @@ from .auth import router as auth_router
 from .users import router as users_router
 from .teams import router as teams_router
 from .projects import router as projects_router
-from .map import router as map_router
+# Map router is imported from v1.endpoints.map in main.py
+# from .map import router as map_router
 from .goals import router as goals_router
 from .briefings import router as briefings_router
 from .insights import router as insights_router
@@ -19,7 +20,8 @@ api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(users_router, prefix="/users", tags=["users"])
 api_router.include_router(teams_router, prefix="/teams", tags=["teams"])
 api_router.include_router(projects_router, prefix="/projects", tags=["projects"])
-api_router.include_router(map_router, prefix="/map", tags=["map"])
+# Map router is included separately in main.py
+# api_router.include_router(map_router, prefix="/map", tags=["map"])
 api_router.include_router(goals_router, prefix="/goals", tags=["goals"])
 api_router.include_router(briefings_router, prefix="/briefings", tags=["briefings"])
 api_router.include_router(insights_router, prefix="/insights", tags=["insights"])
@@ -29,7 +31,7 @@ api_router.include_router(stream_router, tags=["stream"])
 __all__ = [
     "auth_router",
     "goals_router",
-    "map_router",
+    # "map_router", # Map router is handled separately in main.py
     "projects_router",
     "users_router",
     "teams_router",

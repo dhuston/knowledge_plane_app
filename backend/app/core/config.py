@@ -29,10 +29,10 @@ class Settings(BaseSettings):
 
     # Database
     POSTGRES_SERVER: str = "db" # Service name in docker-compose
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "password"
-    POSTGRES_DB: str = "knowledgeplan_dev"
-    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "password")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "knowledgeplan_dev")
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
 
     # Construct SQLAlchemy Database URL asynchronously
     @computed_field # type: ignore[misc]

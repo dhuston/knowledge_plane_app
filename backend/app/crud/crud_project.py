@@ -54,15 +54,19 @@ async def get_projects_by_owner(
     return result.scalars().all()
 
 async def get_projects_by_team(
-    db: AsyncSession, *, team_id: UUID, tenant_id: UUID, skip: int = 0, limit: int = 100
+    db: AsyncSession, *, team_id: UUID, tenant_id: Optional[UUID] = None, skip: int = 0, limit: int = 100
 ) -> List[ProjectModel]:
     """Get projects owned by a specific team."""
-    result = await db.execute(
-        select(ProjectModel)
-        .where(ProjectModel.owning_team_id == team_id, ProjectModel.tenant_id == tenant_id)
-        .offset(skip)
-        .limit(limit)
-    )
+    query = select(ProjectModel).where(ProjectModel.owning_team_id == team_id)
+    
+    # Add tenant filtering only if tenant_id is provided
+    if tenant_id is not None:
+        query = query.where(ProjectModel.tenant_id == tenant_id)
+        
+    # Apply pagination
+    query = query.offset(skip).limit(limit)
+    
+    result = await db.execute(query)
     return result.scalars().all()
 
 async def create_project(
@@ -177,7 +181,7 @@ class CRUDProject():
 
     # Add method to get projects by owning team
     async def get_projects_by_team(
-        self, db: AsyncSession, *, team_id: UUID, tenant_id: UUID, skip: int = 0, limit: int = 100
+        self, db: AsyncSession, *, team_id: UUID, tenant_id: Optional[UUID] = None, skip: int = 0, limit: int = 100
     ) -> List[ProjectModel]:
         """Wrapper method to get projects owned by a specific team."""
         # Call the standalone function

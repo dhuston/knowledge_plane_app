@@ -180,26 +180,8 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
             console.error("Error in analytics calculation:", innerError);
             
             if (isMounted.current) {
-              setGraphMetrics({
-                nodes: {
-                  "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 },
-                  "team-1": { degreeCentrality: 0.8, betweennessCentrality: 0.3, closenessCentrality: 0.5, clusteringCoefficient: 0.6, eigenvectorCentrality: 0.4 }
-                },
-                clusters: [
-                  { id: "cluster-1", nodeIds: ["user-1"], score: 1 },
-                  { id: "cluster-2", nodeIds: ["team-1"], score: 1 }
-                ],
-                mostCentralNodes: ["user-1"],
-                mostConnectedClusters: ["cluster-1"],
-                bottlenecks: [],
-                collaborationOpportunities: [],
-                density: 0.5,
-                modularity: 0.6,
-                connectedness: 0.7,
-                centralization: 0.5,
-                resilience: 0.6,
-                efficiency: 0.7
-              });
+              // Instead of using mock data, just set null metrics which will prevent showing analytics
+              setGraphMetrics(null);
             }
           } finally {
             if (isMounted.current) {
@@ -214,23 +196,7 @@ const MapWithAnalytics: React.FC<MapWithAnalyticsProps> = ({
         
         if (isMounted.current) {
           setIsCalculatingMetrics(false);
-          
-          setGraphMetrics({
-            nodes: {
-              "user-1": { degreeCentrality: 0.5, betweennessCentrality: 0.7, closenessCentrality: 0.6, clusteringCoefficient: 0.4, eigenvectorCentrality: 0.5 }
-            },
-            clusters: [{ id: "cluster-1", nodeIds: ["user-1"], score: 1 }],
-            mostCentralNodes: ["user-1"],
-            mostConnectedClusters: ["cluster-1"],
-            bottlenecks: [],
-            collaborationOpportunities: [],
-            density: 0.5,
-            modularity: 0.6,
-            connectedness: 0.7,
-            centralization: 0.5,
-            resilience: 0.6,
-            efficiency: 0.7
-          });
+          setGraphMetrics(null);
         }
         resolve();
       }

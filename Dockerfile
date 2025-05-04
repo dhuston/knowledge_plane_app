@@ -1,5 +1,5 @@
 # Multi-stage build: Builder stage
-FROM python:3.12.2-slim as builder
+FROM python:3.12.2-alpine AS builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -8,16 +8,17 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /build
 
 # Install build dependencies
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    build-base \
+    gcc \
+    musl-dev
 
 # Copy and install requirements first (for better layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Final stage
-FROM python:3.12.2-slim
+FROM python:3.12.2-alpine
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -27,11 +28,10 @@ ENV APP_HOME=/app
 WORKDIR ${APP_HOME}
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    libpq-dev \
+RUN apk add --no-cache \
+    postgresql-dev \
     ca-certificates \
-    && update-ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && update-ca-certificates
 
 # Copy installed packages from builder stage
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
@@ -44,7 +44,7 @@ COPY . ${APP_HOME}
 EXPOSE 8000
 
 # Create a non-root user
-RUN adduser --uid 5678 --disabled-password --gecos "" appuser && \
+RUN adduser -D -u 5678 appuser && \
     chown -R appuser:appuser ${APP_HOME}
 
 # Switch to non-root user

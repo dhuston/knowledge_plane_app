@@ -48,6 +48,7 @@ export default function useNotifications() {
       setUnreadCount(response.data.filter((n: Notification) => !n.read_at).length);
       setIsLoading(false);
     } catch (err) {
+      console.error('Failed to fetch notifications:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch notifications'));
       setIsLoading(false);
     }
@@ -56,10 +57,20 @@ export default function useNotifications() {
   // Fetch user preferences
   const fetchPreferences = useCallback(async () => {
     try {
+      console.log('Attempting to fetch notification preferences...');
       const response = await apiClient.get<UserNotificationSettings>('/notifications/preferences');
+      console.log('Successfully fetched notification preferences:', response.data);
       setPreferences(response.data.preferences);
     } catch (err) {
       console.error('Failed to fetch notification preferences:', err);
+      // Log more detailed error information
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          message: err.message,
+          name: err.name,
+          stack: err.stack
+        });
+      }
     }
   }, []);
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { 
   Insight, 
   InsightTimePeriod, 
@@ -42,17 +42,40 @@ export const InsightsProvider: React.FC<InsightsProviderProps> = ({ children }) 
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Fetch insights on component mount
+  useEffect(() => {
+    const initializeInsights = async () => {
+      try {
+        console.log('Initializing insights provider...');
+        const fetchedInsights = await fetchInsightsApi('daily');
+        console.log('Initial insights loaded:', fetchedInsights.length);
+        setInsights(fetchedInsights);
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Error initializing insights:', err);
+        // Set empty array to avoid undefined errors
+        setInsights([]);
+      }
+    };
+    
+    initializeInsights();
+  }, []);
+  
   const fetchInsights = useCallback(async (timePeriod: InsightTimePeriod) => {
     setLoading(true);
     setError(null);
     
     try {
+      console.log('Fetching insights for time period:', timePeriod);
       const fetchedInsights = await fetchInsightsApi(timePeriod);
+      console.log('Insights fetched:', fetchedInsights);
       setInsights(fetchedInsights);
       setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred fetching insights');
       console.error('Error fetching insights:', err);
+      // Fallback to empty insights array to avoid undefined errors
+      setInsights([]);
     } finally {
       setLoading(false);
     }

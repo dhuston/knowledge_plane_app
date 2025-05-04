@@ -4,6 +4,7 @@ Script to create a healthcare system tenant in Biosphere Alpha.
 """
 
 import asyncio
+import json
 import uuid
 from datetime import datetime, timedelta
 
@@ -17,7 +18,7 @@ TENANT_DOMAIN = "metrohealth.org"
 TENANT_ID = str(uuid.uuid4())
 
 # Database connection from config
-DATABASE_URL = "postgresql+asyncpg://postgres:postgres@db:5432/knowledgeplan_dev"
+DATABASE_URL = "postgresql+asyncpg://postgres:password@db:5432/knowledgeplan_dev"
 
 # Create async engine
 engine = create_async_engine(DATABASE_URL)
@@ -67,7 +68,7 @@ async def create_healthcare_tenant():
             "tenant_id": TENANT_ID,
             "name": TENANT_NAME,
             "domain": TENANT_DOMAIN,
-            "settings": tenant_settings,
+            "settings": json.dumps(tenant_settings),
             "created_at": now,
             "updated_at": now
         }
@@ -173,11 +174,11 @@ async def create_healthcare_tenant():
         admin_id = str(uuid.uuid4())
         admin_query = """
         INSERT INTO users (
-            id, tenant_id, name, email, title, is_active, is_admin,
+            id, tenant_id, name, email, title, 
             auth_provider, auth_provider_id, created_at, updated_at
         )
         VALUES (
-            :user_id, :tenant_id, :name, :email, :title, TRUE, TRUE,
+            :user_id, :tenant_id, :name, :email, :title, 
             'mock', :auth_provider_id, :created_at, :updated_at
         )
         RETURNING id;
@@ -189,7 +190,7 @@ async def create_healthcare_tenant():
             "name": "Medical Director",
             "email": f"admin@{TENANT_DOMAIN}",
             "title": "Chief Medical Officer",
-            "auth_provider_id": f"mock-{uuid.uuid4()}",
+            "auth_provider_id": f"health-admin-{uuid.uuid4()}",
             "created_at": now,
             "updated_at": now
         }
@@ -231,11 +232,11 @@ async def create_healthcare_tenant():
             
             user_query = """
             INSERT INTO users (
-                id, tenant_id, name, email, title, is_active, is_admin,
+                id, tenant_id, name, email, title, 
                 team_id, auth_provider, auth_provider_id, created_at, updated_at
             )
             VALUES (
-                :user_id, :tenant_id, :name, :email, :title, TRUE, FALSE,
+                :user_id, :tenant_id, :name, :email, :title, 
                 :team_id, 'mock', :auth_provider_id, :created_at, :updated_at
             )
             RETURNING id;
@@ -248,7 +249,7 @@ async def create_healthcare_tenant():
                 "email": user_data["email"],
                 "title": user_data["title"],
                 "team_id": team_id,
-                "auth_provider_id": f"mock-{uuid.uuid4()}",
+                "auth_provider_id": f"health-user-{user_data['name'].replace(' ', '-').lower()}-{uuid.uuid4()}",
                 "created_at": now,
                 "updated_at": now
             }
@@ -293,17 +294,19 @@ async def create_healthcare_tenant():
             
             project_query = """
             INSERT INTO projects (
-                id, tenant_id, name, description, status, start_date, target_date, created_at, updated_at
+                id, tenant_id, name, description, status, created_at, updated_at, properties
             )
             VALUES (
-                :project_id, :tenant_id, :name, :description, :status, :start_date, :target_date, :created_at, :updated_at
+                :project_id, :tenant_id, :name, :description, :status, :created_at, :updated_at, :properties
             )
             RETURNING id;
             """
             
-            # Set random start and target dates
-            start_date = now - timedelta(days=90)
-            target_date = now + timedelta(days=270)
+            # Set project properties with dates
+            properties = {
+                "start_date": (now - timedelta(days=90)).isoformat(),
+                "target_date": (now + timedelta(days=270)).isoformat()
+            }
             
             project_params = {
                 "project_id": project_id,
@@ -311,8 +314,7 @@ async def create_healthcare_tenant():
                 "name": project["name"],
                 "description": project["description"],
                 "status": project["status"],
-                "start_date": start_date,
-                "target_date": target_date,
+                "properties": json.dumps(properties),
                 "created_at": now,
                 "updated_at": now
             }
@@ -334,10 +336,10 @@ async def create_healthcare_tenant():
             
             goal_query = """
             INSERT INTO goals (
-                id, tenant_id, name, description, status, priority, created_at, updated_at
+                id, tenant_id, title, description, status, type, created_at, updated_at
             )
             VALUES (
-                :goal_id, :tenant_id, :name, :description, :status, :priority, :created_at, :updated_at
+                :goal_id, :tenant_id, :title, :description, :status, :type, :created_at, :updated_at
             )
             RETURNING id;
             """
@@ -345,10 +347,10 @@ async def create_healthcare_tenant():
             goal_params = {
                 "goal_id": goal_id,
                 "tenant_id": TENANT_ID,
-                "name": goal["name"],
+                "title": goal["name"],
                 "description": goal["description"],
                 "status": goal["status"],
-                "priority": "high",
+                "type": "ENTERPRISE",
                 "created_at": now,
                 "updated_at": now
             }

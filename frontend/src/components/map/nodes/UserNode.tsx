@@ -46,8 +46,7 @@ const UserNode: React.FC<NodeProps<UserNodeData>> = ({ data }) => {
             <HStack spacing={3}>
                 <Avatar 
                     size="sm" 
-                    name={data.label} 
-                    src={avatarUrl} // Use corrected variable
+                    name={data.label}
                 />
                 <VStack align="start" spacing={0}>
                     <Text fontWeight="bold" fontSize="sm" noOfLines={1}>{data.label}</Text>

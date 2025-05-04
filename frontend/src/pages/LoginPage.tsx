@@ -8,7 +8,7 @@ import {
 import { EmailIcon } from '@chakra-ui/icons';
 import { useAuth } from '../context/AuthContext';
 
-// Get backend API base URL (adjust if needed, could use env var later)
+// Get backend API base URL (ensure consistent with AuthContext)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001";
 
 interface TenantInfo {
@@ -45,37 +45,98 @@ export default function LoginPage() {
       setLoadingTenants(true);
       
       try {
-        // Use static tenant data while backend endpoint is having issues
-        const staticTenants: TenantInfo[] = [
-          {
-            id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", // Static UUID for Pharma AI Demo
-            name: "Pharma AI Demo",
-            domain: "pharmademo.biosphere.ai",
-            is_active: true
-          },
-          {
-            id: "4fa85f64-5717-4562-b3fc-2c963f66afa7", // Static UUID for Tech Innovations
-            name: "Tech Innovations Inc.",
-            domain: "techinnovations.biosphere.ai",
-            is_active: true
-          },
-          {
-            id: "5fa85f64-5717-4562-b3fc-2c963f66afa8", // Static UUID for UltraThink demo tenant
-            name: "UltraThink",
-            domain: "ultrathink.demo.biosphere.ai", 
-            is_active: true
+        console.log(`Fetching tenants from ${API_BASE_URL}/api/v1/auth/tenants`);
+        // Fetch available tenants from backend with error handling
+        const tenantsResponse = await fetch(`${API_BASE_URL}/api/v1/auth/tenants`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
           }
-        ];
+        }).catch(error => {
+          console.error("Network error fetching tenants:", error);
+          throw error;
+        });
         
-        console.log("Using static tenant data:", staticTenants);
-        setTenants(staticTenants);
-        
-        // Select the first tenant by default
-        if (staticTenants.length > 0) {
-          setSelectedTenant(staticTenants[0].id);
+        if (tenantsResponse && tenantsResponse.ok) {
+          const tenantData: TenantInfo[] = await tenantsResponse.json();
+          
+          if (tenantData && tenantData.length > 0) {
+            setTenants(tenantData);
+            console.log("Available tenants from API:", tenantData);
+            
+            // Select the first tenant by default
+            setSelectedTenant(tenantData[0].id);
+          } else {
+            // Fallback to static tenant data if API returns empty array
+            console.warn("API returned empty tenant list, using static data");
+            useStaticTenantData();
+          }
+        } else {
+          console.error("Failed to fetch tenants", tenantsResponse ? `Status: ${tenantsResponse.status}` : "No response");
+          toast({
+            title: "Warning",
+            description: "Could not load available tenants",
+            status: "warning",
+            duration: 5000,
+            isClosable: true,
+          });
+          
+          // Fallback to static data
+          useStaticTenantData();
         }
         
-        /* Backend API call disabled temporarily due to server issues
+        function useStaticTenantData() {
+          // Static tenant data as fallback
+          const staticTenants: TenantInfo[] = [
+            {
+              id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", // Static UUID for Pharma AI Demo
+              name: "Pharma AI Demo",
+              domain: "pharmademo.biosphere.ai",
+              is_active: true
+            },
+            {
+              id: "4fa85f64-5717-4562-b3fc-2c963f66afa7", // Static UUID for Tech Innovations
+              name: "Tech Innovations Inc.",
+              domain: "techinnovations.biosphere.ai",
+              is_active: true
+            },
+            {
+              id: "6fa85f64-5717-4562-b3fc-2c963f66afa9", // Metropolitan Health System
+              name: "Metropolitan Health System",
+              domain: "metrohealth.biosphere.ai", 
+              is_active: true
+            },
+            {
+              id: "7fa85f64-5717-4562-b3fc-2c963f66afaa", // Global Financial Group
+              name: "Global Financial Group",
+              domain: "globalfingroup.biosphere.ai", 
+              is_active: true
+            },
+            {
+              id: "8fa85f64-5717-4562-b3fc-2c963f66afab", // Advanced Manufacturing Corp
+              name: "Advanced Manufacturing Corp",
+              domain: "advancedmfg.biosphere.ai", 
+              is_active: true
+            },
+            {
+              id: "9fa85f64-5717-4562-b3fc-2c963f66afac", // University Research Alliance
+              name: "University Research Alliance",
+              domain: "uniresearch.biosphere.ai", 
+              is_active: true
+            }
+          ];
+          
+          console.log("Using static tenant data:", staticTenants);
+          setTenants(staticTenants);
+          
+          // Select the first tenant by default
+          if (staticTenants.length > 0) {
+            setSelectedTenant(staticTenants[0].id);
+          }
+        }
+        
+        // Old implementation for reference
+        /*
         // Fetch available tenants
         const tenantsResponse = await fetch(`${API_BASE_URL}/api/v1/auth/tenants`);
         if (tenantsResponse.ok) {
@@ -152,22 +213,76 @@ export default function LoginPage() {
     setIsLoginLoading(true);
     
     try {
+      // Debug log for tenant selection
+      console.log(`DEBUG: Selected tenant ID: ${selectedTenant}`);
+      console.log(`DEBUG: Available tenants:`, tenants);
+      const selectedTenantObj = tenants.find(t => t.id === selectedTenant);
+      console.log(`DEBUG: Selected tenant object:`, selectedTenantObj);
+      
       const loginUrl = `${API_BASE_URL}/api/v1/auth/demo-login?tenant_id=${selectedTenant}`;
+      console.log(`DEBUG: Login URL: ${loginUrl}`);
+      
       const response = await fetch(loginUrl);
       
+      console.log(`DEBUG: Login response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: "Login failed" }));
-        throw new Error(errorData.detail || `HTTP error ${response.status}`);
+        let errorText = '';
+        try {
+          const errorData = await response.json();
+          errorText = errorData.detail || `HTTP error ${response.status}`;
+          console.error(`DEBUG: Server error response:`, errorData);
+        } catch (parseError) {
+          errorText = `HTTP error ${response.status}`;
+          console.error(`DEBUG: Failed to parse error response: ${parseError}`);
+        }
+        throw new Error(errorText);
       }
       
       const data = await response.json();
-      console.log("Tenant login successful");
+      console.log("Tenant login successful", data);
+      
+      // Check tokens
+      if (!data.access_token) {
+        console.error("Missing access token in response:", data);
+        throw new Error("Login successful but no access token received");
+      }
       
       // Store the tokens
+      console.log("Setting tokens in AuthContext");
       setToken(data.access_token, data.refresh_token);
       
-      // Navigate to the main app
-      navigate("/workspace");
+      // Set a delay to allow auth context to process the token
+      // and fetch user data before navigating
+      console.log("Waiting for auth context to process token before navigation");
+      
+      // Show a toast to inform the user we're logging in
+      toast({
+        title: "Login successful",
+        description: "Preparing your workspace...",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      // Use a longer timeout to ensure user data is fetched before navigation
+      setTimeout(() => {
+        const storedToken = localStorage.getItem('knowledge_plane_token');
+        console.log("Token before navigation:", storedToken ? `present (${storedToken.substring(0, 20)}...)` : "missing");
+        
+        if (!storedToken) {
+          console.error("Token not found in localStorage! This indicates a storage issue.");
+          // Try to store it again directly
+          console.log("Attempting to store token directly in localStorage");
+          localStorage.setItem('knowledge_plane_token', data.access_token);
+          if (data.refresh_token) {
+            localStorage.setItem('knowledge_plane_refresh_token', data.refresh_token);
+          }
+        }
+        
+        console.log("Navigating to workspace");
+        navigate("/workspace");
+      }, 1500); // Increase delay to allow time for user data fetch
     } catch (error) {
       console.error("Login failed:", error);
       toast({

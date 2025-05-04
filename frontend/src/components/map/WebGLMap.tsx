@@ -85,104 +85,13 @@ const WebGLMap: React.FC<WebGLMapProps> = ({
 
         if (!isMounted) return;
 
-        // Mock nodes data
-        // Enhanced mock nodes with relationship data
-        const mockNodes: MapNode[] = [
-          {
-            id: 'user-1',
-            type: MapNodeTypeEnum.USER,
-            label: 'John Doe',
-            data: { 
-              name: 'John Doe', 
-              title: 'Research Scientist',
-              relationships: [
-                { type: MapEdgeTypeEnum.MEMBER_OF, nodeId: 'team-1', label: 'Research Team' },
-                { type: MapEdgeTypeEnum.OWNS, nodeId: 'asset-1', label: 'Research Paper' }
-              ]
-            }
-          },
-          {
-            id: 'user-2',
-            type: MapNodeTypeEnum.USER,
-            label: 'Jane Smith',
-            data: { 
-              name: 'Jane Smith', 
-              title: 'Project Manager',
-              relationships: [
-                { type: MapEdgeTypeEnum.MEMBER_OF, nodeId: 'team-1', label: 'Research Team' },
-                { type: MapEdgeTypeEnum.REPORTS_TO, nodeId: 'user-1', label: 'John Doe' }
-              ]
-            }
-          },
-          {
-            id: 'team-1',
-            type: MapNodeTypeEnum.TEAM,
-            label: 'Research Team',
-            data: { 
-              name: 'Research Team', 
-              description: 'Core research team',
-              memberCount: 2,
-              relationships: [
-                { type: MapEdgeTypeEnum.OWNS, nodeId: 'project-1', label: 'AI Research Project' }
-              ]
-            }
-          },
-          {
-            id: 'project-1',
-            type: MapNodeTypeEnum.PROJECT,
-            label: 'AI Research Project',
-            data: { 
-              name: 'AI Research Project', 
-              description: 'Advanced AI research initiative',
-              status: 'In Progress',
-              relationships: [
-                { type: MapEdgeTypeEnum.ALIGNED_TO, nodeId: 'goal-1', label: 'Increase Research Output' },
-                { type: MapEdgeTypeEnum.RELATED_TO, nodeId: 'asset-1', label: 'Research Paper' }
-              ]
-            }
-          },
-          {
-            id: 'goal-1',
-            type: MapNodeTypeEnum.GOAL,
-            label: 'Increase Research Output',
-            data: { 
-              title: 'Increase Research Output', 
-              type: 'team',
-              progress: 65,
-              relationships: []
-            }
-          },
-          {
-            id: 'asset-1',
-            type: MapNodeTypeEnum.KNOWLEDGE_ASSET,
-            label: 'Research Paper',
-            data: { 
-              title: 'Research Paper', 
-              type: 'DOCUMENT',
-              relationships: [
-                { type: MapEdgeTypeEnum.RELATED_TO, nodeId: 'project-1', label: 'AI Research Project' }
-              ]
-            }
-          }
-        ];
+        // Initialize with empty data - no mock data
+        setNodes([]);
+        setEdges([]);
 
-        // Enhanced mock edges with relationship types
-        const mockEdges = [
-          { source: 'user-1', target: 'team-1', type: MapEdgeTypeEnum.MEMBER_OF },
-          { source: 'user-2', target: 'team-1', type: MapEdgeTypeEnum.MEMBER_OF },
-          { source: 'team-1', target: 'project-1', type: MapEdgeTypeEnum.OWNS },
-          { source: 'project-1', target: 'goal-1', type: MapEdgeTypeEnum.ALIGNED_TO },
-          { source: 'user-1', target: 'asset-1', type: MapEdgeTypeEnum.OWNS },
-          { source: 'project-1', target: 'asset-1', type: MapEdgeTypeEnum.RELATED_TO },
-          { source: 'user-2', target: 'user-1', type: MapEdgeTypeEnum.REPORTS_TO },
-        ];
-
-        setNodes(mockNodes);
-        setEdges(mockEdges);
-
-        // Notify parent with map data for analytics
+        // Notify parent with empty data for analytics
         if (onDataChange) {
-          onDataChange(mockNodes, mockEdges);
+          onDataChange([], []);
         }
 
         // Notify parent

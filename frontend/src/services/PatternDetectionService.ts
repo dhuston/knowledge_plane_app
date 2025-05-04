@@ -346,6 +346,24 @@ export const detectPatterns = async (
   ]
 ): Promise<Insight[]> => {
   try {
+    // First, try to use OpenAI for advanced pattern detection
+    if (OpenAIService.isAvailable()) {
+      try {
+        console.log('Using OpenAI for advanced pattern detection');
+        const openAiInsights = await OpenAIService.generateInsights(activities, contextData);
+        
+        // If we get insights from OpenAI, use them
+        if (openAiInsights && openAiInsights.length > 0) {
+          console.log(`Generated ${openAiInsights.length} insights using OpenAI`);
+          return openAiInsights;
+        }
+      } catch (openAiError) {
+        console.error('Error using OpenAI for pattern detection:', openAiError);
+        // Fall back to the built-in detectors if OpenAI fails
+      }
+    }
+    
+    // Fall back to built-in detectors if OpenAI is not available or fails
     // Create detectors for requested pattern types
     const detectors = patternTypes.map(type => createPatternDetector(type));
     
@@ -366,6 +384,25 @@ export const detectPatterns = async (
         const detector = detectors.find(d => d.type === insight.category);
         return detector ? insight.relevanceScore >= detector.relevanceThreshold : true;
       });
+    
+    // Try to enhance one of the insights with OpenAI if available
+    if (OpenAIService.isAvailable() && allInsights.length > 0) {
+      try {
+        // Take the most relevant insight and enhance it
+        const topInsight = allInsights.sort((a, b) => b.relevanceScore - a.relevanceScore)[0];
+        const enhancedInsight = await OpenAIService.enhanceInsight(topInsight);
+        
+        // Replace the original insight with the enhanced version
+        const enhancedInsights = allInsights.map(insight => 
+          insight.id === enhancedInsight.id ? enhancedInsight : insight
+        );
+        
+        return enhancedInsights;
+      } catch (enhanceError) {
+        console.error('Error enhancing insights with OpenAI:', enhanceError);
+        // Return original insights if enhancement fails
+      }
+    }
     
     return allInsights;
   } catch (error) {

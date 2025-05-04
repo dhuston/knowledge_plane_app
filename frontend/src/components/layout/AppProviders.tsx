@@ -4,6 +4,8 @@
  */
 import React, { ReactNode } from 'react';
 import { NodeSelectionProvider } from '../../context/NodeSelectionContext';
+import InsightsProvider from '../../context/InsightsContext';
+import ErrorBoundary from '../error/ErrorBoundary';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -17,7 +19,11 @@ interface AppProvidersProps {
 const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
   return (
     <NodeSelectionProvider>
-      {children}
+      <ErrorBoundary>
+        <InsightsProvider>
+          {children}
+        </InsightsProvider>
+      </ErrorBoundary>
     </NodeSelectionProvider>
   );
 };
