@@ -25,7 +25,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Define API base URL - ensure it doesn't include /api/v1 suffix
+// Define API base URL
+// IMPORTANT: this must be consistent with other files like api/client.ts
+// API_BASE_URL should NOT include "/api/v1" as it's added in specific requests
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
@@ -171,7 +173,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           const responseText = await fetchResponse.text();
           logAuthEvent(`fetchResponse-body:${responseText.substring(0, 50)}...`);
           
-          // Now continue with axios as before
+          // Now continue with axios as before (using the same path as fetch)
           response = await axios.get<User>(`${API_BASE_URL}/api/v1/users/me`, {
             headers: {
               Authorization: `Bearer ${token}`,

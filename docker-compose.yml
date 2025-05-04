@@ -19,6 +19,7 @@ services:
       # Enable spatial features since we're using PostGIS now
       - USE_SPATIAL_FEATURES=true
       - BYPASS_DB_FOR_DEMO=false
+      - SKIP_MIGRATION_CHECK=true  # Disable migration checks on startup
     depends_on:
       - db
     # Add health check for backend
@@ -32,7 +33,7 @@ services:
     # Run only the initial migration to create tenant tables
     command: >
       bash -c "pip install networkx &&
-              alembic upgrade 12819ed4b9bd &&
+              alembic upgrade 0001_baseline_schema &&
               uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     # Add resource limits
     deploy:

@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useMemo } from 'react';
 
 // Define API base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+// IMPORTANT: Standardized to NOT include "/api/v1" suffix
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 // Anti-CSRF token header
 const CSRF_HEADER = 'X-CSRF-Token';
@@ -38,7 +39,7 @@ export const useApiClient = (): AxiosInstance => {
     const apiClient = useMemo(() => {
         // Create a new axios instance
         const instance = axios.create({
-            baseURL: API_BASE_URL,
+            baseURL: `${API_BASE_URL}/api/v1`, // Always include /api/v1 in the baseURL
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -51,7 +52,7 @@ export const useApiClient = (): AxiosInstance => {
          */
         const fetchCsrfToken = async () => {
             try {
-                const response = await axios.get(`${API_BASE_URL}/auth/csrf-token`, {
+                const response = await axios.get(`${API_BASE_URL}/api/v1/auth/csrf-token`, {
                     withCredentials: true
                 });
                 return response.data.csrfToken;
@@ -115,7 +116,7 @@ export const useApiClient = (): AxiosInstance => {
                         }
 
                         const refreshResponse = await axios.post(
-                            `${API_BASE_URL}/auth/refresh-token`, 
+                            `${API_BASE_URL}/api/v1/auth/refresh-token`, 
                             { refresh_token: refreshToken }, 
                             { withCredentials: true }
                         );

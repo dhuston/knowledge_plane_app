@@ -1,4 +1,0 @@
-services:
-  backend:
-    environment:
-      - SKIP_MIGRATION_CHECK=true  # Add this to disable migration checks on startup
