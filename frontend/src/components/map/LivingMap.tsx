@@ -7,6 +7,7 @@ import { MapControls } from './MapControls';
 import { MapSearch } from './MapSearch';
 import { NodeTooltip } from './NodeTooltip';
 import { MapFilterPanel } from './filters/MapFilterPanel';
+import StrategicAlignmentLayer from './overlays/StrategicAlignmentLayer';
 import { useLayoutWorker } from '../../hooks/useLayoutWorker';
 import { perfume, useComponentPerformance, measureAsync } from '../../utils/performance';
 import type { MapData, MapNode, MapEdge, MapNodeTypeEnum, MapPosition } from '../../types/map';
@@ -21,6 +22,7 @@ interface LivingMapProps {
   onNodeSelect?: (nodeId: string, nodeType: MapNodeTypeEnum) => void;
   clusterTeams?: boolean;
   height?: string | number;
+  showAlignmentOverlays?: boolean;
 }
 
 export const LivingMap = ({
@@ -29,7 +31,8 @@ export const LivingMap = ({
   initialFilters = {},
   onNodeSelect,
   clusterTeams = false,
-  height = '100%'
+  height = '100%',
+  showAlignmentOverlays = true
 }: LivingMapProps) => {
   // Performance monitoring
   const mapPerformance = useComponentPerformance('LivingMap');
@@ -52,6 +55,8 @@ export const LivingMap = ({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [viewportPosition, setViewportPosition] = useState<MapPosition | null>(null);
+  const [sigma, setSigma] = useState<any>(null);
+  const [visibleNodeIds, setVisibleNodeIds] = useState<number[]>([]);
   
   // Keep track of renders for performance monitoring
   renderCount.current += 1;
@@ -117,6 +122,10 @@ export const LivingMap = ({
       });
       
       setMapData(processedData);
+      
+      // Update visible node IDs
+      setVisibleNodeIds(processedData.nodes.map(node => parseInt(node.id)));
+      
       perfume.end('mapDataProcessing');
     } catch (error) {
       console.error('Error loading map data:', error);
@@ -165,6 +174,30 @@ export const LivingMap = ({
     }
   }, [viewportPosition]);
   
+  // Handle sigma initialization
+  const handleSigmaInitialized = useCallback((sigmaInstance: any) => {
+    setSigma(sigmaInstance);
+  }, []);
+  
+  // Handle misalignment click
+  const handleMisalignmentClick = useCallback((nodeId: number, misalignmentData: any) => {
+    // Find the node with this ID
+    const node = mapData.nodes.find(n => parseInt(n.id) === nodeId);
+    if (node) {
+      // Select the node
+      handleNodeSelect(node.id, node.type);
+      
+      // Show a toast with misalignment information
+      toast({
+        title: `Misalignment Detected`,
+        description: misalignmentData.description,
+        status: 'warning',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [mapData.nodes, handleNodeSelect, toast]);
+  
   const lastViewportUpdate = useRef(0);
   
   // Memoized graph settings to prevent unnecessary re-renders
@@ -199,10 +232,20 @@ export const LivingMap = ({
           selectedNodeId={selectedNode}
           centerNodeId={centerNodeId}
           isLoading={isLoading}
+          onSigmaInitialized={handleSigmaInitialized}
         />
         
         {hoveredNode && (
           <NodeTooltip nodeId={hoveredNode} nodes={mapData.nodes} />
+        )}
+
+        {/* Strategic alignment overlays layer */}
+        {showAlignmentOverlays && sigma && (
+          <StrategicAlignmentLayer 
+            sigma={sigma} 
+            visibleNodes={visibleNodeIds} 
+            onMisalignmentClick={handleMisalignmentClick}
+          />
         )}
       </Box>
     </Flex>

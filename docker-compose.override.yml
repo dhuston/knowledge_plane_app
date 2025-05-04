@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  db:
+    command: >
+      bash -c "
+        echo 'host all postgres all md5' >> /var/lib/postgresql/data/pg_hba.conf &&
+        echo 'local all postgres md5' >> /var/lib/postgresql/data/pg_hba.conf &&
+        docker-entrypoint.sh postgres
+      "
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: md5
+      # Make sure these match what's in your config.py
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-knowledgeplan_dev}

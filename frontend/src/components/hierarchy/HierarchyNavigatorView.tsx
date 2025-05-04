@@ -60,7 +60,7 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
   
   return (
     <Box 
-      width="60px"
+      width="64px"
       height="100%"
       bg={bgColor}
       borderRight="1px solid"

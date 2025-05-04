@@ -14,10 +14,9 @@ router = APIRouter()
 
 @router.get("/me")
 async def read_users_me(
-    current_user: models.User = Depends(security.get_current_user_or_dev)
+    current_user: models.User = Depends(security.get_current_user)
 ):
     """Fetch the current logged in user."""
-    import os
     import logging
     
     logger = logging.getLogger(__name__)

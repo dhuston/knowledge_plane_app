@@ -60,15 +60,22 @@ register_tenant_events()
 # For development, we'll allow all origins since we're having CORS issues
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add CORS middleware with explicit frontend origin to support credentials
+# Add CORS middleware with explicit frontend origins to support credentials
+# For production, this list should be restricted to specific domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend dev server
-    allow_credentials=True,  # Enable credentials (cookies, auth headers)
+    allow_origins=[
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:3000",   # React dev server 
+        "http://localhost:8080",   # Alternative dev server
+        "http://127.0.0.1:5173",   # Local IP variants
+        "http://127.0.0.1:3000"    # Local IP variants
+    ],  
+    allow_credentials=True,        # Enable credentials (cookies, auth headers)
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=600,  # Cache preflight requests for 10 minutes
+    allow_headers=["*"],           # In production, this should be restricted
+    expose_headers=["*"],          # In production, this should be restricted
+    max_age=600,                   # Cache preflight requests for 10 minutes
 )
 
 # Add the temporary logging middleware FIRST (COMMENTED OUT)

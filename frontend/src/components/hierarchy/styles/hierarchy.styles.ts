@@ -143,7 +143,7 @@ export const popoverVariants = {
 
 // Navigator container style
 export const navigatorStyle = {
-  width: '60px',
+  width: '64px',
   height: '100%',
   borderRightWidth: '1px',
   borderRightStyle: 'solid',

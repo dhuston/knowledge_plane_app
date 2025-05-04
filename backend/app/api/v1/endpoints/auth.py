@@ -1,10 +1,11 @@
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, List
 from datetime import timedelta, timezone, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from authlib.integrations.starlette_client import OAuthError
 from uuid import UUID
 import logging
@@ -23,6 +24,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db_session
 from app.schemas import UserCreate, UserUpdate, TenantCreate
 from app.schemas.auth import PasswordLoginRequest, DemoUserCreate, AuthMode
+from app.schemas.tenant import TenantRead
 from app.schemas.token import Token
 from app.services.google_calendar import refresh_google_access_token, GoogleTokenRefreshError
 
@@ -81,10 +83,27 @@ async def login_password(
         
         
 @router.get("/demo-login", response_model=Token)
-async def demo_login(db: AsyncSession = Depends(get_db_session)):
+async def demo_login(
+    tenant_id: Optional[UUID] = None,
+    db: AsyncSession = Depends(get_db_session)
+):
     """
     Get a token for demo login without credentials.
     Only works in demo mode.
+    
+    This endpoint provides a quick way to login with a demo account for testing and
+    exploration purposes. In production, it will redirect users to proper authentication.
+    
+    Parameters:
+    - tenant_id: Optional UUID for the specific tenant to login to. If not provided,
+                the system will use the default demo tenant.
+    
+    Steps:
+    1. Checks if system is in demo mode
+    2. Gets or creates a demo tenant (or uses the specified tenant)
+    3. Gets or creates a demo user
+    4. Creates JWT tokens for authentication
+    5. Updates the user's last login timestamp
     """
     try:
         # Check if we're in demo mode
@@ -97,17 +116,31 @@ async def demo_login(db: AsyncSession = Depends(get_db_session)):
             )
             
         # Get or create demo user and tokens
-        token = await get_demo_login_token(db)
+        token = await get_demo_login_token(db, tenant_id=tenant_id)
         return token
         
     except AuthError as e:
         logger.warning(f"Demo login failed: {e.message}")
+        # Return a more user-friendly error message
+        if "schema not initialized" in e.message:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="System not fully initialized. Please contact administrator."
+            )
         raise HTTPException(
             status_code=e.status_code,
             detail=e.message
         )
     except Exception as e:
         logger.error(f"Unexpected error during demo login: {str(e)}")
+        # Check if this is a database related issue
+        if "relation" in str(e).lower() and "does not exist" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database schema not initialized. Please run migrations."
+            )
+        
+        # Generic error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred during authentication"
@@ -518,6 +551,40 @@ async def create_new_access_token(user_id: UUID) -> str:
     
     return new_access_token
 
+
+@router.get("/tenants", response_model=List[TenantRead])
+async def list_available_tenants(db: AsyncSession = Depends(get_db_session)):
+    """
+    List all active tenants available for login.
+    This endpoint returns a list of available tenants that users can select from 
+    during the login process.
+    """
+    logger.info("Fetching list of available tenants")
+    try:
+        # Query for active tenants
+        statement = select(models.Tenant).where(models.Tenant.is_active == True)
+        result = await db.execute(statement)
+        tenants = result.scalars().all()
+        
+        if not tenants:
+            logger.warning("No active tenants found in the system")
+            # Create a demo tenant if none exists
+            demo_tenant = await crud_tenant.create_demo_tenant(
+                db=db, 
+                name="UltraThink",
+                domain="ultrathink.demo.biosphere.ai"
+            )
+            tenants = [demo_tenant]
+            logger.info(f"Created default demo tenant: {demo_tenant.name}")
+        
+        logger.info(f"Returning {len(tenants)} active tenants")
+        return tenants
+    except Exception as e:
+        logger.error(f"Error fetching tenants: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve tenant list"
+        )
 
 @router.post("/logout")
 async def logout(

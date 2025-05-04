@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     @computed_field # type: ignore[misc]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
+        # Log authentication details
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[Config] Building DB URI with: scheme=postgresql+asyncpg, user={self.POSTGRES_USER}, host={self.POSTGRES_SERVER}, port={self.POSTGRES_PORT}")
+        logger.info(f"[Config] Docker environment: RUNNING_IN_DOCKER={os.getenv('RUNNING_IN_DOCKER', 'not set')}")
+        logger.info(f"[Config] Checking environment: POSTGRES_HOST={os.getenv('POSTGRES_HOST', 'not set')}, POSTGRES_SERVER={self.POSTGRES_SERVER}")
+        
+        # Try with md5 auth instead of peer
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
             username=self.POSTGRES_USER,

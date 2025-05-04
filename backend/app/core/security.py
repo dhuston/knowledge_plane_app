@@ -189,73 +189,16 @@ async def get_current_user(
     return user
 
 
-async def get_current_user_or_dev(
+# This function is no longer needed as we're using proper database authentication
+# It has been kept in the codebase but renamed to indicate it shouldn't be used
+async def _deprecated_get_current_user_or_dev(
     db: AsyncSession = Depends(get_db_session),
     token: str = Depends(oauth2_scheme)
 ) -> UserModel:
     """
-    Dependency that returns the current user or a mock user in development mode.
-    Prioritizes development mode if environment variables are set.
+    DEPRECATED: Use get_current_user instead. 
+    This function is kept for reference but should not be used in production code.
     """
-    import os
-    
-    # Check if we're in development mode with DB bypass enabled
-    is_dev_mode = os.getenv("ENVIRONMENT", "").lower() == "development" or os.getenv("DEBUG", "").lower() == "true"
-    bypass_db = os.getenv("BYPASS_DB_FOR_DEMO", "").lower() != "false"
-    
-    if is_dev_mode and bypass_db:
-        logger.info("Development mode detected in get_current_user_or_dev")
-        try:
-            # Parse token without database access
-            from jose import JWTError
-            
-            try:
-                payload = jwt.decode(
-                    token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-                )
-                user_id_str = payload.get("sub")
-                tenant_id_str = payload.get("tenant_id")
-                name = payload.get("name", "Demo User")
-                email = payload.get("email", "demo@example.com")
-                
-                if user_id_str is None:
-                    user_id = UUID("11111111-1111-1111-1111-111111111111")
-                else:
-                    user_id = UUID(user_id_str)
-                    
-                if tenant_id_str is None:
-                    tenant_id = UUID("22222222-2222-2222-2222-222222222222")
-                else:
-                    tenant_id = UUID(tenant_id_str)
-                
-                # Create a mock user
-                from datetime import datetime, timezone
-                mock_user = UserModel(
-                    id=user_id,
-                    email=email,
-                    name=name,
-                    title="Product Manager",
-                    avatar_url="https://i.pravatar.cc/150?u=demo@example.com",
-                    online_status=True,
-                    tenant_id=tenant_id,
-                    auth_provider="password",
-                    auth_provider_id=None,
-                    created_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
-                    updated_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
-                    last_login_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
-                    team_id=None,
-                )
-                
-                logger.info(f"Created mock user in development mode: {name} ({email})")
-                return mock_user
-            except JWTError as e:
-                logger.warning(f"JWT error in development mode: {e}")
-                raise CREDENTIALS_EXCEPTION
-            
-        except Exception as e:
-            logger.error(f"Error creating mock user in development mode: {e}")
-            raise CREDENTIALS_EXCEPTION
-    
-    # Regular production path
+    # Just delegate to the standard user authentication
     logger.info("Using standard authentication path")
     return await get_current_user(db, token)

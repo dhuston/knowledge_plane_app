@@ -254,13 +254,14 @@ async def create_demo_user(
     return await user_crud.create(db, obj_in=user_create, tenant_id=tenant.id)
 
 
-async def get_demo_login_token(db: AsyncSession) -> Token:
+async def get_demo_login_token(db: AsyncSession, tenant_id: Optional[UUID] = None) -> Token:
     """
     Create or get a demo user and return login tokens.
     Used for quick demo access without requiring login.
     
     Args:
         db: Database session
+        tenant_id: Optional UUID for specific tenant to login to
         
     Returns:
         Token object with access and refresh tokens
@@ -272,66 +273,42 @@ async def get_demo_login_token(db: AsyncSession) -> Token:
             logger.warning("Demo auto-login attempted but not in demo mode")
             raise AuthError("Auto-login is only available in demo mode", 403)
         
-        # For debugging
         logger.info("Starting demo login process")
         
-        # Generate a temporary demo token without database access
-        # This is used in development when the database isn't migrated
-        logger.info("Checking environment mode...")
-        is_dev_mode = os.getenv("ENVIRONMENT", "").lower() == "development" or os.getenv("DEBUG", "").lower() == "true"
+        # Get or create tenant based on tenant_id if provided
+        demo_tenant = None
         
-        if is_dev_mode and os.getenv("BYPASS_DB_FOR_DEMO", "").lower() != "false":
-            logger.info("Development mode detected - generating temporary demo token without database")
-            # Create fake user ID and tenant ID
-            from uuid import uuid4
-            demo_user_id = uuid4()
-            demo_tenant_id = uuid4()
-            
-            # Generate tokens
-            access_token = create_access_token(
-                subject=demo_user_id, 
-                tenant_id=demo_tenant_id,
-                additional_data={"name": "Demo User", "email": "demo@example.com", "dev_mode": True}
-            )
-            refresh_token = create_access_token(
-                subject=demo_user_id,
-                tenant_id=demo_tenant_id,
-                expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-                additional_data={"name": "Demo User", "email": "demo@example.com", "dev_mode": True}
-            )
-            
-            logger.info(f"Generated dev mode token for demo user with ID {demo_user_id}")
-            
-            return Token(
-                access_token=access_token,
-                token_type="bearer",
-                refresh_token=refresh_token
-            )
+        if tenant_id:
+            logger.info(f"Using provided tenant ID: {tenant_id}")
+            demo_tenant = await tenant_crud.get(db, id=tenant_id)
+            if not demo_tenant:
+                logger.warning(f"Tenant with ID {tenant_id} not found")
+                raise AuthError(f"Tenant with ID {tenant_id} not found", 404)
+        else:
+            # Use default tenant
+            logger.info("No tenant ID provided, finding or creating default tenant")
+            demo_tenant = await tenant_crud.get_by_name(db, name="UltraThink")
+            if not demo_tenant:
+                logger.info("Creating new UltraThink demo tenant")
+                demo_tenant = await tenant_crud.create_demo_tenant(db, name="UltraThink")
         
-        # Standard database mode
-        logger.info("Using database-based demo login")
+        # Get or create demo user for this tenant
+        email_username = demo_tenant.domain.split('.')[0] if demo_tenant.domain else "demo"
+        demo_email = f"{email_username}@example.com"
         
-        # Get or create demo tenant
-        logger.info("Attempting to get demo tenant")
-        demo_tenant = await tenant_crud.get_by_name(db, name="Demo Tenant")
-        if not demo_tenant:
-            logger.info("Creating new demo tenant")
-            demo_tenant = await tenant_crud.create_demo_tenant(db, name="Demo Tenant")
-        
-        # Get or create demo user
-        logger.info("Attempting to get demo user")
-        demo_user = await user_crud.get_by_email(db, email="demo@example.com")
+        logger.info(f"Finding or creating demo user for tenant: {demo_tenant.name}")
+        demo_user = await user_crud.get_by_email_and_tenant(db, email=demo_email, tenant_id=demo_tenant.id)
         
         if not demo_user:
             # Create a demo user with a standard password
-            logger.info("Creating new demo user")
+            logger.info(f"Creating new demo user for tenant: {demo_tenant.name}")
             user_create = UserCreate(
-                email="demo@example.com",
-                name="Demo User",
+                email=demo_email,
+                name=f"{demo_tenant.name} Demo User",
                 hashed_password=get_password_hash("demo12345"),
                 auth_provider="password",
                 title="Product Manager",
-                avatar_url="https://i.pravatar.cc/150?u=demo@example.com"
+                avatar_url=f"https://i.pravatar.cc/150?u={demo_email}"
             )
             demo_user = await user_crud.create(db, obj_in=user_create, tenant_id=demo_tenant.id)
         
@@ -348,7 +325,7 @@ async def get_demo_login_token(db: AsyncSession) -> Token:
         logger.info("Updating last login timestamp")
         await user_crud.update_last_login(db, user_id=demo_user.id)
         
-        logger.info("Demo login process completed successfully")
+        logger.info(f"Demo login process completed successfully for tenant: {demo_tenant.name}")
         return Token(
             access_token=access_token,
             token_type="bearer",
@@ -359,6 +336,11 @@ async def get_demo_login_token(db: AsyncSession) -> Token:
         logger.error(f"Error in get_demo_login_token: {str(e)}")
         if hasattr(e, "__cause__") and e.__cause__:
             logger.error(f"Caused by: {str(e.__cause__)}")
+        
+        # Re-raise with a more specific error message
+        if "relation" in str(e) and "does not exist" in str(e):
+            logger.error("Database schema is not initialized. Run migrations first.")
+            raise AuthError("Database schema not initialized. Please run migrations.", 500)
         
         # Re-raise the exception
         raise

@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, validator
 
 
@@ -6,6 +7,7 @@ class PasswordLoginRequest(BaseModel):
     """Schema for password-based login requests."""
     email: EmailStr
     password: str = Field(..., min_length=8)
+    tenant_id: Optional[UUID] = None  # Optional tenant ID for multi-tenant selection
 
 
 class DemoUserCreate(BaseModel):

@@ -8,6 +8,7 @@ from app import crud, models, schemas
 from app.crud.crud_notification import notification, notification_preference
 from app.models.notification import Notification
 from app.core.delta_stream import delta_stream_service
+from app.schemas.notification import NotificationType, NotificationPriority
 
 
 class NotificationService:
@@ -263,6 +264,280 @@ class NotificationService:
         
         return notification_obj
     
+    def create_strategic_alignment_notification(
+        self,
+        db: Session,
+        *,
+        tenant_id: uuid.UUID,
+        notification_type: str,  # "misalignment", "recommendation", "impact"
+        title: str,
+        message: str,
+        severity: str,
+        entity_type: str,
+        entity_id: uuid.UUID,
+        action_url: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        recipient_ids: List[uuid.UUID]
+    ) -> Notification:
+        """
+        Create a notification for strategic alignment events.
+        
+        Args:
+            db: Database session
+            tenant_id: Tenant ID
+            notification_type: Type of strategic alignment notification
+            title: Notification title
+            message: Notification message
+            severity: Severity level
+            entity_type: Type of entity
+            entity_id: ID of the entity
+            action_url: URL for action
+            metadata: Additional metadata
+            recipient_ids: List of user IDs to receive the notification
+            
+        Returns:
+            Created notification
+        """
+        # Create notification data
+        notification_data = schemas.notification.NotificationCreate(
+            type="strategic_alignment",
+            subtype=notification_type,
+            severity=severity,
+            title=title,
+            message=message,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action_url=action_url,
+            metadata=metadata or {}
+        )
+        
+        # Create notification and assign recipients
+        notification_obj = notification.create_with_recipients(
+            db=db,
+            obj_in=notification_data,
+            tenant_id=tenant_id,
+            recipient_ids=recipient_ids
+        )
+        
+        # Send real-time notification via WebSocket
+        self._send_realtime_notification(
+            db=db,
+            notification_obj=notification_obj,
+            recipient_ids=recipient_ids
+        )
+        
+        return notification_obj
+    
+    def create_misalignment_notification(
+        self,
+        db: Session,
+        *,
+        tenant_id: uuid.UUID,
+        misalignment_id: int,
+        misalignment_type: str,
+        description: str,
+        severity: str,
+        affected_entities: Dict[str, List[int]],
+        recipient_ids: List[uuid.UUID]
+    ) -> Notification:
+        """
+        Create a notification for misalignment detection.
+        
+        Args:
+            db: Database session
+            tenant_id: Tenant ID
+            misalignment_id: The ID of the misalignment
+            misalignment_type: The type of misalignment
+            description: The description of the misalignment
+            severity: The severity of the misalignment
+            affected_entities: The affected entities
+            recipient_ids: List of user IDs to receive the notification
+            
+        Returns:
+            Created notification
+        """
+        # Map misalignment type to title
+        title_map = {
+            "unaligned_project": "Unaligned Project Detected",
+            "conflicting_goals": "Conflicting Goals Detected",
+            "resource_misallocation": "Resource Misallocation Detected",
+            "strategic_gap": "Strategic Gap Detected",
+            "duplicated_effort": "Duplicated Effort Detected"
+        }
+        
+        # Create notification
+        return self.create_strategic_alignment_notification(
+            db=db,
+            tenant_id=tenant_id,
+            notification_type="misalignment",
+            title=title_map.get(misalignment_type, "Strategic Misalignment Detected"),
+            message=description,
+            severity=severity,
+            entity_type="misalignment",
+            entity_id=misalignment_id,
+            action_url=f"/dashboard/strategic-alignment/misalignments/{misalignment_id}",
+            metadata={
+                "misalignment_type": misalignment_type,
+                "severity": severity,
+                "affected_entities": affected_entities
+            },
+            recipient_ids=recipient_ids
+        )
+    
+    def create_recommendation_notification(
+        self,
+        db: Session,
+        *,
+        tenant_id: uuid.UUID,
+        recommendation_id: int,
+        recommendation_type: str,
+        title: str,
+        description: str,
+        difficulty: str,
+        project_id: Optional[int] = None,
+        recipient_ids: List[uuid.UUID]
+    ) -> Notification:
+        """
+        Create a notification for strategic recommendations.
+        
+        Args:
+            db: Database session
+            tenant_id: Tenant ID
+            recommendation_id: The ID of the recommendation
+            recommendation_type: The type of recommendation
+            title: The recommendation title
+            description: The recommendation description
+            difficulty: The difficulty of implementing the recommendation
+            project_id: Optional related project ID
+            recipient_ids: List of user IDs to receive the notification
+            
+        Returns:
+            Created notification
+        """
+        # Map severity based on difficulty
+        severity_map = {
+            "easy": "info",
+            "medium": "warning",
+            "hard": "critical"
+        }
+        
+        # Build action link
+        action_url = f"/dashboard/strategic-alignment/recommendations/{recommendation_id}"
+        if project_id:
+            action_url = f"/dashboard/projects/{project_id}/recommendations/{recommendation_id}"
+        
+        # Create notification
+        return self.create_strategic_alignment_notification(
+            db=db,
+            tenant_id=tenant_id,
+            notification_type="recommendation",
+            title=f"New Recommendation: {title}",
+            message=description,
+            severity=severity_map.get(difficulty, "warning"),
+            entity_type="recommendation",
+            entity_id=recommendation_id,
+            action_url=action_url,
+            metadata={
+                "recommendation_type": recommendation_type,
+                "difficulty": difficulty,
+                "project_id": project_id
+            },
+            recipient_ids=recipient_ids
+        )
+    
+    def notify_management_about_misalignment(
+        self,
+        db: Session,
+        *,
+        tenant_id: uuid.UUID,
+        misalignment_id: int,
+        misalignment_type: str,
+        description: str,
+        severity: str,
+        affected_entities: Dict[str, List[int]]
+    ) -> List[Notification]:
+        """
+        Notify relevant managers about a misalignment.
+        
+        Args:
+            db: Database session
+            tenant_id: Tenant ID
+            misalignment_id: The ID of the misalignment
+            misalignment_type: The type of misalignment
+            description: The description of the misalignment
+            severity: The severity of the misalignment
+            affected_entities: The affected entities
+            
+        Returns:
+            List of created notifications
+        """
+        notifications_created = []
+        notified_users = set()
+        
+        # Find managers for affected projects
+        if "projects" in affected_entities and affected_entities["projects"]:
+            for project_id in affected_entities["projects"]:
+                # Find project owner
+                project = crud.project.get(db=db, id=project_id)
+                if project and project.owner_id and project.owner_id not in notified_users:
+                    # Create notification for project owner
+                    notification_obj = self.create_misalignment_notification(
+                        db=db,
+                        tenant_id=tenant_id,
+                        misalignment_id=misalignment_id,
+                        misalignment_type=misalignment_type,
+                        description=description,
+                        severity=severity,
+                        affected_entities=affected_entities,
+                        recipient_ids=[project.owner_id]
+                    )
+                    notifications_created.append(notification_obj)
+                    notified_users.add(project.owner_id)
+        
+        # Find managers for affected teams
+        if "teams" in affected_entities and affected_entities["teams"]:
+            for team_id in affected_entities["teams"]:
+                # Find team lead
+                team = crud.team.get(db=db, id=team_id)
+                if team and team.lead_id and team.lead_id not in notified_users:
+                    # Create notification for team lead
+                    notification_obj = self.create_misalignment_notification(
+                        db=db,
+                        tenant_id=tenant_id,
+                        misalignment_id=misalignment_id,
+                        misalignment_type=misalignment_type,
+                        description=description,
+                        severity=severity,
+                        affected_entities=affected_entities,
+                        recipient_ids=[team.lead_id]
+                    )
+                    notifications_created.append(notification_obj)
+                    notified_users.add(team.lead_id)
+        
+        # If critical severity, notify tenant admins
+        if severity.lower() == "critical":
+            admin_users = crud.user.get_tenant_admins(db=db, tenant_id=tenant_id)
+            admin_ids = [
+                admin.id for admin in admin_users 
+                if admin.id not in notified_users
+            ]
+            
+            if admin_ids:
+                notification_obj = self.create_misalignment_notification(
+                    db=db,
+                    tenant_id=tenant_id,
+                    misalignment_id=misalignment_id,
+                    misalignment_type=misalignment_type,
+                    description=description,
+                    severity=severity,
+                    affected_entities=affected_entities,
+                    recipient_ids=admin_ids
+                )
+                notifications_created.append(notification_obj)
+                notified_users.update(admin_ids)
+        
+        return notifications_created
+    
     def _send_realtime_notification(
         self,
         db: Session,
@@ -301,6 +576,7 @@ class NotificationService:
             notification_data = {
                 "id": str(notification_obj.id),
                 "type": notification_obj.type,
+                "subtype": notification_obj.subtype,
                 "severity": notification_obj.severity,
                 "title": notification_obj.title,
                 "message": notification_obj.message,
@@ -309,7 +585,8 @@ class NotificationService:
                 "dismissed_at": recipient.dismissed_at.isoformat() if recipient.dismissed_at else None,
                 "entity_type": notification_obj.entity_type,
                 "entity_id": str(notification_obj.entity_id) if notification_obj.entity_id else None,
-                "action_url": notification_obj.action_url
+                "action_url": notification_obj.action_url,
+                "metadata": notification_obj.metadata
             }
             
             # Send via delta stream

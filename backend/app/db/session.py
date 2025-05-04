@@ -13,6 +13,15 @@ def get_db_url():
         # Inside container: Use settings from config.py
         from app.core.config import settings 
         print("[Session] Running in container, using settings URL")
+        # Add debug info about PostgreSQL authentication
+        import pwd
+        try:
+            current_user = pwd.getpwuid(os.getuid()).pw_name
+            print(f"[Session] DEBUG: Current process running as OS user: {current_user}")
+            print(f"[Session] DEBUG: UID={os.getuid()}, GID={os.getgid()}")
+            print(f"[Session] DEBUG: DB User in settings: {settings.POSTGRES_USER}")
+        except Exception as e:
+            print(f"[Session] DEBUG: Error getting user info: {e}")
         return str(settings.SQLALCHEMY_DATABASE_URI)
     else:
         # Local execution (e.g., scripts): Construct local URL

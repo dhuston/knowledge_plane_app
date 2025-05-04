@@ -65,14 +65,31 @@ class CRUDTenant(): # Remove inheritance from CRUDBase
             safe_name = '-'.join(filter(None, safe_name.split('-')))
             domain = f"{safe_name}.demo.biosphere.ai"
         
-        # Create tenant data
+        # Create tenant data with enhanced demo settings
         tenant_data = TenantCreate(
             name=name,
             domain=domain,
             is_active=True,
             settings={
                 "demo_mode": True,
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "features": {
+                    "advanced_analytics": True,
+                    "collaboration": True,
+                    "integration_framework": True,
+                    "spatial_mapping": True,
+                    "knowledge_management": True
+                },
+                "usage_limits": {
+                    "max_users": 50,
+                    "max_projects": 100,
+                    "max_storage_gb": 10
+                },
+                "branding": {
+                    "primary_color": "#1E88E5",
+                    "secondary_color": "#26A69A",
+                    "logo_url": "https://placekitten.com/200/200"  # Placeholder logo
+                }
             }
         )
         

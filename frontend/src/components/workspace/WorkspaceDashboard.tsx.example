@@ -1,0 +1,98 @@
+import React from 'react';
+import {
+  Grid,
+  GridItem,
+  Heading,
+  Box,
+  Text,
+  Flex,
+  useColorModeValue
+} from '@chakra-ui/react';
+import { InsightsProvider } from '../../context/InsightsContext';
+import InsightsSummary from '../insights/InsightsSummary';
+
+// Import other dashboard components
+import TeamActivity from './activity/TeamActivity';
+import DailyBriefing from './briefing/DailyBriefing';
+import QuickActions from './actions/QuickActions';
+import WelcomePanel from './welcome/WelcomePanel';
+
+/**
+ * Main workspace dashboard component that includes the InsightsSummary component
+ */
+const WorkspaceDashboard = () => {
+  const bgColor = useColorModeValue('gray.50', 'gray.900');
+  const cardBgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  
+  return (
+    <Box bg={bgColor} minH="100vh" p={5}>
+      <Heading size="lg" mb={6}>My Workspace</Heading>
+      
+      <Grid
+        templateColumns={{ base: "1fr", lg: "repeat(3, 1fr)" }}
+        gap={5}
+      >
+        {/* Welcome Panel - Spans 2 columns on large screens */}
+        <GridItem colSpan={{ base: 1, lg: 2 }}>
+          <WelcomePanel />
+        </GridItem>
+        
+        {/* Quick Actions */}
+        <GridItem>
+          <Box
+            p={4}
+            bg={cardBgColor}
+            borderRadius="lg"
+            boxShadow="sm"
+            borderWidth="1px"
+            borderColor={borderColor}
+            height="100%"
+          >
+            <Heading size="md" mb={4}>Quick Actions</Heading>
+            <QuickActions />
+          </Box>
+        </GridItem>
+        
+        {/* Daily Briefing */}
+        <GridItem>
+          <Box
+            p={4}
+            bg={cardBgColor}
+            borderRadius="lg"
+            boxShadow="sm"
+            borderWidth="1px"
+            borderColor={borderColor}
+          >
+            <Heading size="md" mb={4}>Daily Briefing</Heading>
+            <DailyBriefing />
+          </Box>
+        </GridItem>
+        
+        {/* Team Activity */}
+        <GridItem>
+          <Box
+            p={4}
+            bg={cardBgColor}
+            borderRadius="lg"
+            boxShadow="sm"
+            borderWidth="1px" 
+            borderColor={borderColor}
+          >
+            <Heading size="md" mb={4}>Team Activity</Heading>
+            <TeamActivity />
+          </Box>
+        </GridItem>
+        
+        {/* AI Insights - Full width on larger screens */}
+        <GridItem colSpan={{ base: 1, lg: 3 }}>
+          <InsightsProvider>
+            <InsightsSummary maxInsights={3} />
+          </InsightsProvider>
+        </GridItem>
+      </Grid>
+    </Box>
+  );
+};
+
+export default WorkspaceDashboard;

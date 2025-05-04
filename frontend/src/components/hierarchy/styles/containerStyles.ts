@@ -5,7 +5,7 @@
 
 // Navigator container style
 export const navigatorStyles = {
-  width: '60px',
+  width: '64px',
   height: '100%',
   borderRightWidth: '1px',
   borderRightStyle: 'solid',

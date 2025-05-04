@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, Table, Column, String, DateTime, MetaData, insert
+from sqlalchemy import select, update, Table, Column, String, DateTime, MetaData, insert
 from sqlalchemy.dialects.postgresql import insert
 from uuid import UUID
 from sqlalchemy.future import select
@@ -146,6 +146,15 @@ class CRUDUser():
     async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[UserModel]:
         # TODO: Add relationship loading option?
         return await get_user_by_email(db, email=email)
+        
+    async def get_by_email_and_tenant(self, db: AsyncSession, *, email: str, tenant_id: UUID) -> Optional[UserModel]:
+        """Get a user by email within a specific tenant."""
+        stmt = select(UserModel).where(
+            UserModel.email == email,
+            UserModel.tenant_id == tenant_id
+        )
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def get_by_auth_id(self, db: AsyncSession, auth_provider: str, auth_provider_id: str) -> UserModel | None:
         return await get_user_by_auth_id(db, auth_provider=auth_provider, auth_provider_id=auth_provider_id)
