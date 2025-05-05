@@ -77,14 +77,18 @@ export const useLayoutWorker = (): UseLayoutWorkerReturn => {
             const forceAtlas2 = require('graphology-layout-forceatlas2').default;
             
             forceAtlas2.assign(graph, {
-              iterations: options?.iterations || 150,
+              iterations: options?.iterations || 200,
               settings: options?.settings || {
-                slowDown: 5,
-                gravity: 1.5,
+                slowDown: 8,  // Increased to slow down node movements
+                gravity: 0.8, // Reduced gravity to prevent excessive clustering
+                strongGravityMode: false, // Disable strong gravity which can cause clumping
                 barnesHutOptimize: true,
-                linLogMode: true,
+                linLogMode: false, // Disabled for more uniform spacing
                 outboundAttractionDistribution: true,
                 adjustSizes: true,
+                scalingRatio: 3.0, // Increased to create more space between nodes
+                edgeWeightInfluence: 1.0, // Consider edge weights for better structure
+                preventOverlap: true, // Prevent nodes from overlapping
               }
             });
             

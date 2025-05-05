@@ -24,25 +24,48 @@ async def get_organization_structure(
     """
     logger.info(f"Generating organization structure for user {current_user.name} in tenant {current_user.tenant_id}")
     
-    # Get tenant name to customize the organization
+    # Get tenant name to customize the organization - avoid lazy loading relationship
     tenant_name = getattr(current_user, 'tenant_name', None)
-    if not tenant_name and hasattr(current_user, 'tenant'):
-        tenant_name = getattr(current_user.tenant, 'name', None)
+    # Use tenant_id instead of accessing tenant relationship directly to avoid MissingGreenlet error
+    tenant_id = getattr(current_user, 'tenant_id', None)
     
-    # Set organization name based on tenant if available
-    org_name = tenant_name if tenant_name else "Biosphere Corporation"
+    # Set organization name based on tenant_id if available
+    if tenant_id:
+        # Map common tenant IDs to names
+        tenant_map = {
+            1: "Tech Innovations Inc.",
+            2: "Pharma AI Research",
+            3: "Metropolitan Health System",
+            4: "Global Financial Group",
+            5: "Advanced Manufacturing Corp",
+            6: "University Research Alliance"
+        }
+        # Use tenant_id for lookup instead of the relationship
+        org_name = tenant_map.get(tenant_id, tenant_name or "Biosphere Corporation")
+    else:
+        org_name = tenant_name if tenant_name else "Biosphere Corporation"
     
     # Get IDs from current user for hierarchy
     user_id = str(current_user.id)
     team_id = str(current_user.team_id) if current_user.team_id else None
     
     # Set up industry-specific data based on tenant name
-    is_pharma = "pharma" in org_name.lower() if org_name else False
-    is_tech = "tech" in org_name.lower() or "innovation" in org_name.lower() if org_name else False
-    is_healthcare = "health" in org_name.lower() or "medical" in org_name.lower() if org_name else False
-    is_financial = "financial" in org_name.lower() or "bank" in org_name.lower() if org_name else False
-    is_manufacturing = "manufacturing" in org_name.lower() if org_name else False
-    is_education = "university" in org_name.lower() or "education" in org_name.lower() if org_name else False
+    # Default values
+    is_pharma = False
+    is_tech = True  # Default to tech industry
+    is_healthcare = False
+    is_financial = False
+    is_manufacturing = False
+    is_education = False
+    
+    # Check the industry from the organization name if we have one
+    if org_name:
+        is_pharma = "pharma" in org_name.lower()
+        is_tech = "tech" in org_name.lower() or "innovation" in org_name.lower()
+        is_healthcare = "health" in org_name.lower() or "medical" in org_name.lower()
+        is_financial = "financial" in org_name.lower() or "bank" in org_name.lower()
+        is_manufacturing = "manufacturing" in org_name.lower()
+        is_education = "university" in org_name.lower() or "education" in org_name.lower()
     
     # Default to tech if no industry detected
     if not any([is_pharma, is_tech, is_healthcare, is_financial, is_manufacturing, is_education]):
@@ -369,23 +392,43 @@ async def get_organization_unit(
     
     # First check for common unit IDs (organization, divisions, departments)
     
-    # Get tenant name to customize the organization
+    # Get tenant name to customize the organization - avoid lazy loading relationship
     tenant_name = getattr(current_user, 'tenant_name', None)
-    if not tenant_name and hasattr(current_user, 'tenant'):
-        tenant_name = getattr(current_user.tenant, 'name', None)
+    # Use tenant_id instead of accessing tenant relationship directly to avoid MissingGreenlet error
+    tenant_id = getattr(current_user, 'tenant_id', None)
     
-    # Set organization name based on tenant if available
-    org_name = tenant_name if tenant_name else "Biosphere Corporation"
+    # Set organization name based on tenant_id if available
+    if tenant_id:
+        # Map common tenant IDs to names
+        tenant_map = {
+            1: "Tech Innovations Inc.",
+            2: "Pharma AI Research",
+            3: "Metropolitan Health System",
+            4: "Global Financial Group",
+            5: "Advanced Manufacturing Corp",
+            6: "University Research Alliance"
+        }
+        # Use tenant_id for lookup instead of the relationship
+        org_name = tenant_map.get(tenant_id, tenant_name or "Biosphere Corporation")
+    else:
+        org_name = tenant_name if tenant_name else "Biosphere Corporation"
+    
+    # Default values for industry flags
     is_tech = True  # Default to tech industry
+    is_pharma = False
+    is_healthcare = False
+    is_financial = False
+    is_manufacturing = False
+    is_education = False
     
     # Check the industry from the organization name
-    if tenant_name:
-        is_pharma = "pharma" in org_name.lower() if org_name else False
-        is_tech = "tech" in org_name.lower() or "innovation" in org_name.lower() if org_name else True
-        is_healthcare = "health" in org_name.lower() or "medical" in org_name.lower() if org_name else False
-        is_financial = "financial" in org_name.lower() or "bank" in org_name.lower() if org_name else False
-        is_manufacturing = "manufacturing" in org_name.lower() if org_name else False
-        is_education = "university" in org_name.lower() or "education" in org_name.lower() if org_name else False
+    if org_name:
+        is_pharma = "pharma" in org_name.lower()
+        is_tech = "tech" in org_name.lower() or "innovation" in org_name.lower()
+        is_healthcare = "health" in org_name.lower() or "medical" in org_name.lower()
+        is_financial = "financial" in org_name.lower() or "bank" in org_name.lower()
+        is_manufacturing = "manufacturing" in org_name.lower()
+        is_education = "university" in org_name.lower() or "education" in org_name.lower()
     
     # Get structure data for the requested unit
     # Note: In a real implementation, we would query this from a database

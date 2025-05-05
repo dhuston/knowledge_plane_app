@@ -78,11 +78,13 @@ const useDeltaStream = (onMessage?: (data: DeltaData) => void) => {
       maxRetries: 5, // Reduced max retries
     };
 
+    // Calculate WebSocket URL
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname === 'localhost' ? 'localhost:8001' : window.location.host;
     const wsUrl = `${protocol}//${host}/api/v1/ws/delta?token=${encodeURIComponent(token || '')}`;
     
-    console.log('Connecting to WebSocket:', wsUrl.replace(/token=.*/, 'token=REDACTED'));
+    // Avoid logging token information, even if redacted
+    const redactedUrl = wsUrl.replace(/token=.*/, 'token=REDACTED');
     const ws = new ReconnectingWebSocket(wsUrl, [], wsOptions);
     wsRef.current = ws;
 

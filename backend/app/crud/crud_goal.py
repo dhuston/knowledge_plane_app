@@ -162,6 +162,16 @@ class CRUDGoal():
     ) -> List[Row]:
         # Note: skip isn't used in the standalone function currently, added limit
         return await get_goals_for_team(db=db, team_id=team_id, tenant_id=tenant_id, limit=limit)
+        
+    async def get_aligned_project_ids(self, db: AsyncSession, goal: GoalModel) -> List[UUID]:
+        """Returns a list of project IDs aligned to this goal."""
+        # This implementation relies on the direct relationship in the Project model
+        stmt = (
+            select(ProjectModel.id)
+            .where(ProjectModel.goal_id == goal.id)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
 
 # Removed model from instantiation
 goal = CRUDGoal() 

@@ -1,16 +1,21 @@
 // src/api/client.ts
 
+import { 
+  AppError, 
+  ErrorCategory, 
+  createApiError, 
+  logError 
+} from '../utils/errorHandling';
+
 // Get backend API base URL from environment variable with fallback
 // IMPORTANT: Standardizing across the app to use base URL WITHOUT "/api/v1" 
 // This avoids path duplication issues
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (window.location.protocol === 'https:' 
   ? "https://localhost:8001" 
   : "http://localhost:8001");
-  
-console.log(`API base URL: ${API_BASE_URL}`);
 
 /**
- * API client for making HTTP requests to the backend
+ * API client for making HTTP requests to the backend with enhanced error handling
  */
 export const apiClient = {
     /**
@@ -20,7 +25,7 @@ export const apiClient = {
      * @returns Promise with the response data
      */
     async get<T>(endpoint: string, options?: RequestInit): Promise<T> {
-        return await request<T>(endpoint, { ...options, method: 'GET' });
+        return await request<T>(endpoint, { ...options, method: 'GET' }, 'fetching data');
     },
     
     /**
@@ -36,7 +41,7 @@ export const apiClient = {
             method: 'POST', 
             body: JSON.stringify(body),
             headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) }
-        });
+        }, 'creating resource');
     },
     
     /**
@@ -52,7 +57,7 @@ export const apiClient = {
             method: 'PUT',
             body: JSON.stringify(body),
             headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) }
-        });
+        }, 'updating resource');
     },
     
     /**
@@ -65,7 +70,7 @@ export const apiClient = {
         return await request<T>(endpoint, {
             ...options,
             method: 'DELETE'
-        });
+        }, 'deleting resource');
     },
     
     /**
@@ -81,101 +86,208 @@ export const apiClient = {
             method: 'PATCH',
             body: JSON.stringify(body),
             headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) }
+        }, 'patching resource');
+    },
+
+    /**
+     * Check if a specific API endpoint is available
+     * @param endpoint - API endpoint to check
+     * @returns Promise resolving to true if API is available, false otherwise
+     */
+    async isEndpointAvailable(endpoint: string): Promise<boolean> {
+      try {
+        const url = buildUrl(endpoint);
+        const response = await fetch(url, { 
+          method: 'HEAD', 
+          cache: 'no-store',
+          headers: { 'X-Availability-Check': 'true' }
         });
+        return response.ok;
+      } catch (error) {
+        return false;
+      }
+    },
+
+    /**
+     * Check if the API is generally available (health check)
+     * @returns Promise resolving to true if API is available, false otherwise
+     */
+    async isApiAvailable(): Promise<boolean> {
+      try {
+        return await this.isEndpointAvailable('/api/v1/health');
+      } catch (_) {
+        return false;
+      }
     }
 };
 
 /**
- * Main request function that handles authentication and response processing
- * @param endpoint - API endpoint path
- * @param options - Request options
- * @returns Promise with the response data
+ * Builds a full URL from API base and endpoint
  */
-async function request<T>(endpoint: string, options: RequestInit): Promise<T> {
-    // Normalize endpoint paths to ensure they work with the API base URL
-    let url = '';
-
-    // NEW IMPLEMENTATION: Simply ensure the endpoint always begins with /api/v1
-    // since we've standardized API_BASE_URL to NOT include this prefix
+function buildUrl(endpoint: string): string {
+    // Normalize endpoint paths
     const normalizedEndpoint = endpoint.startsWith('/api/v1') 
         ? endpoint 
         : `/api/v1${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 
     // Add the normalized endpoint to the base URL
     if (API_BASE_URL.endsWith('/') && normalizedEndpoint.startsWith('/')) {
-        url = `${API_BASE_URL}${normalizedEndpoint.substring(1)}`;
+        return `${API_BASE_URL}${normalizedEndpoint.substring(1)}`;
     } else if (!API_BASE_URL.endsWith('/') && !normalizedEndpoint.startsWith('/')) {
-        url = `${API_BASE_URL}/${normalizedEndpoint}`;
+        return `${API_BASE_URL}/${normalizedEndpoint}`;
     } else {
-        url = `${API_BASE_URL}${normalizedEndpoint}`;
+        return `${API_BASE_URL}${normalizedEndpoint}`;
     }
-    
-    console.log(`Making API request to: ${url}`);
-    
+}
+
+/**
+ * Enhanced request function that handles authentication, response processing, and structured error handling
+ * @param endpoint - API endpoint path
+ * @param options - Request options
+ * @param operation - Description of the operation for error context
+ * @returns Promise with the response data
+ */
+async function request<T>(endpoint: string, options: RequestInit, operation = 'API request'): Promise<T> {
+    const url = buildUrl(endpoint);
     const headers = new Headers(options.headers || {});
     
+    // Add authentication token if available
     const token = localStorage.getItem('knowledge_plane_token');
     if (token) {
-        console.log(`API request adding auth token to ${url} (token length: ${token.length})`);
-        console.log(`Token preview: ${token.substring(0, 15)}...`);
         headers.append('Authorization', `Bearer ${token}`);
-    } else {
-        console.log(`API request to ${url} has no auth token!`);
     }
 
     // Include credentials to enable cookie-based authentication
     const config: RequestInit = {
         ...options,
         headers,
-        credentials: 'include', // Include credentials for CORS requests to support cookies
+        credentials: 'include',
     };
-    
+
     try {
-        const response = await fetch(url, config);
+        // Start the request with timeout handling
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
         
-        // Enhanced error logging for debugging
+        const response = await fetch(url, {
+            ...config,
+            signal: abortController.signal
+        });
+        
+        clearTimeout(timeoutId);
+
+        // Create structured error for unsuccessful responses
         if (!response.ok) {
-            console.error(`[Debug] API error for ${url} - Status: ${response.status}`);
+            let errorData: any = {};
+            let errorText = '';
             
-            let errorData;
             try {
                 errorData = await response.json();
-                console.error('[Debug] Error details:', errorData);
-            } catch (parseError) {
-                console.error('[Debug] Could not parse error response as JSON:', parseError);
-                // Fallback to text if JSON parsing fails
+            } catch (_) {
                 try {
-                    const textError = await response.text();
-                    console.error('[Debug] Error response text:', textError.substring(0, 500));
-                } catch (textError) {
-                    console.error('[Debug] Could not read error response as text:', textError);
+                    errorText = await response.text();
+                    // If response is HTML or too long, use a generic message instead
+                    if (errorText.includes('<html') || errorText.length > 500) {
+                        errorText = `Server returned ${response.status} ${response.statusText}`;
+                    }
+                } catch (_) {
+                    errorText = `Server returned ${response.status} ${response.statusText}`;
                 }
             }
             
-            // Throw standardized error with status code and message
-            throw new Error(errorData?.detail || `HTTP error! status: ${response.status}`);
+            const detail = errorData?.detail || errorData?.message || errorData?.error || errorText;
+            let category: ErrorCategory;
+            
+            // Categorize based on status code
+            switch (response.status) {
+                case 401:
+                    category = ErrorCategory.AUTHENTICATION;
+                    break;
+                case 403:
+                    category = ErrorCategory.AUTHORIZATION;
+                    break;
+                case 404:
+                    category = ErrorCategory.NOT_FOUND;
+                    break;
+                case 422:
+                    category = ErrorCategory.VALIDATION;
+                    break;
+                default:
+                    category = response.status >= 500 
+                        ? ErrorCategory.SERVER 
+                        : ErrorCategory.UNKNOWN;
+            }
+            
+            // Create structured AppError with appropriate metadata
+            const appError = new AppError(
+                detail || `Error ${response.status} while ${operation}`,
+                category,
+                { status: response.status, data: errorData }
+            );
+            
+            // Add additional details to the error object
+            appError.status = response.status;
+            appError.endpoint = endpoint;
+            appError.responseData = errorData;
+            
+            // Log the error for debugging, but without exposing sensitive information
+            logError(appError, `API:${options.method || 'GET'}:${endpoint}`);
+            
+            throw appError;
         }
 
+        // Handle 204 No Content responses
         if (response.status === 204) {
-            return null as T; 
+            return null as T;
         }
 
-        // Log the response for debugging
-        if (endpoint.includes('notification')) {
-            console.log(`[Debug] Response for ${url}:`, response);
+        // Parse successful responses
+        try {
+            const data = await response.json() as T;
+            return data;
+        } catch (parseError) {
+            const error = new AppError(
+                `Failed to parse response from ${endpoint}`, 
+                ErrorCategory.SERVER,
+                parseError
+            );
+            logError(error, 'API:JSON-parse');
+            throw error;
         }
-
-        const data = await response.json() as T;
-        
-        // For debugging notification-related responses
-        if (endpoint.includes('notification')) {
-            console.log(`[Debug] Processed data for ${url}:`, data);
-        }
-        
-        return data;
     } catch (error) {
-        // Enhanced error logging
-        console.error(`[Debug] Request failed for ${url}:`, error);
-        throw error;
+        // Handle fetch errors (network issues, timeouts, etc.)
+        if (error instanceof AppError) {
+            // Re-throw AppErrors that we created above
+            throw error;
+        }
+        
+        // Convert other errors to AppError with appropriate categorization
+        if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('network'))) {
+            throw new AppError(
+                `Network error while ${operation}: The server may be unavailable`,
+                ErrorCategory.NETWORK,
+                error
+            );
+        }
+        
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw new AppError(
+                `Request timeout while ${operation}`,
+                ErrorCategory.NETWORK,
+                error
+            );
+        }
+        
+        // Generic error handling for other cases
+        throw createApiError(error, operation);
+    }
+}
+
+// Add error handling types to AppError
+declare module '../utils/errorHandling' {
+    interface AppError {
+        status?: number;
+        endpoint?: string;
+        responseData?: any;
     }
 } 

@@ -365,16 +365,23 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           }
         });
       } catch (err: any) {
-        console.error(`Error fetching ${selectedNode.type} data:`, err);
-        if (isMounted()) {
-          // Log the error with context
-          logError(err, `ContextPanel-${selectedNode.type}`);
-          
-          // Set friendly error message
-          setError(extractErrorMessage(
-            err, 
-            `Failed to load ${selectedNode.type} details. Please try again later.`
-          ));
+        // Special handling for 404 errors - likely the entity doesn't exist in the database
+        if (err.response && err.response.status === 404) {
+          if (isMounted()) {
+            setError(`The selected ${selectedNode.type.toLowerCase()} no longer exists or could not be found.`);
+          }
+        } else {
+          console.error(`Error fetching ${selectedNode.type} data:`, err);
+          if (isMounted()) {
+            // Log the error with context
+            logError(err, `ContextPanel-${selectedNode.type}`);
+            
+            // Set friendly error message
+            setError(extractErrorMessage(
+              err, 
+              `Failed to load ${selectedNode.type} details. Please try again later.`
+            ));
+          }
         }
       } finally {
         if (isMounted()) {
@@ -829,22 +836,30 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Get entity-specific background accent color - moved outside of functional component
-  // Define color mappings outside of hook
-  const getEntityAccentColor = () => {
-    if (!selectedNode) return bgColor;
+  // Pre-define accent color mappings to avoid calling hooks inside a function
+  const userAccentColor = useColorModeValue('blue.50', 'blue.900');
+  const teamAccentColor = useColorModeValue('green.50', 'green.900');
+  const projectAccentColor = useColorModeValue('purple.50', 'purple.900');
+  const goalAccentColor = useColorModeValue('orange.50', 'orange.900');
+  const departmentAccentColor = useColorModeValue('cyan.50', 'cyan.900');
+  const knowledgeAssetAccentColor = useColorModeValue('yellow.50', 'yellow.900');
+  const defaultAccentColor = useColorModeValue('gray.50', 'gray.800');
+  
+  // Memoize the entity accent color mapping
+  const entityAccentColor = useMemo(() => {
+    if (!selectedNode) return defaultAccentColor;
     
     const colorMapping = {
-      [MapNodeTypeEnum.USER]: useColorModeValue('blue.50', 'blue.900'),
-      [MapNodeTypeEnum.TEAM]: useColorModeValue('green.50', 'green.900'),
-      [MapNodeTypeEnum.PROJECT]: useColorModeValue('purple.50', 'purple.900'),
-      [MapNodeTypeEnum.GOAL]: useColorModeValue('orange.50', 'orange.900'),
-      [MapNodeTypeEnum.DEPARTMENT]: useColorModeValue('cyan.50', 'cyan.900'),
-      [MapNodeTypeEnum.KNOWLEDGE_ASSET]: useColorModeValue('yellow.50', 'yellow.900')
+      [MapNodeTypeEnum.USER]: userAccentColor,
+      [MapNodeTypeEnum.TEAM]: teamAccentColor,
+      [MapNodeTypeEnum.PROJECT]: projectAccentColor,
+      [MapNodeTypeEnum.GOAL]: goalAccentColor,
+      [MapNodeTypeEnum.DEPARTMENT]: departmentAccentColor,
+      [MapNodeTypeEnum.KNOWLEDGE_ASSET]: knowledgeAssetAccentColor
     };
     
-    return colorMapping[selectedNode.type] || useColorModeValue('gray.50', 'gray.800');
-  };
+    return colorMapping[selectedNode.type] || defaultAccentColor;
+  }, [selectedNode?.type, userAccentColor, teamAccentColor, projectAccentColor, goalAccentColor, departmentAccentColor, knowledgeAssetAccentColor, defaultAccentColor]);
   
   // Update previous node reference
   useEffect(() => {
@@ -899,7 +914,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           left={0}
           right={0}
           height="8px"
-          bg={getEntityAccentColor}
+          bg={entityAccentColor}
           transition="background-color 0.5s ease"
           opacity={0.7}
         />

@@ -1,10 +1,27 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { ChakraProvider } from '@chakra-ui/react';
 import InsightsDailySummary from '../InsightsDailySummary';
 import { useInsights } from '../../../context/InsightsContext';
 import OpenAIService from '../../../services/OpenAIService';
+
+// Mock matchMedia for tests
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
 
 // Mock dependencies
 vi.mock('../../../context/InsightsContext');

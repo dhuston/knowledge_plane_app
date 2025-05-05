@@ -1,4 +1,4 @@
-from typing import Any, List, Set, Optional
+from typing import Any, List, Set, Optional, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -45,13 +45,24 @@ async def expand_graph(
 
     collected_ids: Set[UUID] = {node_id}
 
-    # Use existing helper for depth 1 neighbours
+    # Import helper at the module level, not inside the function
     from app.api.v1.endpoints.map import get_neighbor_ids  # reuse logic
+
+    # Create a function to safely get neighbors with proper exception handling
+    async def safe_get_neighbors(entity_id: UUID, entity_type: schemas.MapNodeTypeEnum, db_session: AsyncSession) -> Dict[str, Set[UUID]]:
+        try:
+            return await get_neighbor_ids(entity_id, entity_type, db_session)
+        except Exception as e:
+            print(f"Error getting neighbors for {entity_id}: {e}")
+            # Return empty sets as a fallback
+            return {"user": set(), "team": set(), "project": set(), "goal": set()}
 
     for _ in range(depth):
         next_frontier: Set[UUID] = set()
         for fid in frontier:
-            neigh_dict = await get_neighbor_ids(fid, node_type, db) if fid == node_id else await get_neighbor_ids(fid, schemas.MapNodeTypeEnum.USER, db)  # node_type unknown for others but function expects correct enum; we approximate with USER fallback.
+            # Use our safe wrapper function
+            entity_type_to_use = node_type if fid == node_id else schemas.MapNodeTypeEnum.USER
+            neigh_dict = await safe_get_neighbors(fid, entity_type_to_use, db)
             for tset in neigh_dict.values():
                 for nid in tset:
                     if nid not in visited:

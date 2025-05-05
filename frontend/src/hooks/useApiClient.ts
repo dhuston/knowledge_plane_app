@@ -33,7 +33,12 @@ const processQueue = (error: AxiosError | null) => {
  * Hook that provides an authenticated axios instance for API requests
  * @returns Axios instance configured for API requests with auth
  */
-export const useApiClient = (): AxiosInstance => {
+// Extend the AxiosInstance type to include our custom methods
+interface EnhancedAxiosInstance extends AxiosInstance {
+    isApiAvailable(): Promise<boolean>;
+}
+
+export const useApiClient = (): EnhancedAxiosInstance => {
     const { isAuthenticated, setAuthenticated } = useAuth();
 
     const apiClient = useMemo(() => {
@@ -45,6 +50,22 @@ export const useApiClient = (): AxiosInstance => {
             },
             withCredentials: true, // Critical for cookies
         });
+        
+        // Add isApiAvailable method to check if the API is available
+        const augmentedInstance: any = instance;
+        augmentedInstance.isApiAvailable = async (): Promise<boolean> => {
+            try {
+                // Check if the health endpoint is available
+                const response = await axios.get(`${API_BASE_URL}/api/v1/health`, { 
+                    timeout: 3000,
+                    validateStatus: (status) => status < 500 // Accept any non-server error
+                });
+                return response.status < 400; // Any 2xx or 3xx status is OK
+            } catch (error) {
+                console.error('API availability check failed:', error);
+                return false;
+            }
+        };
 
         /**
          * Fetch CSRF token from the server
@@ -180,7 +201,7 @@ export const useApiClient = (): AxiosInstance => {
             }
         );
 
-        return instance;
+        return augmentedInstance as EnhancedAxiosInstance;
     }, [isAuthenticated, setAuthenticated]);
 
     return apiClient;

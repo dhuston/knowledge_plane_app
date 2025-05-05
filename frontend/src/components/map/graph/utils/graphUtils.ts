@@ -84,9 +84,48 @@ export function processGraphData(
     // Store node type for edge processing
     nodeTypeMap.set(node.id, node.type);
     
-    // Get node positioning
-    const x = node.position?.x ?? Math.random() * 1000 - 500;
-    const y = node.position?.y ?? Math.random() * 1000 - 500;
+    // Get node positioning with improved initial layout
+    let x, y;
+    
+    if (node.position?.x !== undefined && node.position?.y !== undefined) {
+      // Use provided position if available
+      x = node.position.x;
+      y = node.position.y;
+    } else {
+      // Create more structured initial layout based on node type
+      // This helps the force-directed algorithm start from a better position
+      const angle = Math.random() * Math.PI * 2; // Random angle
+      const radius = 100 + Math.random() * 300;  // Varied distance from center
+      
+      // Position nodes in rough circular clusters by node type
+      // Add slight rotation based on node type to separate different entity types
+      switch (node.type) {
+        case MapNodeTypeEnum.USER:
+          x = Math.cos(angle) * radius * 1.2;
+          y = Math.sin(angle) * radius * 1.2;
+          break;
+        case MapNodeTypeEnum.TEAM:
+          x = Math.cos(angle + Math.PI/3) * radius * 1.5;
+          y = Math.sin(angle + Math.PI/3) * radius * 1.5;
+          break;
+        case MapNodeTypeEnum.PROJECT:
+          x = Math.cos(angle + Math.PI/1.5) * radius * 1.3;
+          y = Math.sin(angle + Math.PI/1.5) * radius * 1.3;
+          break;
+        case MapNodeTypeEnum.GOAL:
+          x = Math.cos(angle + Math.PI) * radius * 1.8;
+          y = Math.sin(angle + Math.PI) * radius * 1.8;
+          break;
+        case MapNodeTypeEnum.DEPARTMENT:
+          x = Math.cos(angle + Math.PI/6) * radius * 2;
+          y = Math.sin(angle + Math.PI/6) * radius * 2;
+          break;
+        default:
+          // Fallback to a more uniform circular layout
+          x = Math.cos(angle) * radius;
+          y = Math.sin(angle) * radius;
+      }
+    }
     
     // Get basic node attributes
     const attributes = {

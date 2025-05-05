@@ -319,28 +319,59 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
       const isLargeGraphDetected = nodeCount > 200;
       setIsLargeGraph(isLargeGraphDetected);
       
-      // Scale down iterations and adjust settings for larger graphs
+      // Adjust settings for larger graphs while maintaining spacing
       if (nodeCount > 500) {
-        // For very large graphs, use minimal iterations
+        // For very large graphs, optimize for performance
         iterations = 50;
-        settings.slowDown = 10;
-        settings.gravity = 2.0;
+        settings.slowDown = 12;
+        settings.gravity = 0.9;
+        settings.scalingRatio = 4.0; // Increase scaling ratio for more spacing
+        settings.preventOverlap = true;
+        settings.edgeWeightInfluence = 0.8; // Reduce edge influence for more even spacing
       } else if (nodeCount > 200) {
         // For medium graphs, use moderate iterations
         iterations = 100;
-        settings.slowDown = 8;
-        settings.gravity = 1.8;
+        settings.slowDown = 10;
+        settings.gravity = 0.8;
+        settings.scalingRatio = 3.5;
+        settings.preventOverlap = true;
+        settings.edgeWeightInfluence = 0.9;
       }
       
       console.log("SigmaGraphLoader: Setting initial node positions");
       // Set initial positions for nodes without defined positions
+      // Create a more structured initial layout by arranging nodes by type
+      
+      // Group nodes by type
+      const nodesByType = {};
       graph.nodes().forEach((nodeId) => {
-        if (!graph.hasNodeAttribute(nodeId, 'x') || !graph.hasNodeAttribute(nodeId, 'y')) {
-          // Use a consistent approach for all entity types - pure random positioning
-          // This prevents any predetermined layout patterns that might look like mock data
-          graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 1000);
-          graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 1000);
+        const nodeType = graph.getNodeAttribute(nodeId, 'entityType') || 'unknown';
+        if (!nodesByType[nodeType]) {
+          nodesByType[nodeType] = [];
         }
+        nodesByType[nodeType].push(nodeId);
+      });
+      
+      // Position nodes in a more structured way
+      Object.entries(nodesByType).forEach(([type, nodeIds], typeIndex) => {
+        const nodeCount = nodeIds.length;
+        
+        // For each type, arrange in a rough circular pattern with some variance
+        (nodeIds as string[]).forEach((nodeId, i) => {
+          if (!graph.hasNodeAttribute(nodeId, 'x') || !graph.hasNodeAttribute(nodeId, 'y')) {
+            // Create a circular layout for each type with different radii
+            const baseRadius = 300 + (typeIndex * 150);
+            const angle = (i / nodeCount) * 2 * Math.PI;
+            const radius = baseRadius + (Math.random() * 100);
+            
+            // Add a slight offset to avoid perfect circles
+            const xOffset = (Math.random() - 0.5) * 100;
+            const yOffset = (Math.random() - 0.5) * 100;
+            
+            graph.setNodeAttribute(nodeId, 'x', Math.cos(angle) * radius + xOffset);
+            graph.setNodeAttribute(nodeId, 'y', Math.sin(angle) * radius + yOffset);
+          }
+        });
       });
       
       // For large graphs, use the web worker for layout computation

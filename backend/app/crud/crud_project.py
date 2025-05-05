@@ -244,6 +244,26 @@ class CRUDProject():
         )
         result = await db.execute(stmt)
         return result.scalars().all()
+        
+    async def get_participant_ids(self, db: AsyncSession, project: ProjectModel) -> List[UUID]:
+        """Returns a list of user IDs that participate in this project."""
+        # This is a simplified implementation - in a real app, you would
+        # query a user_project or similar table.
+        from app.models.project import project_participants
+        
+        stmt = (
+            select(project_participants.c.user_id)
+            .where(project_participants.c.project_id == project.id)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+        
+    async def get_goal_ids(self, db: AsyncSession, project: ProjectModel) -> List[UUID]:
+        """Returns a list of goal IDs associated with this project."""
+        # If project has a direct goal relationship
+        if project.goal_id:
+            return [project.goal_id]
+        return []
 
 # Removed model from instantiation
 project = CRUDProject() 

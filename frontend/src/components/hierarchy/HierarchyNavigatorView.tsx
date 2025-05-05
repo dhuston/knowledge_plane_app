@@ -60,14 +60,14 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
   
   return (
     <Box 
-      width="64px"
+      width="68px"
       height="100%"
       bg={bgColor}
       borderRight="1px solid"
       borderColor={borderColor}
       boxShadow="0 2px 8px rgba(0, 0, 0, 0.08)"
       borderRadius="0px 4px 4px 0px"
-      padding="12px 8px"
+      padding="12px 10px"
       display="flex"
       flexDirection="column"
       alignItems="center"
@@ -86,8 +86,8 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
             icon={<FiSearch size="1.2rem" />}
             aria-label="Search organization"
             size="md"
-            width="44px"
-            height="44px"
+            width="48px"
+            height="48px"
             variant="ghost"
             borderRadius="6px" 
             onClick={onSearchToggle}
@@ -114,8 +114,8 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
         <Flex 
           justifyContent="center" 
           alignItems="center" 
-          width="44px" 
-          height="44px"
+          width="48px" 
+          height="48px"
           borderRadius="8px"
           bg={loadingBgColor}
         >
@@ -126,7 +126,7 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
       {/* Error message */}
       {error && (
         <InlineTooltip label={error} placement="right" delay={100}>
-          <Box width="44px" height="44px" display="flex" alignItems="center" justifyContent="center">
+          <Box width="48px" height="48px" display="flex" alignItems="center" justifyContent="center">
             <Alert status="error" variant="subtle" borderRadius="full" padding={1}>
               <AlertIcon />
             </Alert>
@@ -179,8 +179,8 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
             icon={<FiChevronUp size="1.2rem" />}
             aria-label="Navigate up the hierarchy"
             size="md"
-            width="44px"
-            height="44px"
+            width="48px"
+            height="48px"
             variant="ghost"
             borderRadius="6px"
             onClick={onNavigateUp}
@@ -194,8 +194,8 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
             icon={<FiCompass size="1.2rem" />}
             aria-label="Navigate to organization root"
             size="md"
-            width="44px"
-            height="44px"
+            width="48px"
+            height="48px"
             variant="ghost"
             borderRadius="6px"
             onClick={onNavigateToRoot}
