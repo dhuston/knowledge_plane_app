@@ -110,15 +110,10 @@ export const MapInteractionHandler: React.FC<MapInteractionHandlerProps> = ({
         analyticsEnabled={analyticsEnabled}
       />
       
-      {hoveredNodeData && hoveredPosition && (
+      {hoveredNodeData && (
         <NodeTooltip
-          node={hoveredNodeData}
-          position={hoveredPosition}
-          onViewDetails={(nodeId) => {
-            if (hoveredNodeData) {
-              handleNodeSelect(nodeId, hoveredNodeData.type);
-            }
-          }}
+          nodeId={hoveredNodeData.id}
+          nodes={[hoveredNodeData]} // Pass it as an array with just this node
         />
       )}
     </MapInteractionContext.Provider>

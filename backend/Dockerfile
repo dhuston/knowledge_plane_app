@@ -113,7 +113,7 @@ print(f"Python executable: {sys.executable}")
 print(f"sys.path: {sys.path}")
 
 # Check critical packages
-packages = ["geoalchemy2", "sqlalchemy", "shapely", "alembic"]
+packages = ["geoalchemy2", "sqlalchemy", "shapely", "alembic", "pkg_resources"]
 for pkg in packages:
     spec = importlib.util.find_spec(pkg)
     if spec:

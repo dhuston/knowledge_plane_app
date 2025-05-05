@@ -38,16 +38,22 @@ export const useLayoutWorker = (): UseLayoutWorkerReturn => {
   const [isComputing, setIsComputing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Initialize worker
+  // Initialize worker with error handling
   useEffect(() => {
-    // Create worker instance
-    const layoutWorker = new LayoutWorker();
-    setWorker(layoutWorker);
+    try {
+      // Create worker instance
+      const layoutWorker = new LayoutWorker();
+      setWorker(layoutWorker);
 
-    // Clean up function
-    return () => {
-      layoutWorker.terminate();
-    };
+      // Clean up function
+      return () => {
+        layoutWorker.terminate();
+      };
+    } catch (err) {
+      console.error("Failed to initialize layout worker:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      // Leave worker as null, computeLayout will use fallback
+    }
   }, []);
 
   // Function to compute layout in the worker

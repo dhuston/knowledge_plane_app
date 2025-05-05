@@ -1,6 +1,9 @@
 from typing import Any, Optional, Tuple, List
 from datetime import timedelta, timezone, datetime
 import time
+import json
+import traceback
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -86,7 +89,8 @@ async def login_password(
 @router.get("/demo-login", response_model=Token)
 async def demo_login(
     tenant_id: Optional[UUID] = None,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    request: Request = None
 ):
     """
     Get a token for demo login without credentials.
@@ -106,9 +110,35 @@ async def demo_login(
     4. Creates JWT tokens for authentication
     5. Updates the user's last login timestamp
     """
+    # Create a debug entry with request info
+    debug_info = {
+        "endpoint": "demo-login",
+        "tenant_id": str(tenant_id) if tenant_id else None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "client_info": {},
+        "headers": {}
+    }
+    
+    # Add client info 
+    if request:
+        debug_info["client_info"] = {
+            "host": request.client.host if hasattr(request, "client") and request.client else "unknown",
+            "path": request.url.path,
+            "query_params": str(request.query_params),
+        }
+        
+        # Add relevant headers for debugging
+        for header in ["user-agent", "referer", "origin", "x-forwarded-for"]:
+            if header in request.headers:
+                debug_info["headers"][header] = request.headers[header]
+    
+    # Create a dedicated auth debug logger
+    auth_debug_logger = logging.getLogger("auth_debug")
+    
     try:
         # Log detailed information about the tenant request
         request_info = f"Demo login requested for tenant_id={tenant_id}"
+        auth_debug_logger.info(f"DEMO_LOGIN_REQUEST: {json.dumps(debug_info)}")
         
         # If tenant_id provided, try to look it up
         if tenant_id:
@@ -116,8 +146,12 @@ async def demo_login(
                 tenant = await crud_tenant.get(db, id=tenant_id)
                 if tenant:
                     request_info += f" (name: {tenant.name}, domain: {tenant.domain})"
+                    debug_info["tenant_name"] = tenant.name
+                    debug_info["tenant_domain"] = tenant.domain
                 else:
                     request_info += " (tenant not found in database)"
+                    debug_info["tenant_status"] = "not_found"
+                    
                     # List available tenants to help with debugging
                     from sqlalchemy.future import select
                     from app.models.tenant import Tenant
@@ -127,24 +161,66 @@ async def demo_login(
                     if available_tenants:
                         tenant_list = ", ".join([f"{t.name} ({t.id})" for t in available_tenants])
                         logger.info(f"Available tenants: {tenant_list}")
+                        debug_info["available_tenants"] = [{"id": str(t.id), "name": t.name} for t in available_tenants]
             except Exception as lookup_error:
-                logger.warning(f"Error looking up tenant: {str(lookup_error)}")
+                err_msg = f"Error looking up tenant: {str(lookup_error)}"
+                logger.warning(err_msg)
+                debug_info["tenant_lookup_error"] = err_msg
+                debug_info["error_traceback"] = traceback.format_exc()
         
         logger.info(request_info)
+        auth_debug_logger.info(f"DEMO_LOGIN_TENANT_INFO: {json.dumps(debug_info)}")
         
         # Create a simple token directly
         if os.environ.get("QUICK_LOGIN_FIX", "true") == "true":
             logger.info("Using quick login fix for development")
-            # Create mock IDs - use tenant_id if provided
-            from datetime import timedelta
-            user_id = UUID("11111111-1111-1111-1111-111111111111")
-            use_tenant_id = tenant_id or UUID("d3667ea1-079a-434e-84d2-60e84757b5d5")
+            auth_debug_logger.info("DEMO_LOGIN_USING_QUICK_FIX")
             
-            # Log the tenant being used
+            # Create mock IDs - use tenant_id if provided
+            # Using timedelta import from the top of the file
+            
+            # Get or validate tenant information
             if tenant_id:
-                logger.info(f"Using provided tenant ID: {tenant_id}")
+                try:
+                    # Try to get the tenant info to make sure it exists
+                    tenant_obj = await crud_tenant.get(db, id=tenant_id)
+                    if tenant_obj:
+                        use_tenant_id = tenant_id
+                        logger.info(f"Using provided tenant ID: {tenant_id} ({tenant_obj.name})")
+                    else:
+                        logger.warning(f"Tenant ID {tenant_id} not found in database, falling back to default")
+                        use_tenant_id = UUID("d3667ea1-079a-434e-84d2-60e84757b5d5")
+                except Exception as e:
+                    logger.error(f"Error looking up tenant {tenant_id}: {str(e)}")
+                    use_tenant_id = UUID("d3667ea1-079a-434e-84d2-60e84757b5d5")
             else:
-                logger.info(f"No tenant ID provided, using default: {use_tenant_id}")
+                logger.info("No tenant ID provided, using default")
+                use_tenant_id = UUID("d3667ea1-079a-434e-84d2-60e84757b5d5")
+            
+            # Create a consistent user ID that matches with user data in the system
+            # BUT make it unique per tenant to avoid tenant mismatch issues
+            # We'll derive a deterministic user ID from the tenant ID to ensure consistency
+            from hashlib import md5
+            
+            # Use the standard demo user ID as fallback
+            base_user_id = UUID("11111111-1111-1111-1111-111111111111")
+            
+            if use_tenant_id:
+                # Create a tenant-specific demo user ID by hashing the tenant ID with a salt
+                # This ensures each tenant has its own dedicated demo user
+                tenant_hash = md5(f"demo-user-{str(use_tenant_id)}".encode()).hexdigest()
+                try:
+                    # Use the first 32 chars of hash to create a UUID
+                    user_id = UUID(tenant_hash[:32])
+                    logger.info(f"Generated tenant-specific demo user ID: {user_id} for tenant: {use_tenant_id}")
+                except ValueError:
+                    # Fallback to standard demo user ID if UUID creation fails
+                    user_id = base_user_id
+                    logger.warning(f"Using fallback demo user ID: {user_id}")
+            else:
+                # Fallback to standard demo user ID
+                user_id = base_user_id
+                logger.warning(f"No tenant ID, using standard demo user ID: {user_id}")
             
             # Create tokens with tenant_id
             access_token = create_access_token(
@@ -161,7 +237,139 @@ async def demo_login(
             from jose import jwt
             try:
                 payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                
+                # Regular logging
                 logger.info(f"Token payload: user_id={payload.get('sub')}, tenant_id={payload.get('tenant_id')}")
+                
+                # Enhanced debug logging
+                auth_debug_logger = logging.getLogger("auth_debug")
+                token_debug = {
+                    "user_id": payload.get('sub'),
+                    "tenant_id": str(payload.get('tenant_id')) if payload.get('tenant_id') else None,
+                    "issued_at": datetime.fromtimestamp(payload.get('iat', 0)).isoformat() if payload.get('iat') else None,
+                    "expires_at": datetime.fromtimestamp(payload.get('exp', 0)).isoformat() if payload.get('exp') else None,
+                    "time_to_expiry_mins": round((payload.get('exp', 0) - time.time()) / 60, 1) if payload.get('exp') else None,
+                    "token_prefix": access_token[:10] + "..." if access_token else None,
+                    "token_length": len(access_token) if access_token else 0,
+                    "has_refresh_token": bool(refresh_token),
+                }
+                auth_debug_logger.info(f"DEMO_LOGIN_TOKEN_CREATED: {json.dumps(token_debug)}")
+                
+                # Validate that this user ID actually exists in the database
+                from app.crud.crud_user import user as crud_user
+                demo_user = await crud_user.get(db, id=user_id)
+                if demo_user:
+                    logger.info(f"Confirmed demo user exists: {demo_user.email} ({user_id})")
+                    
+                    # Check if user needs to be updated with the correct tenant
+                    if demo_user.tenant_id != use_tenant_id:
+                        logger.warning(f"Demo user has incorrect tenant. Current: {demo_user.tenant_id}, Token: {use_tenant_id}")
+                        
+                        # Update user with correct tenant ID directly in database
+                        from app.models.user import User
+                        from sqlalchemy import update
+                        stmt = update(User).where(User.id == user_id).values(tenant_id=use_tenant_id)
+                        await db.execute(stmt)
+                        await db.commit()
+                        logger.info(f"Updated demo user tenant to match token: {use_tenant_id}")
+                else:
+                    logger.warning(f"Demo user with ID {user_id} not found in database!")
+                    # This is a critical issue - the token won't work
+                    
+                    # Create the demo user if it doesn't exist
+                    from app.schemas import UserCreate
+                    demo_user_create = UserCreate(
+                        email="demo@example.com",
+                        name="Demo User",
+                        title="Knowledge Worker",
+                        auth_provider="demo",
+                        auth_provider_id="demo-user-id"
+                    )
+                    try:
+                        # Generate a tenant-specific name for the demo user
+                        tenant_name = "Unknown Tenant"
+                        tenant_obj = await crud_tenant.get(db, id=use_tenant_id)
+                        if tenant_obj:
+                            logger.info(f"[DEMO LOGIN] Confirmed tenant exists: {tenant_obj.name} ({tenant_obj.id})")
+                            tenant_name = tenant_obj.name
+                        else:
+                            logger.error(f"[DEMO LOGIN] CRITICAL: Tenant {use_tenant_id} not found in database!")
+                            # Create the tenant if it doesn't exist
+                            try:
+                                from app.schemas.tenant import TenantCreate
+                                tenant_create = TenantCreate(
+                                    name=f"Demo Tenant {use_tenant_id}",
+                                    domain=f"demo-{str(use_tenant_id)[:8]}.example.com",
+                                    is_active=True
+                                )
+                                tenant_obj = await crud_tenant.create(db=db, obj_in=tenant_create)
+                                tenant_name = tenant_obj.name
+                                logger.info(f"[DEMO LOGIN] Created new tenant: {tenant_obj.name} ({tenant_obj.id})")
+                            except Exception as tenant_error:
+                                logger.error(f"[DEMO LOGIN] Failed to create tenant: {str(tenant_error)}")
+                        
+                        # Check if user already exists with this ID
+                        from app.models.user import User
+                        from sqlalchemy import select, update
+                        
+                        stmt = select(User).where(User.id == user_id)
+                        result = await db.execute(stmt)
+                        existing_user = result.scalar_one_or_none()
+                        
+                        if existing_user:
+                            logger.info(f"[DEMO LOGIN] User already exists: {existing_user.email} (ID: {existing_user.id})")
+                            
+                            # Check if the user's tenant matches the token tenant
+                            if existing_user.tenant_id != use_tenant_id:
+                                logger.warning(f"[DEMO LOGIN] User tenant mismatch - User: {existing_user.tenant_id}, Token: {use_tenant_id}")
+                                
+                                # Update the user's tenant_id to match the token
+                                update_stmt = update(User).where(User.id == user_id).values(tenant_id=use_tenant_id)
+                                await db.execute(update_stmt)
+                                await db.commit()
+                                logger.info(f"[DEMO LOGIN] Updated user tenant_id to: {use_tenant_id}")
+                            
+                            # Update user's last login timestamp
+                            # Using datetime import from the top of the file
+                            update_stmt = update(User).where(User.id == user_id).values(
+                                last_login_at=datetime.now(timezone.utc),
+                                name=f"Demo User ({tenant_name})"  # Update name to include tenant
+                            )
+                            await db.execute(update_stmt)
+                            await db.commit()
+                            logger.info(f"[DEMO LOGIN] Updated user last_login_at and name")
+                        else:
+                            # User doesn't exist, create a new one
+                            logger.info(f"[DEMO LOGIN] Creating new demo user with ID {user_id}, tenant {use_tenant_id}")
+                            
+                            # Update the user create object with tenant-specific info
+                            demo_user_create.email = f"demo-{str(use_tenant_id)[:8]}@example.com"
+                            demo_user_create.name = f"Demo User ({tenant_name})"
+                            
+                            # Create the user with the tenant-specific ID
+                            new_user = await crud_user.create(
+                                db=db,
+                                obj_in=demo_user_create,
+                                tenant_id=use_tenant_id,
+                                user_id=user_id
+                            )
+                            logger.info(f"[DEMO LOGIN] Created demo user: {new_user.email} ({user_id}) in tenant {new_user.tenant_id}")
+                            
+                            # Double-check creation
+                            stmt = select(User.id, User.email, User.tenant_id).where(User.id == user_id)
+                            result = await db.execute(stmt)
+                            created_user = result.first()
+                            
+                            if created_user:
+                                logger.info(f"[DEMO LOGIN] Verified user creation: {created_user.email} ({created_user.id}) in tenant {created_user.tenant_id}")
+                            else:
+                                logger.error(f"[DEMO LOGIN] CRITICAL: User not found after creation!")
+                    except Exception as user_error:
+                        logger.error(f"[DEMO LOGIN] Failed to create or update demo user: {str(user_error)}")
+                        # Log detailed error information
+                        import traceback
+                        logger.error(traceback.format_exc())
+                
             except Exception as decode_error:
                 logger.error(f"Error decoding token for logging: {str(decode_error)}")
             

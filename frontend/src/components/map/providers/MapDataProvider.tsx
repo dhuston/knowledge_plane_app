@@ -113,17 +113,35 @@ export const MapDataProvider: React.FC<MapDataProviderProps> = ({
       }
       
       try {
-        console.log("Attempting to fetch map data with explicit path...");
-        // Try with explicit path
-        response = await apiClient.get<MapData>(`/map/data?${params.toString()}`);
-        console.log("Map data fetch successful with path: /map/data");
+        console.log("Attempting to fetch map data from graph endpoint...");
+        // Try with the correct endpoint path - with router prefix already included in apiClient
+        response = await apiClient.get<MapData>('/map/graph');
+        console.log("Map data fetch successful from graph endpoint");
       } catch (err) {
-        console.error("Failed with `/map/data` path:", err);
-        console.log("Attempting alternate path format...");
+        console.error("Failed with `/map/graph` endpoint:", err);
+        console.log("Attempting alternate paths...");
         
-        // Try alternate format as fallback
-        response = await apiClient.get<MapData>(`/api/v1/map/data?${params.toString()}`);
-        console.log("Map data fetch successful with alternate path: /api/v1/map/data");
+        try {
+          // Try with explicit path including params
+          response = await apiClient.get<MapData>(`/map/data?${params.toString()}`);
+          console.log("Map data fetch successful with path: /map/data");
+        } catch (dataErr) {
+          console.error("Failed with `/map/data` path:", dataErr);
+          
+          // Try with hardcoded API base URL as final fallback
+          try {
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+            const resp = await fetch(`${apiBaseUrl}/api/v1/map/graph?${params.toString()}`);
+            if (!resp.ok) {
+              throw new Error(`HTTP error! status: ${resp.status}`);
+            }
+            response = { data: await resp.json() };
+            console.log("Map data fetch successful with direct fetch");
+          } catch (directErr) {
+            console.error("All fetch attempts failed:", directErr);
+            throw new Error("Failed to fetch map data from all available endpoints");
+          }
+        }
       }
       
       perfume.end('mapDataFetch');

@@ -184,6 +184,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   onClose,
   projectOverlaps = {},
   getProjectNameById = () => undefined,
+  onNodeClick,
   initialExpandedState = false,
   onToggleExpand,
   containerWidth = 400
@@ -212,6 +213,13 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
+  // Reference for focus management
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Track previous node for transitions
+  const prevNodeRef = useRef<MapNode | null>(null);
+  const isNewEntityType = prevNodeRef.current?.type !== selectedNode?.type;
+
   // Memoize projectOverlaps to prevent unnecessary re-renders
   const memoizedOverlaps = useMemo(() => projectOverlaps, [JSON.stringify(projectOverlaps)]);
   // Memoize the getProjectNameById function to prevent unnecessary re-renders
@@ -222,6 +230,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   // Delayed execution for non-critical UI elements
   const shouldLoadSecondary = useDelayedExecution(300);
   const shouldLoadTertiary = useDelayedExecution(800);
+
+  // Track when the panel has fully loaded for smoother animations
+  const [isPanelMounted, setIsPanelMounted] = useState(false);
+
+  // Track tab changes for animations
+  const [prevTab, setPrevTab] = useState<PanelTabType>(activeTab);
 
   // Fetch entity data with caching
   useEffect(() => {
@@ -376,12 +390,15 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   useEffect(() => {
     if (!selectedNode || !entityData) return;
     
-    // Only fetch relationships if related tab has been viewed or is active
-    if (!viewedTabsRef.current.has('related') && activeTab !== 'related') {
-      return;
-    }
+    // Always check if the tab is active or has been viewed, but don't skip hook execution
+    const shouldFetchData = viewedTabsRef.current.has('related') || activeTab === 'related';
     
     const fetchRelationships = async () => {
+      // Only proceed with data fetching if needed
+      if (!shouldFetchData) {
+        return;
+      }
+      
       setIsRelationshipsLoading(true);
       try {
         // Check cache first
@@ -436,18 +453,19 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
 
   // Optimized fetch for activity history
   useEffect(() => {
-    // Skip activity history if feature flag is disabled
-    // or if activity tab has never been viewed and isn't active
-    if (
-      !selectedNode || 
-      !entityData || 
-      !flags.enableActivityTimeline ||
-      (!viewedTabsRef.current.has('activity') && activeTab !== 'activity')
-    ) {
-      return;
-    }
+    if (!selectedNode || !entityData) return;
+    
+    // Determine if we should fetch activity data, but don't skip hook execution
+    const featureEnabled = flags.enableActivityTimeline;
+    const tabActiveOrViewed = viewedTabsRef.current.has('activity') || activeTab === 'activity';
+    const shouldFetchActivity = featureEnabled && tabActiveOrViewed;
 
     const fetchActivityHistory = async () => {
+      // Only proceed with data fetching if needed
+      if (!shouldFetchActivity) {
+        return;
+      }
+      
       setIsActivityLoading(true);
       try {
         // Check cache first
@@ -539,10 +557,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     // For example, if action is "Edit", you would open an edit modal
   }, []);
 
-  const handleSuggestionClick = useCallback((suggestionId: string, label: string) => {
+  const handleSuggestionClick = useCallback(({ id, type, label }: { id: string, type?: string, label: string }) => {
     // Navigate to the suggested entity - with null check
     if (onNodeClick) {
-      onNodeClick(suggestionId);
+      onNodeClick(id);
     }
   }, [onNodeClick]);
   
@@ -760,9 +778,6 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     return null;
   }
 
-  // Reference for focus management
-  const panelRef = useRef<HTMLDivElement>(null);
-
   // Focus the panel when it opens
   useEffect(() => {
     if (selectedNode && panelRef.current) {
@@ -808,38 +823,35 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     })
   };
   
-  // Track when the panel has fully loaded for smoother animations
-  const [isPanelMounted, setIsPanelMounted] = useState(false);
+  // Panel mount animation effect
   useEffect(() => {
     const timer = setTimeout(() => setIsPanelMounted(true), 100);
     return () => clearTimeout(timer);
   }, []);
 
-  // Get entity-specific background accent color - memoized for performance
-  const getEntityAccentColor = useMemo(() => {
-    if (!selectedNode) return useColorModeValue('gray.50', 'gray.800');
+  // Get entity-specific background accent color - moved outside of functional component
+  // Define color mappings outside of hook
+  const getEntityAccentColor = () => {
+    if (!selectedNode) return bgColor;
     
-    switch(selectedNode.type) {
-      case MapNodeTypeEnum.USER: return useColorModeValue('blue.50', 'blue.900');
-      case MapNodeTypeEnum.TEAM: return useColorModeValue('green.50', 'green.900');
-      case MapNodeTypeEnum.PROJECT: return useColorModeValue('purple.50', 'purple.900');
-      case MapNodeTypeEnum.GOAL: return useColorModeValue('orange.50', 'orange.900');
-      case MapNodeTypeEnum.DEPARTMENT: return useColorModeValue('cyan.50', 'cyan.900');
-      case MapNodeTypeEnum.KNOWLEDGE_ASSET: return useColorModeValue('yellow.50', 'yellow.900');
-      default: return useColorModeValue('gray.50', 'gray.800');
-    }
-  }, [selectedNode]);
-
-  // Track previous node for transitions
-  const prevNodeRef = useRef<MapNode | null>(null);
-  const isNewEntityType = prevNodeRef.current?.type !== selectedNode?.type;
+    const colorMapping = {
+      [MapNodeTypeEnum.USER]: useColorModeValue('blue.50', 'blue.900'),
+      [MapNodeTypeEnum.TEAM]: useColorModeValue('green.50', 'green.900'),
+      [MapNodeTypeEnum.PROJECT]: useColorModeValue('purple.50', 'purple.900'),
+      [MapNodeTypeEnum.GOAL]: useColorModeValue('orange.50', 'orange.900'),
+      [MapNodeTypeEnum.DEPARTMENT]: useColorModeValue('cyan.50', 'cyan.900'),
+      [MapNodeTypeEnum.KNOWLEDGE_ASSET]: useColorModeValue('yellow.50', 'yellow.900')
+    };
+    
+    return colorMapping[selectedNode.type] || useColorModeValue('gray.50', 'gray.800');
+  };
   
+  // Update previous node reference
   useEffect(() => {
     prevNodeRef.current = selectedNode;
   }, [selectedNode]);
 
-  // Track tab changes for animations
-  const [prevTab, setPrevTab] = useState<PanelTabType>(activeTab);
+  // Update previous tab reference
   useEffect(() => {
     setPrevTab(activeTab);
   }, [activeTab]);

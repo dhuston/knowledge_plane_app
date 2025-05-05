@@ -195,34 +195,50 @@ const EnhancedFeatureFlags: React.FC = () => {
       .replace(/^enable /, ''); // Remove "enable" prefix
   };
   
-  // Simulate loading enhanced flag data
+  // Load enhanced flag data from backend or generate from basic flags
   useEffect(() => {
     const loadEnhancedFlags = async () => {
       setIsLoading(true);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Transform basic flags into enhanced flags with metadata
-      const enhancedData: EnhancedFeatureFlag[] = Object.keys(flags).map(key => {
-        const flagKey = key as keyof FeatureFlags;
-        const category = getFeatureCategory(flagKey);
+      try {
+        // Try to get debug info about feature flags
+        console.log('[Debug] Attempting to fetch feature flags debug info');
+        let debugInfo = null;
         
-        return {
-          key: flagKey,
-          name: formatFeatureName(flagKey),
-          description: getFeatureDescription(flagKey),
-          category,
-          status: flags[flagKey] ? 'active' : 'inactive',
-          lastUpdated: getMockLastUpdated(),
-          owner: 'System',
-          tenantOverrides: ['enableIntegrations', 'enableAnalytics'].includes(flagKey),
-          scheduleEnabled: false
-        };
-      });
-      
-      setEnhancedFlags(enhancedData);
-      setIsLoading(false);
+        try {
+          const { apiClient } = await import('../../../api/client');
+          const response = await apiClient.get('/debug/feature-flags-status');
+          debugInfo = response;
+          console.log('[Debug] Feature flags debug info:', debugInfo);
+        } catch (error) {
+          console.warn('[Debug] Could not fetch feature flags debug info:', error);
+        }
+        
+        // Transform basic flags into enhanced flags with metadata
+        const enhancedData: EnhancedFeatureFlag[] = Object.keys(flags).map(key => {
+          const flagKey = key as keyof FeatureFlags;
+          const category = getFeatureCategory(flagKey);
+          
+          return {
+            key: flagKey,
+            name: formatFeatureName(flagKey),
+            description: getFeatureDescription(flagKey),
+            category,
+            status: flags[flagKey] ? 'active' : 'inactive',
+            // Use actual backend data or mock data
+            lastUpdated: debugInfo ? 'Updated from backend' : getMockLastUpdated(),
+            owner: 'System',
+            tenantOverrides: ['enableIntegrations', 'enableAnalytics'].includes(flagKey),
+            scheduleEnabled: false
+          };
+        });
+        
+        setEnhancedFlags(enhancedData);
+      } catch (error) {
+        console.error('[Debug] Error loading enhanced flags:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     loadEnhancedFlags();

@@ -65,12 +65,21 @@ const notificationTypes = [
 ];
 
 const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onBack }) => {
-  const { preferences, updatePreference } = useNotifications();
+  const { preferences = [], updatePreference, isLoading } = useNotifications();
   const toast = useToast();
+  
+  // Log preferences for debugging
+  console.log('[Debug] NotificationPreferences component - preferences:', preferences);
   
   // Function to get preference value for a type
   const getPreferenceValue = (notificationType: string, field: 'enabled' | 'email_enabled') => {
-    const pref = preferences.find(p => p.notification_type === notificationType);
+    // Add null/undefined check for preferences
+    if (!Array.isArray(preferences)) {
+      console.warn('[Debug] preferences is not an array in NotificationPreferences');
+      return true; // Default to true if preferences is not an array
+    }
+    
+    const pref = preferences.find(p => p && p.notification_type === notificationType);
     return pref ? pref[field] : true; // Default to true if not found
   };
   
@@ -136,39 +145,52 @@ const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onBac
       
       <Heading size="md" mb={4}>Notification Preferences</Heading>
       
-      <VStack spacing={4} align="stretch" divider={<Divider />}>
-        {notificationTypes.map(({ type, label, description, icon, color }) => (
-          <Box key={type}>
-            <HStack mb={2}>
-              <Icon as={icon} color={`${color}.500`} boxSize={5} />
-              <Text fontWeight="bold">{label}</Text>
-            </HStack>
-            
-            <Text fontSize="sm" color="gray.500" mb={3}>
-              {description}
-            </Text>
-            
-            <HStack justifyContent="space-between" mt={2}>
-              <Text>Receive in app</Text>
-              <Switch
-                isChecked={getPreferenceValue(type, 'enabled')}
-                onChange={() => handleToggleApp(type)}
-                colorScheme={color}
-              />
-            </HStack>
-            
-            <HStack justifyContent="space-between" mt={2}>
-              <Text>Receive by email</Text>
-              <Switch
-                isChecked={getPreferenceValue(type, 'email_enabled')}
-                onChange={() => handleToggleEmail(type)}
-                colorScheme={color}
-                isDisabled={!getPreferenceValue(type, 'enabled')}
-              />
-            </HStack>
-          </Box>
-        ))}
-      </VStack>
+      {isLoading ? (
+        <Box textAlign="center" py={10}>
+          <Text>Loading preferences...</Text>
+        </Box>
+      ) : !Array.isArray(preferences) ? (
+        <Box textAlign="center" py={10}>
+          <Text>Could not load notification preferences. Please try again later.</Text>
+          <Button mt={4} onClick={() => window.location.reload()}>
+            Reload
+          </Button>
+        </Box>
+      ) : (
+        <VStack spacing={4} align="stretch" divider={<Divider />}>
+          {notificationTypes.map(({ type, label, description, icon, color }) => (
+            <Box key={type}>
+              <HStack mb={2}>
+                <Icon as={icon} color={`${color}.500`} boxSize={5} />
+                <Text fontWeight="bold">{label}</Text>
+              </HStack>
+              
+              <Text fontSize="sm" color="gray.500" mb={3}>
+                {description}
+              </Text>
+              
+              <HStack justifyContent="space-between" mt={2}>
+                <Text>Receive in app</Text>
+                <Switch
+                  isChecked={getPreferenceValue(type, 'enabled')}
+                  onChange={() => handleToggleApp(type)}
+                  colorScheme={color}
+                />
+              </HStack>
+              
+              <HStack justifyContent="space-between" mt={2}>
+                <Text>Receive by email</Text>
+                <Switch
+                  isChecked={getPreferenceValue(type, 'email_enabled')}
+                  onChange={() => handleToggleEmail(type)}
+                  colorScheme={color}
+                  isDisabled={!getPreferenceValue(type, 'enabled')}
+                />
+              </HStack>
+            </Box>
+          ))}
+        </VStack>
+      )}
     </Box>
   );
 };

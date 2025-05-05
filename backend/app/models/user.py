@@ -22,6 +22,7 @@ class User(Base):
     title = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True)
     online_status = Column(Boolean(), default=False)
+    is_admin = Column(Boolean(), default=False, index=True)
 
     # Authentication
     auth_provider = Column(String, nullable=True) # e.g., 'google', 'microsoft', 'password'

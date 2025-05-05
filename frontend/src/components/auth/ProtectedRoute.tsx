@@ -1,10 +1,8 @@
 import React from 'react';
-// Restore Navigate, useLocation
 import { Navigate, Outlet, useLocation } from 'react-router-dom'; 
-// Revert to relative path after restart
 import { useAuth } from '../../context/AuthContext'; 
-// Restore Center, Spinner imports
-import { Center, Spinner, VStack, Text } from '@chakra-ui/react'; 
+import { Center, Spinner, VStack, Text, Box, Code, useColorModeValue } from '@chakra-ui/react'; 
+import { LogLevel, logAuthEvent, analyzeJwtToken } from '../../utils/authDebugger';
 
 interface ProtectedRouteProps {
   children?: React.ReactNode; // Allow wrapping specific components like MainLayout
@@ -12,93 +10,153 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Auth context values
-  const { user, isLoading, isAuthenticated, token } = useAuth();
+  const { user, isLoading, isAuthenticated, token, authStatus } = useAuth();
   const location = useLocation();
 
   // Track if we've already attempted a reload for persistent race conditions
   const [reloadAttempted, setReloadAttempted] = React.useState<boolean>(false);
-
-  // Check localStorage directly for debugging
-  const localStorageToken = localStorage.getItem('knowledge_plane_token');
   
-  // Logging for debugging
-  console.log(`[ProtectedRoute] Check: isLoading: ${isLoading}, user: ${!!user}, isAuthenticated: ${isAuthenticated}, token exists: ${!!token}`);
-  console.log(`[ProtectedRoute] localStorage token:`, localStorageToken ? `present (${localStorageToken.substring(0, 20)}...)` : "missing");
-  console.log(`[ProtectedRoute] User object:`, user ? JSON.stringify(user).substring(0, 100) + '...' : 'null');
+  // Record routing decision events for analysis (disabled to prevent re-renders)
+  const [routingEvents, setRoutingEvents] = React.useState<Array<{ 
+    time: string; 
+    event: string; 
+    details?: Record<string, any>;
+  }>>([]);
   
-  // Detailed token validation
-  let tokenData: {
-    isValid: boolean;
-    isExpired: boolean;
-    userId?: string;
-    tenantId?: string;
-    expiryDate?: Date;
-    timeRemaining?: number;
-  } = { isValid: false, isExpired: true };
-
-  // Validate token and extract details if present
-  if (localStorageToken) {
-    try {
-      // Simple JWT payload extract (not validation)
-      const tokenParts = localStorageToken.split('.');
-      if (tokenParts.length === 3) {
-        const payload = JSON.parse(atob(tokenParts[1]));
-        console.log('[ProtectedRoute] Token payload:', payload);
-        console.log('[ProtectedRoute] Token sub (user id):', payload.sub);
-        console.log('[ProtectedRoute] Token tenant_id:', payload.tenant_id);
-        console.log('[ProtectedRoute] Token expiry:', new Date(payload.exp * 1000).toISOString());
-        console.log('[ProtectedRoute] Current time:', new Date().toISOString());
-        
-        const expiryTime = payload.exp * 1000;
-        const isExpired = expiryTime < Date.now();
-        console.log('[ProtectedRoute] Token expired:', isExpired);
-        
-        tokenData = {
-          isValid: true,
-          isExpired,
-          userId: payload.sub,
-          tenantId: payload.tenant_id,
-          expiryDate: new Date(expiryTime),
-          timeRemaining: Math.floor((expiryTime - Date.now()) / 1000 / 60) // minutes
-        };
-        
-        // If token is valid but user is null, this is our problem case
-        if (!isExpired && !user) {
-          console.error('[ProtectedRoute] CRITICAL ISSUE: Valid token but no user object - this is our bug');
-          console.error('[ProtectedRoute] This confirms a race condition or API error');
-          
-          // Set up page reload if we haven't tried already and not in loading state
-          if (!isLoading && !reloadAttempted) {
-            console.log('[ProtectedRoute] Setting up emergency page reload in 3 seconds');
-            setTimeout(() => {
-              // Only reload if we still have no user but valid token
-              if (!user && localStorage.getItem('knowledge_plane_token')) {
-                console.log('[ProtectedRoute] Emergency page reload triggered');
-                setReloadAttempted(true);
-                window.location.reload();
-              }
-            }, 3000);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[ProtectedRoute] Error decoding token:', e);
+  // Add a routing event to the log - NOOP to prevent re-renders
+  const logRoutingEvent = (event: string, details?: Record<string, any>) => {
+    // Disabled to prevent re-renders
+    // Log directly to console only in development if needed
+    if (process.env.NODE_ENV === 'development') {
+      // console.log(`[ProtectedRoute] ${event}`, details);
     }
-  }
+    
+    // Do not update state to prevent re-renders
+    // setRoutingEvents(prev => [...prev, { time: new Date().toISOString(), event, details }].slice(-10));
+  };
+
+  // Check all storage locations for tokens - move inside a useEffect
+  const [effectiveToken, setEffectiveToken] = React.useState<string | null>(null);
+  const [tokenAnalysis, setTokenAnalysis] = React.useState<any>(null);
+  
+  // Use a ref for checking if a log event was already sent
+  const logSentRef = React.useRef<{[key: string]: boolean}>({});
+  
+  React.useEffect(() => {
+    const localStorageToken = localStorage.getItem('knowledge_plane_token');
+    const sessionStorageToken = sessionStorage.getItem('knowledge_plane_token');
+    const currentEffectiveToken = localStorageToken || sessionStorageToken;
+    
+    setEffectiveToken(currentEffectiveToken);
+    
+    // Disabled to prevent re-renders
+    // const logKey = `${location.pathname}-${isLoading}-${!!user}-${isAuthenticated}-${!!token}`;
+    
+    // Only log if we haven't recently logged this exact state
+    // if (!logSentRef.current[logKey]) {
+    //   // Log comprehensive debug info
+    //   logAuthEvent(LogLevel.INFO, "ProtectedRoute", "routeCheck", {
+    //     path: location.pathname,
+    //     isLoading,
+    //     hasUser: !!user,
+    //     isAuthenticated,
+    //     hasToken: !!token,
+    //     localStorageToken: !!localStorageToken,
+    //     sessionStorageToken: !!sessionStorageToken,
+    //     authStatus: {
+    //       lastAuthCheck: authStatus.lastAuthCheck,
+    //       lastError: authStatus.lastError,
+    //       tokenValid: authStatus.tokenStatus.valid
+    //     }
+    //   });
+      
+    //   // Mark this state as logged
+    //   logSentRef.current[logKey] = true;
+      
+    //   // Clear old entries from the ref to prevent memory leaks
+    //   const keys = Object.keys(logSentRef.current);
+    //   if (keys.length > 20) { // Keep only last 20 states
+    //     const oldestKey = keys[0];
+    //     delete logSentRef.current[oldestKey];
+    //   }
+    // }
+    
+    // Analyze token in detail
+    if (currentEffectiveToken) {
+      const analysis = analyzeJwtToken(currentEffectiveToken);
+      setTokenAnalysis(analysis);
+    } else {
+      setTokenAnalysis(null);
+    }
+  }, [location.pathname, isLoading, user, isAuthenticated, token, authStatus]);
+  
+  // Track reload attempts in localStorage to prevent reload loops across page refreshes
+  React.useEffect(() => {
+    // Use localStorage to track reload attempts persistently
+    const reloadAttemptTime = localStorage.getItem('auth_reload_attempt_time');
+    const now = Date.now();
+    const reloadThreshold = 10000; // 10 seconds
+    
+    if (tokenAnalysis) {
+      // Handle edge case: valid token but no user data
+      if (tokenAnalysis.valid && !tokenAnalysis.isExpired && !user) {
+        // Only reload if we haven't recently attempted a reload (either in this session or previous)
+        if (!isLoading && !reloadAttempted && 
+            (!reloadAttemptTime || (now - parseInt(reloadAttemptTime)) > reloadThreshold)) {
+          
+          // Set both session state and persistent localStorage state
+          setReloadAttempted(true);
+          localStorage.setItem('auth_reload_attempt_time', now.toString());
+          
+          // Add a random delay to prevent synchronized reload loops (0-500ms)
+          const randomDelay = Math.floor(Math.random() * 500);
+          
+          setTimeout(() => {
+            // Double-check that we still need to reload
+            if (!user && (localStorage.getItem('knowledge_plane_token') || sessionStorage.getItem('knowledge_plane_token'))) {
+              console.log("[AUTH] Attempting page reload to recover user session");
+              // Add cache busting parameter to the URL
+              window.location.href = window.location.pathname + '?reload=' + Date.now();
+            }
+          }, 2000 + randomDelay);
+        }
+      } else {
+        // If conditions don't match, clear the reload attempt time
+        localStorage.removeItem('auth_reload_attempt_time');
+      }
+    }
+  }, [tokenAnalysis, user, isLoading, reloadAttempted]);
 
   // Handle loading state
   if (isLoading) {
-    console.log(`[ProtectedRoute] Showing Loading Spinner`);
     return (
       <Center h="100vh">
-        <VStack spacing={4}>
-          <Spinner size="xl" />
+        <VStack spacing={4} maxW="90%" w="400px">
+          <Spinner size="xl" color="primary.500" thickness="4px" />
           <Text>Loading user data...</Text>
-          {tokenData.isValid && (
+          
+          {tokenAnalysis?.valid && (
             <Text fontSize="sm" color="gray.500">
-              Token valid for {tokenData.timeRemaining} more minutes
+              Token valid for {tokenAnalysis.timeToExpire ? Math.floor(tokenAnalysis.timeToExpire / 60) : 0} more minutes
             </Text>
           )}
+          
+          {/* Add a debug box with auth status */}
+          <Box 
+            p={3} 
+            bg={useColorModeValue('gray.100', 'gray.700')} 
+            borderRadius="md" 
+            fontSize="xs" 
+            mt={4} 
+            maxW="100%" 
+            overflow="auto"
+          >
+            <Text fontWeight="bold">Auth Debug Info:</Text>
+            <Text mt={1}>Last Check: {authStatus.lastAuthCheck ? new Date(authStatus.lastAuthCheck).toLocaleTimeString() : 'None'}</Text>
+            {authStatus.lastError && (
+              <Text color="red.500">Error: {authStatus.lastError}</Text>
+            )}
+          </Box>
         </VStack>
       </Center>
     );
@@ -106,33 +164,51 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Special case: valid token exists but no user data yet
   // This is the race condition we're fixing
-  if (localStorageToken && !user && !isLoading) {
-    console.log(`[ProtectedRoute] We have a token but no user, waiting for auth context to catch up`);
-    
+  if (effectiveToken && !user && !isLoading) {
     // Check if token is expired
-    if (tokenData.isValid && tokenData.isExpired) {
-      console.log('[ProtectedRoute] Token expired, clearing and redirecting to login');
+    if (tokenAnalysis?.isExpired) {
+      // Clean up any tokens
       localStorage.removeItem('knowledge_plane_token');
+      sessionStorage.removeItem('knowledge_plane_token');
+      
       return <Navigate to="/login" state={{ from: location }} replace />;
     }
     
     // Show enhanced loading spinner while we wait for auth to complete
     return (
       <Center h="100vh">
-        <VStack spacing={4}>
-          <Spinner size="xl" colorScheme="blue" />
+        <VStack spacing={4} maxW="90%" w="450px">
+          <Spinner size="xl" colorScheme="blue" thickness="4px" />
           <Text fontWeight="medium">Verifying authentication...</Text>
-          {tokenData.isValid && (
+          
+          {tokenAnalysis?.valid && (
             <VStack spacing={1}>
               <Text fontSize="sm">Valid token found</Text>
               <Text fontSize="sm" color="gray.500">
-                Token expires in {tokenData.timeRemaining} minutes
+                Token expires in {tokenAnalysis.timeToExpire ? Math.floor(tokenAnalysis.timeToExpire / 60) : 0} minutes
               </Text>
               <Text fontSize="xs" color="orange.500" mt={2}>
                 {reloadAttempted ? "Reload attempted, still recovering..." : "User data synchronizing..."}
               </Text>
             </VStack>
           )}
+          
+          {/* Simplified debug info - removed dynamic events list to prevent re-renders */}
+          <Box 
+            p={3} 
+            bg={useColorModeValue('gray.100', 'gray.700')} 
+            borderRadius="md" 
+            fontSize="xs" 
+            mt={4} 
+            maxW="100%"
+            overflow="auto"
+          >
+            <Text fontWeight="bold">Auth Status:</Text>
+            <Text my={1}>Verifying authentication...</Text>
+            {tokenAnalysis?.valid && (
+              <Text my={1} color="green.500">Valid token detected</Text>
+            )}
+          </Box>
         </VStack>
       </Center>
     );
@@ -140,12 +216,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // No user after loading is complete
   if (!user) {
-    console.log(`[ProtectedRoute] No user found after load, redirecting to /login`);
+    // Removed logging to prevent re-renders
+    
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If authenticated, render children/Outlet
-  console.log(`[ProtectedRoute] User authenticated, rendering children/outlet`);
+  // If authenticated - removed logging to prevent re-renders
+  
   return children ? <>{children}</> : <Outlet />;
 };
 

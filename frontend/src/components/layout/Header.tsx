@@ -60,7 +60,9 @@ const Header: React.FC<HeaderProps> = ({
     const borderColor = useColorModeValue('primary.300', 'primary.600'); // Light mint green : Sage green
     const logoColor = useColorModeValue('#262626', 'secondary.400'); // Button color : Off-white/cream
     const { isOpen: isNotificationsOpen, onOpen: openNotifications, onClose: closeNotifications } = useDisclosure();
-    const { notifications, unreadCount } = useNotifications();
+    
+    // Add safe retrieval of notifications
+    const { notifications = [], unreadCount = 0 } = useNotifications();
     
     // State to control logo visibility
     const [logoOpacity, setLogoOpacity] = useState(1);
@@ -180,8 +182,8 @@ const Header: React.FC<HeaderProps> = ({
                                             My Team
                                         </MenuItem>
                                         <MenuItem icon={<FiSettings />} command="⌘,">Settings</MenuItem>
-                                        {/* Only show Admin Console for superusers */}
-                                        {user?.is_superuser && (
+                                        {/* Show Admin Console for superusers or admins */}
+                                        {(user?.is_superuser || user?.is_admin) && (
                                           <MenuItem 
                                             icon={<FiGrid />} 
                                             as={Link} 

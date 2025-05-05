@@ -248,13 +248,23 @@ export default function LoginPage() {
         throw new Error("Login successful but no access token received");
       }
       
+      // Debug token contents
+      try {
+        const tokenParts = data.access_token.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log("DEBUG: Token payload:", payload);
+          console.log("DEBUG: User ID in token:", payload.sub);
+          console.log("DEBUG: Tenant ID in token:", payload.tenant_id);
+          console.log("DEBUG: Token expiration:", new Date(payload.exp * 1000).toLocaleString());
+        }
+      } catch (e) {
+        console.error("DEBUG: Failed to decode token:", e);
+      }
+      
       // Store the tokens
       console.log("Setting tokens in AuthContext");
       setToken(data.access_token, data.refresh_token);
-      
-      // Set a delay to allow auth context to process the token
-      // and fetch user data before navigating
-      console.log("Waiting for auth context to process token before navigation");
       
       // Show a toast to inform the user we're logging in
       toast({
@@ -265,24 +275,30 @@ export default function LoginPage() {
         isClosable: true,
       });
       
-      // Use a longer timeout to ensure user data is fetched before navigation
-      setTimeout(() => {
-        const storedToken = localStorage.getItem('knowledge_plane_token');
-        console.log("Token before navigation:", storedToken ? `present (${storedToken.substring(0, 20)}...)` : "missing");
-        
-        if (!storedToken) {
-          console.error("Token not found in localStorage! This indicates a storage issue.");
-          // Try to store it again directly
-          console.log("Attempting to store token directly in localStorage");
-          localStorage.setItem('knowledge_plane_token', data.access_token);
-          if (data.refresh_token) {
-            localStorage.setItem('knowledge_plane_refresh_token', data.refresh_token);
+      try {
+        // Clear any existing tracking for token fetches to prevent loop detection false positives
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('token_fetch_')) {
+            localStorage.removeItem(key);
           }
+        });
+        
+        // Ensure the token is properly stored
+        localStorage.removeItem('knowledge_plane_token');
+        localStorage.setItem('knowledge_plane_token', data.access_token);
+        if (data.refresh_token) {
+          localStorage.removeItem('knowledge_plane_refresh_token');
+          localStorage.setItem('knowledge_plane_refresh_token', data.refresh_token);
         }
         
-        console.log("Navigating to workspace");
+        // Add cache-busting parameter when redirecting
+        console.log("Navigating to workspace with cache-busting");
+        navigate(`/workspace?t=${Date.now()}`);
+      } catch (err) {
+        console.error("Error during post-login navigation:", err);
+        // Fallback to simple navigation without cache busting
         navigate("/workspace");
-      }, 1500); // Increase delay to allow time for user data fetch
+      }
     } catch (error) {
       console.error("Login failed:", error);
       toast({

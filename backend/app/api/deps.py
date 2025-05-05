@@ -43,7 +43,8 @@ async def get_current_active_user(
     Raises:
         HTTPException: If user is inactive
     """
-    if not current_user.is_active:
+    # Check if the user has is_active attribute and if it's False
+    if hasattr(current_user, 'is_active') and not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
@@ -63,11 +64,18 @@ def get_current_active_superuser(
     Raises:
         HTTPException: If user is not superuser
     """
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="The user doesn't have enough privileges"
-        )
+    # First check if user has is_admin flag set
+    if hasattr(current_user, 'is_admin') and current_user.is_admin:
+        return current_user
+    
+    # For backwards compatibility, also check is_superuser if it exists
+    if hasattr(current_user, 'is_superuser') and current_user.is_superuser:
+        return current_user
+        
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="The user doesn't have enough privileges"
+    )
     return current_user
 
 

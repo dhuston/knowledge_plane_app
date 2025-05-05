@@ -7,11 +7,20 @@ import {
   Spinner,
   useColorModeValue,
   VStack,
-  Icon,
   HStack,
-  Divider
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Flex,
+  Badge,
+  Icon,
+  Card,
+  CardBody,
+  useBreakpointValue
 } from '@chakra-ui/react';
-import { FiRefreshCw, FiClock, FiAward } from 'react-icons/fi';
+import { FiRefreshCw, FiClock, FiAward, FiArrowRight } from 'react-icons/fi';
 import { useInsights } from '../../context/InsightsContext';
 import OpenAIService from '../../services/OpenAIService';
 import ReactMarkdown from 'react-markdown';
@@ -19,11 +28,25 @@ import ReactMarkdown from 'react-markdown';
 interface InsightsDailySummaryProps {
   maxChars?: number;
   maxHeight?: string;
-  personalizationContext?: Record<string, any>;
+  personalizationContext?: {
+    userName?: string;
+    role?: string;
+    organization?: string;
+    interests?: string[];
+    teamObjectives?: string[];
+    [key: string]: any;
+  };
 }
 
 /**
  * Component that displays an AI-generated daily summary of insights
+ * 
+ * The personalizationContext object can include:
+ * - userName: User's full name
+ * - role: User's role in the organization
+ * - organization: Organization name
+ * - interests: Array of skill or topic interests for learning recommendations
+ * - teamObjectives: Array of team goals or objectives
  */
 const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({ 
   maxChars = 500,
@@ -34,6 +57,8 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [tabIndex, setTabIndex] = useState<number>(0);
+  const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
   
   const { insights, loading: insightsLoading } = useInsights();
   
@@ -41,11 +66,28 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
   const headerBgColor = useColorModeValue('blue.50', 'blue.900');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const mutedColor = useColorModeValue('gray.600', 'gray.400');
+  const tabBg = useColorModeValue('gray.100', 'gray.700');
+  const activeTabBg = useColorModeValue('white', 'gray.600');
+  const cardHoverBg = useColorModeValue('gray.50', 'gray.700');
+  
+  // Responsive design adjustments
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
   // Generate summary when insights are loaded or change
   useEffect(() => {
     const generateSummary = async () => {
-      if (insightsLoading || insights.length === 0 || !OpenAIService.isAvailable()) {
+      if (insightsLoading || insights.length === 0) {
+        return;
+      }
+
+      // If OpenAI service is not available, use a basic fallback summary
+      if (!OpenAIService.isAvailable()) {
+        const fallbackSummary = `## Today's Key Insights\n\n${insights.slice(0, 3).map(insight => 
+          `- **${insight.title || 'Insight'}**: ${insight.description?.substring(0, 80)}...`
+        ).join('\n\n')}`;
+        
+        setSummary(fallbackSummary);
+        setLastUpdated(new Date());
         return;
       }
 
@@ -53,13 +95,31 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
       setError(null);
 
       try {
-        // Get personalized summary from OpenAI
-        const generatedSummary = await OpenAIService.generateInsightSummary(insights, personalizationContext);
+        // Set a timeout to prevent hanging the UI if the request takes too long
+        const timeoutPromise = new Promise<string>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("Request timed out")), 5000);
+        });
+        
+        // Get personalized summary from OpenAI with a timeout
+        const summaryPromise = OpenAIService.generateInsightSummary(insights, personalizationContext);
+        
+        // Race between the actual request and the timeout
+        const generatedSummary = await Promise.race([summaryPromise, timeoutPromise]);
+        
         setSummary(generatedSummary);
         setLastUpdated(new Date());
       } catch (err) {
         console.error('Error generating insights summary:', err);
-        setError('Unable to generate summary. Please try again.');
+        // Provide a fallback summary instead of showing an error
+        const fallbackSummary = `## Today's Key Insights\n\n${insights.slice(0, 3).map(insight => 
+          `- **${insight.title || 'Insight'}**: ${insight.description?.substring(0, 80)}...`
+        ).join('\n\n')}`;
+        
+        setSummary(fallbackSummary);
+        setLastUpdated(new Date());
+        
+        // Don't set error state to avoid showing error UI
+        // setError('Unable to generate summary. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -99,9 +159,18 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
       hour12: true
     }).format(lastUpdated);
   };
+  
+  // Toggle expansion of an insight
+  const toggleExpand = (id: string) => {
+    if (expandedInsight === id) {
+      setExpandedInsight(null);
+    } else {
+      setExpandedInsight(id);
+    }
+  };
 
   // Create common card wrapper
-  const SummaryCard = ({children, showHeader = true}: {children: React.ReactNode, showHeader?: boolean}) => (
+  const SummaryCard = ({children}: {children: React.ReactNode}) => (
     <Box
       bg={bgColor}
       borderWidth="1px"
@@ -109,29 +178,27 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
       borderColor={borderColor}
       overflow="hidden"
       boxShadow="sm"
-      maxHeight={maxHeight}
-      overflowY={maxHeight ? "auto" : "visible"}
       transition="all 0.2s"
     >
-      {showHeader && (
-        <Box 
-          bg={headerBgColor}
-          px={4} 
-          py={3}
-          borderBottomWidth="1px"
-          borderColor={borderColor}
-        >
-          <HStack justify="space-between" align="center">
-            <HStack spacing={2}>
-              <Icon as={FiAward} boxSize={4} color="primary.500" />
-              <Heading size="sm" fontWeight="semibold">Daily Summary</Heading>
-            </HStack>
-            <Text fontSize="xs" color={mutedColor}>
-              {lastUpdated ? `Updated ${formatLastUpdated()}` : 'Not yet generated'}
-            </Text>
-          </HStack>
-        </Box>
-      )}
+      <Flex justify="space-between" align="center" bg={headerBgColor} px={4} py={2} borderBottomWidth="1px" borderColor={borderColor}>
+        <Heading size="sm">Daily Insights</Heading>
+        <HStack spacing={3}>
+          <Text fontSize="xs" color={mutedColor}>
+            {lastUpdated ? `Updated ${formatLastUpdated()}` : 'Not yet generated'}
+          </Text>
+          <Button
+            size="xs"
+            variant="ghost"
+            colorScheme="blue"
+            onClick={handleRefresh}
+            leftIcon={<Icon as={FiRefreshCw} />}
+            isLoading={isLoading}
+            fontWeight="normal"
+          >
+            Refresh
+          </Button>
+        </HStack>
+      </Flex>
       {children}
     </Box>
   );
@@ -187,66 +254,198 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
       </SummaryCard>
     );
   }
+  
+  // Group insights by category
+  const groupedInsights = insights.reduce((acc, insight) => {
+    const category = insight.category || 'other';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(insight);
+    return acc;
+  }, {} as Record<string, typeof insights>);
+  
+  // Category labels mapping
+  const categoryLabels: Record<string, string> = {
+    'collaboration': 'Collaboration',
+    'productivity': 'Productivity',
+    'knowledge': 'Knowledge',
+    'project': 'Project',
+    'alignment': 'Alignment',
+    'other': 'Other Insights'
+  };
+  
+  // Get categories for tabs
+  const categories = Object.keys(groupedInsights);
+  
+  // Get insight category counts for tab badges  
+  const categoryCounts = categories.reduce((acc, category) => {
+    acc[category] = groupedInsights[category].length;
+    return acc;
+  }, {} as Record<string, number>);
 
-  // Display the summary
+  // Display the summary with tabs
   return (
     <SummaryCard>
-      <Box p={4}>
-        <Box 
-          className="markdown-content"
-          sx={{
-            'h1': { 
-              fontSize: 'lg', 
-              fontWeight: 'semibold', 
-              mb: 2,
-              mt: 0
-            },
-            'h2': { 
-              fontSize: 'md', 
-              fontWeight: 'medium', 
-              mb: 2,
-              mt: 3 
-            },
-            'p': { 
-              fontSize: 'sm', 
-              mb: 3,
-              lineHeight: 'taller'
-            },
-            'ul, ol': { 
-              fontSize: 'sm', 
-              pl: 4, 
-              mb: 3 
-            },
-            'li': {
-              mb: 1
-            },
-            'strong': { 
-              fontWeight: 'medium',
-              color: 'primary.600'
-            }
-          }}
-        >
-          <ReactMarkdown>
-            {summary.length > maxChars
-              ? `${summary.substring(0, maxChars)}...`
-              : summary
-            }
-          </ReactMarkdown>
-        </Box>
-        
-        <Box textAlign="right" mt={3}>
-          <Button
-            rightIcon={<FiRefreshCw size="14px" />}
-            size="xs"
-            variant="ghost"
-            colorScheme="blue"
-            onClick={handleRefresh}
-            fontWeight="normal"
+      <Tabs 
+        variant="soft-rounded" 
+        colorScheme="blue" 
+        size="sm" 
+        isLazy
+        index={tabIndex}
+        onChange={(index) => setTabIndex(index)}
+      >
+        <TabList px={4} py={2} overflowX="auto" css={{ scrollbarWidth: 'none', '&::-webkit-scrollbar': {display: 'none'} }}>
+          <Tab 
+            mr={2}
+            fontSize="sm" 
+            fontWeight={tabIndex === 0 ? "medium" : "normal"}
+            _selected={{ bg: 'blue.500', color: 'white' }}
           >
-            Refresh
-          </Button>
-        </Box>
-      </Box>
+            Summary
+          </Tab>
+          {categories.map((category, index) => (
+            <Tab 
+              key={category}
+              mr={2}
+              fontSize="sm"
+              fontWeight={tabIndex === index + 1 ? "medium" : "normal"}
+              _selected={{ bg: 'blue.500', color: 'white' }}
+            >
+              <Box>{categoryLabels[category] || category}</Box>
+              <Badge ml={1} colorScheme="blue" variant="solid" borderRadius="full">
+                {categoryCounts[category]}
+              </Badge>
+            </Tab>
+          ))}
+        </TabList>
+
+        <TabPanels>
+          {/* Summary Tab */}
+          <TabPanel p={0}>
+            <Box 
+              p={4} 
+              maxHeight={maxHeight || "300px"} 
+              overflowY="auto"
+              css={{
+                '&::-webkit-scrollbar': { width: '4px' },
+                '&::-webkit-scrollbar-track': { width: '6px' },
+                '&::-webkit-scrollbar-thumb': { 
+                  background: borderColor,
+                  borderRadius: '24px',
+                },
+              }}
+            >
+              <Box 
+                className="markdown-content"
+                sx={{
+                  'h1': { 
+                    fontSize: 'lg', 
+                    fontWeight: 'semibold', 
+                    mb: 2,
+                    mt: 0
+                  },
+                  'h2': { 
+                    fontSize: 'md', 
+                    fontWeight: 'medium', 
+                    mb: 2,
+                    mt: 3 
+                  },
+                  'p': { 
+                    fontSize: 'sm', 
+                    mb: 3,
+                    lineHeight: 'taller'
+                  },
+                  'ul, ol': { 
+                    fontSize: 'sm', 
+                    pl: 4, 
+                    mb: 3 
+                  },
+                  'li': {
+                    mb: 1
+                  },
+                  'strong': { 
+                    fontWeight: 'medium',
+                    color: 'primary.600'
+                  }
+                }}
+              >
+                <ReactMarkdown>
+                  {summary.length > maxChars
+                    ? `${summary.substring(0, maxChars)}...`
+                    : summary
+                  }
+                </ReactMarkdown>
+              </Box>
+            </Box>
+          </TabPanel>
+          
+          {/* Category Tabs */}
+          {categories.map(category => (
+            <TabPanel key={category} p={0}>
+              <Box 
+                p={4} 
+                maxHeight={maxHeight || "300px"} 
+                overflowY="auto"
+                css={{
+                  '&::-webkit-scrollbar': { width: '4px' },
+                  '&::-webkit-scrollbar-track': { width: '6px' },
+                  '&::-webkit-scrollbar-thumb': { 
+                    background: borderColor,
+                    borderRadius: '24px',
+                  },
+                }}
+              >
+                <VStack spacing={3} align="stretch">
+                  {groupedInsights[category].map(insight => (
+                    <Card 
+                      key={insight.id} 
+                      variant="outline" 
+                      size="sm"
+                      _hover={{ bg: cardHoverBg }}
+                      borderLeft="3px solid"
+                      borderLeftColor={insight.category === 'collaboration' ? 'purple.500' : 
+                                       insight.category === 'productivity' ? 'green.500' :
+                                       insight.category === 'knowledge' ? 'orange.500' :
+                                       insight.category === 'project' ? 'blue.500' :
+                                       insight.category === 'alignment' ? 'cyan.500' : 
+                                       'gray.500'}
+                    >
+                      <CardBody py={2} px={3}>
+                        <Flex direction="column">
+                          <Flex justify="space-between" align="center">
+                            <Heading size="xs" fontWeight="medium">
+                              {insight.title || 'Untitled Insight'}
+                            </Heading>
+                            <HStack spacing={2}>
+                              <Badge colorScheme="blue" variant="subtle" fontSize="xs">
+                                {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(insight.createdAt))}
+                              </Badge>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => toggleExpand(insight.id)}
+                                aria-label="Toggle insight details"
+                                rightIcon={<FiArrowRight />}
+                              >
+                                {expandedInsight === insight.id ? 'Less' : 'More'}
+                              </Button>
+                            </HStack>
+                          </Flex>
+                          
+                          <Text fontSize="xs" mt={1} noOfLines={expandedInsight === insight.id ? undefined : 2}>
+                            {insight.description}
+                          </Text>
+                        </Flex>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </VStack>
+              </Box>
+            </TabPanel>
+          ))}
+        </TabPanels>
+      </Tabs>
     </SummaryCard>
   );
 };

@@ -45,19 +45,26 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   
+  // Get notifications with safe fallbacks
   const {
-    notifications,
-    unreadCount,
+    notifications = [],
+    unreadCount = 0,
     markAsRead,
     dismiss,
     markAllAsRead,
-    dismissAll
+    dismissAll,
+    isLoading,
+    apiAvailable
   } = useNotifications();
   
+  
   // Filter notifications by type if a filter is selected
-  const filteredNotifications = selectedType 
-    ? notifications.filter(notification => notification.type === selectedType)
-    : notifications;
+  // Add defensive check for notifications being undefined
+  const filteredNotifications = (notifications && Array.isArray(notifications))
+    ? (selectedType 
+      ? notifications.filter(notification => notification.type === selectedType)
+      : notifications)
+    : [];
   
   // Handle notification actions
   const handleMarkAsRead = async (id: string) => {
@@ -98,7 +105,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
   };
   
   // Get unique notification types for filtering
-  const notificationTypes = Array.from(new Set(notifications.map(n => n.type)));
+  // Add safe defensive check
+  const notificationTypes = Array.isArray(notifications) 
+    ? Array.from(new Set(notifications.map(n => n.type)))
+    : [];
   
   return (
     <>
@@ -193,7 +203,21 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
               <NotificationPreferences onBack={togglePreferences} />
             ) : (
               <Box>
-                {filteredNotifications.length > 0 ? (
+                {isLoading ? (
+                  // Show loading state
+                  <Flex justify="center" align="center" height="200px">
+                    <Text>Loading notifications...</Text>
+                  </Flex>
+                ) : !apiAvailable ? (
+                  // Show API unavailable state
+                  <EmptyState
+                    title="Notifications unavailable"
+                    description="Could not connect to notification service. Please try again later."
+                    icon={FaBell}
+                    mt={10}
+                  />
+                ) : filteredNotifications && filteredNotifications.length > 0 ? (
+                  // Show notifications
                   <VStack spacing={0} align="stretch" divider={<Divider />}>
                     {filteredNotifications.map(notification => (
                       <NotificationItem
@@ -205,6 +229,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
                     ))}
                   </VStack>
                 ) : (
+                  // Show empty state
                   <EmptyState
                     title="No notifications"
                     description={selectedType 

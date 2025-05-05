@@ -116,7 +116,11 @@ async function request<T>(endpoint: string, options: RequestInit): Promise<T> {
     
     const token = localStorage.getItem('knowledge_plane_token');
     if (token) {
+        console.log(`API request adding auth token to ${url} (token length: ${token.length})`);
+        console.log(`Token preview: ${token.substring(0, 15)}...`);
         headers.append('Authorization', `Bearer ${token}`);
+    } else {
+        console.log(`API request to ${url} has no auth token!`);
     }
 
     // Include credentials to enable cookie-based authentication
@@ -126,21 +130,52 @@ async function request<T>(endpoint: string, options: RequestInit): Promise<T> {
         credentials: 'include', // Include credentials for CORS requests to support cookies
     };
     
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-        let errorData;
-        try {
-            errorData = await response.json();
-        } catch {
-            // Ignore if response body isn't JSON
+    try {
+        const response = await fetch(url, config);
+        
+        // Enhanced error logging for debugging
+        if (!response.ok) {
+            console.error(`[Debug] API error for ${url} - Status: ${response.status}`);
+            
+            let errorData;
+            try {
+                errorData = await response.json();
+                console.error('[Debug] Error details:', errorData);
+            } catch (parseError) {
+                console.error('[Debug] Could not parse error response as JSON:', parseError);
+                // Fallback to text if JSON parsing fails
+                try {
+                    const textError = await response.text();
+                    console.error('[Debug] Error response text:', textError.substring(0, 500));
+                } catch (textError) {
+                    console.error('[Debug] Could not read error response as text:', textError);
+                }
+            }
+            
+            // Throw standardized error with status code and message
+            throw new Error(errorData?.detail || `HTTP error! status: ${response.status}`);
         }
-        throw new Error(errorData?.detail || `HTTP error! status: ${response.status}`);
-    }
 
-    if (response.status === 204) {
-        return null as T; 
-    }
+        if (response.status === 204) {
+            return null as T; 
+        }
 
-    return await response.json() as T;
+        // Log the response for debugging
+        if (endpoint.includes('notification')) {
+            console.log(`[Debug] Response for ${url}:`, response);
+        }
+
+        const data = await response.json() as T;
+        
+        // For debugging notification-related responses
+        if (endpoint.includes('notification')) {
+            console.log(`[Debug] Processed data for ${url}:`, data);
+        }
+        
+        return data;
+    } catch (error) {
+        // Enhanced error logging
+        console.error(`[Debug] Request failed for ${url}:`, error);
+        throw error;
+    }
 } 

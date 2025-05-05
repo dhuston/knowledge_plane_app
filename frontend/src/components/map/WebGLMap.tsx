@@ -19,7 +19,7 @@ import { Box, Spinner, Text, useToast, useDisclosure, useColorModeValue } from '
 // Import custom components
 import MapControls from './MapControls';
 import MapSearch from './MapSearch';
-import NodeTooltip from './NodeTooltip';
+import SimpleNodeTooltip from './SimpleNodeTooltip';
 import SigmaGraphLoader from './SigmaGraphLoader';
 
 // Import analytics related components and types
@@ -73,25 +73,64 @@ const WebGLMap: React.FC<WebGLMapProps> = ({
   const [hoveredNodePosition, setHoveredNodePosition] = useState<{ x: number; y: number } | null>(null);
   const { isOpen: isFilterOpen, onToggle: onFilterToggle } = useDisclosure();
 
-  // Fetch initial graph (using mock data for demo)
+  // Fetch initial graph from the API
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
         setIsLoading(true);
 
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
+        console.log("WebGLMap: Fetching map data from API...");
+        
+        // Try multiple endpoint paths to find one that works
+        let response;
+        try {
+          // First try the correct endpoint path
+          response = await apiClient.get('/map/graph');
+          console.log("WebGLMap: Successfully fetched data from /map/graph");
+        } catch (err1) {
+          console.error("WebGLMap: Failed to fetch from /map/graph:", err1);
+          
+          try {
+            // Try with hardcoded API v1 path as fallback
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+            const rawResponse = await fetch(`${apiBaseUrl}/api/v1/map/graph`);
+            if (!rawResponse.ok) {
+              throw new Error(`HTTP error! status: ${rawResponse.status}`);
+            }
+            response = { data: await rawResponse.json() };
+            console.log("WebGLMap: Successfully fetched data with direct fetch");
+          } catch (err2) {
+            console.error("WebGLMap: Failed with direct fetch:", err2);
+            throw new Error("Failed to fetch map data from all available endpoints");
+          }
+        }
+        
         if (!isMounted) return;
-
-        // Initialize with empty data - no mock data
-        setNodes([]);
-        setEdges([]);
-
-        // Notify parent with empty data for analytics
-        if (onDataChange) {
-          onDataChange([], []);
+        
+        console.log("WebGLMap: Data received:", response.data);
+        
+        if (response.data && response.data.nodes && response.data.edges) {
+          setNodes(response.data.nodes);
+          setEdges(response.data.edges.map((edge: any) => ({
+            source: edge.source,
+            target: edge.target,
+            type: edge.label
+          })));
+          
+          // Notify parent with real data for analytics
+          if (onDataChange) {
+            onDataChange(response.data.nodes, response.data.edges);
+          }
+          
+          console.log(`WebGLMap: Loaded ${response.data.nodes.length} nodes and ${response.data.edges.length} edges`);
+        } else {
+          console.warn("WebGLMap: Received empty or invalid data");
+          setNodes([]);
+          setEdges([]);
+          if (onDataChange) {
+            onDataChange([], []);
+          }
         }
 
         // Notify parent
@@ -100,8 +139,13 @@ const WebGLMap: React.FC<WebGLMapProps> = ({
         if (!isMounted) return;
 
         const msg = err instanceof Error ? err.message : 'Failed to load map data';
+        console.error("WebGLMap: Error loading map data:", err);
         setError(msg);
         toast({ title: 'Error', description: msg, status: 'error', duration: 6000, isClosable: true });
+        
+        // Set empty data on error
+        setNodes([]);
+        setEdges([]);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -110,7 +154,7 @@ const WebGLMap: React.FC<WebGLMapProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [onLoad, toast, onDataChange]);
+  }, [onLoad, toast, onDataChange, apiClient]);
 
   // State for link mode
   const [isLinkMode, setIsLinkMode] = useState(false);
@@ -358,7 +402,7 @@ const WebGLMap: React.FC<WebGLMapProps> = ({
 
       {/* Node Tooltip */}
       {hoveredNode && hoveredNodePosition && (
-        <NodeTooltip
+        <SimpleNodeTooltip
           node={hoveredNode}
           position={hoveredNodePosition}
           onViewDetails={(nodeId) => {

@@ -30,16 +30,18 @@ export interface MapNode {
     label: string;
     data: Record<string, unknown>; // Use unknown for safer typing
     position?: { x: number; y: number }; // Optional position hint
+    x?: number; // Direct x coordinate - some APIs return this format
+    y?: number; // Direct y coordinate - some APIs return this format
 }
 
 export interface MapEdge {
     id: string;
     source: string; // Source node ID (UUID as string)
     target: string; // Target node ID (UUID as string)
-    type: MapEdgeTypeEnum;
+    type?: MapEdgeTypeEnum; // Type might be undefined in API responses
+    label?: string | null; // Label is sometimes used instead of type in API responses
     data?: Record<string, unknown> | null; // Use unknown for safer typing
     animated?: boolean | null;
-    label?: string | null;
 }
 
 export interface MapData {

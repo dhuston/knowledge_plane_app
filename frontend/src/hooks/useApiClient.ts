@@ -61,9 +61,29 @@ export const useApiClient = (): AxiosInstance => {
             }
         };
 
-        // Add CSRF token to mutating requests
+        // Add authentication headers and CSRF token to requests
         instance.interceptors.request.use(
             async (config: InternalAxiosRequestConfig) => {
+                // Add authentication token to all requests
+                const token = localStorage.getItem('knowledge_plane_token') || 
+                              sessionStorage.getItem('knowledge_plane_token');
+                
+                if (token && config.headers) {
+                    config.headers['Authorization'] = `Bearer ${token}`;
+                    
+                    // Log for debugging
+                    console.log('[ApiClient] Adding auth header', {
+                        url: config.url,
+                        method: config.method,
+                        hasToken: !!token
+                    });
+                } else {
+                    console.warn('[ApiClient] No token available for request', {
+                        url: config.url,
+                        method: config.method
+                    });
+                }
+                
                 // Only add CSRF token to mutating methods
                 const mutatingMethods = ['post', 'put', 'delete', 'patch'];
                 if (mutatingMethods.includes(config.method?.toLowerCase() || '')) {

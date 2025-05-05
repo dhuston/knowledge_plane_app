@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import axios from 'axios';
+import { LogLevel, logAuthEvent, analyzeJwtToken } from '../utils/authDebugger';
 
 // Define User type (could import from a shared types file later)
 export interface User {
@@ -10,6 +11,8 @@ export interface User {
   avatar_url?: string | null;
   team_id?: string | null;
   manager_id?: string | null;
+  is_superuser?: boolean;
+  is_admin?: boolean;
   // Add other fields returned by /users/me endpoint
 }
 
@@ -21,6 +24,21 @@ interface AuthContextType {
   logout: () => Promise<void>;
   setToken: (accessToken: string | null, refreshToken: string | null) => void;
   token: string | null; // Add token getter to the interface
+  authStatus: AuthStatus; // Add auth status for debugging
+}
+
+// Define status object to track auth state issues
+export interface AuthStatus {
+  lastAuthCheck: string | null;
+  lastTokenRefresh: string | null;
+  lastError: string | null;
+  tokenStatus: {
+    exists: boolean;
+    valid?: boolean;
+    expiresAt?: string;
+    userId?: string;
+    tenantId?: string;
+  };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,204 +53,661 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // Debug tracking for auth flow
-  const [lastAuthEvent, setLastAuthEvent] = useState<string>("none");
-  const logAuthEvent = (event: string) => {
-    console.log(`[AUTH EVENT] ${event} @ ${new Date().toISOString()}`);
-    setLastAuthEvent(event);
+  // Initialize auth status object for tracking and debugging
+  const [authStatus, setAuthStatus] = useState<AuthStatus>({
+    lastAuthCheck: null,
+    lastTokenRefresh: null,
+    lastError: null,
+    tokenStatus: {
+      exists: false
+    }
+  });
+  
+  // Update auth status with current token information
+  const updateAuthStatus = (
+    update: Partial<AuthStatus> = {}, 
+    error: Error | null = null,
+    token: string | null = null
+  ) => {
+    setAuthStatus(prev => {
+      // Analyze token if provided
+      const tokenAnalysis = token ? analyzeJwtToken(token) : null;
+      
+      // Build updated token status
+      const tokenStatus = tokenAnalysis ? {
+        exists: true,
+        valid: tokenAnalysis.valid,
+        expiresAt: tokenAnalysis.expiryDate,
+        userId: tokenAnalysis.userId,
+        tenantId: tokenAnalysis.tenantId
+      } : token ? { exists: true } : { exists: false };
+      
+      return {
+        ...prev,
+        ...update,
+        lastError: error ? error.message : prev.lastError,
+        tokenStatus: tokenStatus
+      };
+    });
+  };
+  
+  // Enhanced debug tracking for auth flow - disabled to prevent re-renders
+  const logAuthContextEvent = (event: string, details?: Record<string, any>, level: LogLevel = LogLevel.INFO) => {
+    // Disabled logging to prevent re-renders
+    // logAuthEvent(level, "AuthContext", event, details);
+    
+    // Update last auth check timestamp if this is an auth check
+    if (event.includes('auth') || event.includes('token')) {
+      updateAuthStatus({
+        lastAuthCheck: new Date().toISOString()
+      });
+    }
   };
 
   // Function to set authentication state
   const setAuthenticated = (value: boolean) => {
-    logAuthEvent(`setAuthenticated(${value})`);
+    console.log(`[LOOP DEBUG] setAuthenticated(${value}) called`);
+    
+    logAuthContextEvent(`setAuthenticated(${value})`, {
+      previousValue: isAuthenticated,
+      newValue: value
+    });
+    
     setIsAuthenticated(value);
+    
     if (!value) {
-      logAuthEvent("clearingUserAndToken");
+      logAuthContextEvent("clearingUserAndToken", {
+        hadUser: !!user,
+        userId: user?.id,
+        userName: user?.name
+      });
+      
       setUser(null);
-      localStorage.removeItem('knowledge_plane_token');
+      
+      // Get token before removal for debugging
+      const tokenBeforeRemoval = localStorage.getItem('knowledge_plane_token');
+      const tokenStatus = tokenBeforeRemoval ? 
+        `exists (${tokenBeforeRemoval.substring(0, 15)}...)` : 'none';
+      
+      console.log(`[LOOP DEBUG] Removing token in setAuthenticated(false): ${tokenStatus}`);
+      
+      logAuthContextEvent("removingToken", {
+        tokenPresent: !!tokenBeforeRemoval,
+        tokenLength: tokenBeforeRemoval?.length
+      }, LogLevel.INFO);
+      
+      try {
+        localStorage.removeItem('knowledge_plane_token');
+        localStorage.removeItem('knowledge_plane_refresh_token');
+        
+        // LOOP FIX: Update token state directly to avoid second re-render
+        setTokenState(null);
+        
+        // Verify token was removed
+        const tokenAfterRemoval = localStorage.getItem('knowledge_plane_token');
+        
+        if (tokenAfterRemoval) {
+          logAuthContextEvent("tokenRemovalFailed", {
+            tokenStillPresent: true
+          }, LogLevel.ERROR);
+        } else {
+          logAuthContextEvent("tokenRemovedSuccessfully", {}, LogLevel.INFO);
+        }
+        
+        // Update auth status to reflect token removal
+        updateAuthStatus({}, null, null);
+        
+      } catch (e) {
+        logAuthContextEvent("tokenRemovalError", {
+          error: (e as Error).message
+        }, LogLevel.ERROR);
+        
+        updateAuthStatus({}, e as Error, null);
+      }
     }
   };
 
   // Function to handle token storage
   const setToken = (accessToken: string | null, refreshToken: string | null) => {
-    logAuthEvent(`setToken(${accessToken ? 'token-provided' : 'null'})`);
-    console.log('AuthContext.setToken called with:', 
-                accessToken ? 'token (length ' + accessToken.length + ')' : 'null',
-                refreshToken ? 'refresh token (length ' + refreshToken.length + ')' : 'null');
+    console.log(`[LOOP DEBUG] setToken called with accessToken length: ${accessToken?.length}`);
+    
+    logAuthContextEvent("setToken", {
+      hasAccessToken: !!accessToken,
+      accessTokenLength: accessToken?.length,
+      hasRefreshToken: !!refreshToken
+    });
     
     if (accessToken) {
-      logAuthEvent("storingToken");
-      console.log('Storing token in localStorage under key: knowledge_plane_token');
+      // First analyze the token
+      const tokenAnalysis = analyzeJwtToken(accessToken);
+      
+      logAuthContextEvent("tokenAnalysis", {
+        valid: tokenAnalysis.valid,
+        userId: tokenAnalysis.userId,
+        tenantId: tokenAnalysis.tenantId,
+        expiresAt: tokenAnalysis.expiryDate,
+        timeToExpire: tokenAnalysis.timeToExpire
+      });
+      
+      // Update auth status with token details
+      updateAuthStatus({
+        lastTokenRefresh: new Date().toISOString()
+      }, null, accessToken);
       
       // RACE CONDITION FIX: Set loading state BEFORE storing token
-      // This ensures components know we're in a loading state before any auth checks
-      logAuthEvent("settingLoadingBeforeTokenStorage");
+      logAuthContextEvent("settingLoadingBeforeTokenStorage");
       setIsLoading(true);
       
-      localStorage.setItem('knowledge_plane_token', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('knowledge_plane_refresh_token', refreshToken);
-      }
-      
-      // Create a JWT parser to check token
+      // Storage diagnostic - check if we can use localStorage
       try {
-        const tokenParts = accessToken.split('.');
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          logAuthEvent(`tokenParsed:${JSON.stringify(payload)}`);
+        const testKey = 'auth_storage_test';
+        localStorage.setItem(testKey, 'test');
+        const testValue = localStorage.getItem(testKey);
+        localStorage.removeItem(testKey);
+        
+        if (testValue !== 'test') {
+          logAuthContextEvent("localStorageMalfunction", {
+            canWrite: true,
+            canRead: false,
+            testValue
+          }, LogLevel.ERROR);
         }
       } catch (e) {
-        logAuthEvent(`tokenParseError:${e}`);
+        logAuthContextEvent("localStorageUnavailable", {
+          error: (e as Error).message
+        }, LogLevel.ERROR);
+        
+        // Try to use sessionStorage as fallback
+        try {
+          sessionStorage.setItem('knowledge_plane_token', accessToken);
+          if (refreshToken) {
+            sessionStorage.setItem('knowledge_plane_refresh_token', refreshToken);
+          }
+          logAuthContextEvent("usingSessionStorageFallback", {}, LogLevel.WARN);
+        } catch (e) {
+          logAuthContextEvent("allStorageUnavailable", {
+            error: (e as Error).message
+          }, LogLevel.ERROR);
+        }
       }
       
-      // RACE CONDITION FIX: Don't set authenticated until we have user data
-      // The token effect hook will fetch user data and set isAuthenticated=true
-      console.log('Token stored, awaiting user data fetch');
+      // Store token with comprehensive error handling
+      try {
+        // Try to clear any existing token first
+        localStorage.removeItem('knowledge_plane_token');
+        
+        // Store the new token
+        localStorage.setItem('knowledge_plane_token', accessToken);
+        
+        if (refreshToken) {
+          localStorage.setItem('knowledge_plane_refresh_token', refreshToken);
+        }
+        
+        logAuthContextEvent("tokenStoredSuccessfully", {
+          accessTokenLength: accessToken.length,
+          refreshTokenPresent: !!refreshToken
+        });
+        
+        // Verify token was properly stored
+        const storedToken = localStorage.getItem('knowledge_plane_token');
+        
+        if (!storedToken) {
+          logAuthContextEvent("tokenStorageVerificationFailed", {
+            attempted: true,
+            stored: false
+          }, LogLevel.ERROR);
+        } else if (storedToken !== accessToken) {
+          logAuthContextEvent("tokenStorageMismatch", {
+            attemptedLength: accessToken.length,
+            storedLength: storedToken.length,
+            match: false
+          }, LogLevel.ERROR);
+        }
+        
+        // LOOP FIX: Update our local state directly to avoid a second re-render cycle
+        console.log('[LOOP DEBUG] Updating token state directly to avoid storage re-read');
+        setTokenState(accessToken);
+      } catch (e) {
+        logAuthContextEvent("tokenStorageError", {
+          error: (e as Error).message
+        }, LogLevel.ERROR);
+        
+        updateAuthStatus({}, e as Error, null);
+      }
+      
+      // Don't set authenticated flag - wait for user data to be fetched
+      logAuthContextEvent("awaitingUserDataFetch");
     } else {
-      logAuthEvent("removingTokens");
-      console.log('Removing tokens from localStorage');
-      localStorage.removeItem('knowledge_plane_token');
-      localStorage.removeItem('knowledge_plane_refresh_token');
+      // No token provided - clear authentication
+      logAuthContextEvent("clearingTokensAndAuth", {
+        reason: "null token provided to setToken"
+      });
+      
+      try {
+        localStorage.removeItem('knowledge_plane_token');
+        localStorage.removeItem('knowledge_plane_refresh_token');
+        
+        // Update auth status
+        updateAuthStatus({}, null, null);
+        
+        logAuthContextEvent("tokensRemovedSuccessfully");
+        
+        // LOOP FIX: Update our local state directly to avoid a second re-render cycle
+        console.log('[LOOP DEBUG] Clearing token state directly');
+        setTokenState(null);
+      } catch (e) {
+        logAuthContextEvent("tokenRemovalError", {
+          error: (e as Error).message
+        }, LogLevel.ERROR);
+        
+        updateAuthStatus({}, e as Error, null);
+      }
+      
       setAuthenticated(false);
     }
     
-    // Debug check to confirm token was stored
+    // Verification with timeout to catch race conditions
     setTimeout(() => {
       const storedToken = localStorage.getItem('knowledge_plane_token');
-      logAuthEvent(`tokenCheckAfterStore:${storedToken ? 'present' : 'missing'}`);
-      console.log('Token in localStorage immediately after storing:', 
-                  storedToken ? 'present (length ' + storedToken.length + ')' : 'missing');
-    }, 10);
+      
+      logAuthContextEvent("verifyingTokenStorage", {
+        tokenPresent: !!storedToken,
+        tokenLength: storedToken?.length,
+        expectedPresent: !!accessToken
+      });
+      
+      if (!!accessToken !== !!storedToken) {
+        logAuthContextEvent("tokenStorageStateMismatch", {
+          expected: !!accessToken,
+          actual: !!storedToken
+        }, LogLevel.ERROR);
+        
+        // If there's a mismatch, fix our state to match reality
+        console.log('[LOOP DEBUG] Token storage mismatch detected - synchronizing state');
+        setTokenState(storedToken);
+      }
+      
+      // Update status one more time
+      updateAuthStatus({}, null, storedToken);
+    }, 50);
   };
 
   // Logout function - calls backend to clear cookies and removes token
   const logout = async () => {
+    logAuthContextEvent("logoutRequested", {
+      userId: user?.id,
+      userName: user?.name,
+      isAuthenticated
+    });
+    
+    const token = localStorage.getItem('knowledge_plane_token');
+    
     try {
-      const token = localStorage.getItem('knowledge_plane_token');
-      await axios.post(`${API_BASE_URL}/auth/logout`, {}, {
+      logAuthContextEvent("callingBackendLogout", {
+        hasToken: !!token,
+        endpoint: `${API_BASE_URL}/auth/logout`
+      });
+      
+      const response = await axios.post(`${API_BASE_URL}/auth/logout`, {}, {
         withCredentials: true,
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      localStorage.removeItem('knowledge_plane_token');
-      localStorage.removeItem('knowledge_plane_refresh_token');
-      setAuthenticated(false);
+      
+      logAuthContextEvent("backendLogoutSuccess", {
+        status: response.status
+      });
     } catch (error) {
-      // Even if the backend call fails, clear the frontend state
-      localStorage.removeItem('knowledge_plane_token');
-      localStorage.removeItem('knowledge_plane_refresh_token');
+      logAuthContextEvent("backendLogoutError", {
+        message: (error as Error).message,
+        isAxiosError: axios.isAxiosError(error),
+        status: axios.isAxiosError(error) ? error.response?.status : undefined
+      }, LogLevel.ERROR);
+    } finally {
+      // Always clear frontend state regardless of backend result
+      try {
+        localStorage.removeItem('knowledge_plane_token');
+        localStorage.removeItem('knowledge_plane_refresh_token');
+        
+        logAuthContextEvent("frontendLogoutComplete");
+        
+        // Update auth status
+        updateAuthStatus({}, null, null);
+      } catch (e) {
+        logAuthContextEvent("frontendLogoutError", {
+          error: (e as Error).message
+        }, LogLevel.ERROR);
+      }
+      
       setAuthenticated(false);
     }
   };
 
   // Effect to check authentication and fetch user data
   useEffect(() => {
-    logAuthEvent("useEffect-authCheck-starting");
+    logAuthContextEvent("useEffect-authCheck-starting");
     
     const checkAuthAndFetchUser = async () => {
-      console.log('AuthContext useEffect running - checkAuthAndFetchUser()');
-      logAuthEvent("checkAuthAndFetchUser-start");
+      logAuthContextEvent("checkAuthAndFetchUser-start", {
+        currentIsAuthenticated: isAuthenticated,
+        currentHasUser: !!user
+      });
+      
       setIsLoading(true);
       
       // Check if token exists in localStorage
       const token = localStorage.getItem('knowledge_plane_token');
-      logAuthEvent(`tokenCheck:${token ? 'present' : 'missing'}`);
-      console.log('Token in localStorage during auth check:', token ? 'present (length ' + token.length + ')' : 'missing');
       
-      if (!token) {
-        logAuthEvent("noToken-settingUnauthenticated");
-        console.log('No token found, setting isAuthenticated to false');
+      // Also check sessionStorage in case we had to use it as a fallback
+      const sessionToken = sessionStorage.getItem('knowledge_plane_token');
+      
+      // Use token from localStorage, fallback to sessionStorage if needed
+      const effectiveToken = token || sessionToken;
+      
+      // Log the token status
+      logAuthContextEvent("tokenCheck", {
+        localStorageToken: !!token,
+        sessionStorageToken: !!sessionToken,
+        effectiveTokenAvailable: !!effectiveToken,
+        tokenLength: effectiveToken?.length
+      });
+      
+      // If we're using sessionStorage as fallback, log a warning
+      if (!token && sessionToken) {
+        logAuthContextEvent("usingSessionStorageToken", {
+          reason: "localStorage token not available"
+        }, LogLevel.WARN);
+      }
+      
+      // If token exists, analyze its contents
+      if (effectiveToken) {
+        // Use our token analyzer utility
+        const tokenAnalysis = analyzeJwtToken(effectiveToken);
+        
+        logAuthContextEvent("existingTokenAnalysis", {
+          valid: tokenAnalysis.valid,
+          isExpired: tokenAnalysis.isExpired,
+          expiresAt: tokenAnalysis.expiryDate,
+          timeToExpire: tokenAnalysis.timeToExpire,
+          userId: tokenAnalysis.userId,
+          tenantId: tokenAnalysis.tenantId
+        });
+        
+        // Update auth status with token info
+        updateAuthStatus({
+          lastAuthCheck: new Date().toISOString()
+        }, null, effectiveToken);
+        
+        // If token is expired, clear it now
+        if (tokenAnalysis.isExpired) {
+          logAuthContextEvent("expiredTokenDetected", {
+            expiredAt: tokenAnalysis.expiryDate,
+            currentTime: new Date().toISOString()
+          }, LogLevel.WARN);
+          
+          try {
+            localStorage.removeItem('knowledge_plane_token');
+            localStorage.removeItem('knowledge_plane_refresh_token');
+            sessionStorage.removeItem('knowledge_plane_token');
+            sessionStorage.removeItem('knowledge_plane_refresh_token');
+            
+            updateAuthStatus({
+              lastError: "Token expired"
+            }, null, null);
+            
+            logAuthContextEvent("expiredTokenCleared");
+            
+            setIsAuthenticated(false);
+            setUser(null);
+            setIsLoading(false);
+            return;
+          } catch (e) {
+            logAuthContextEvent("errorClearingExpiredToken", {
+              error: (e as Error).message
+            }, LogLevel.ERROR);
+          }
+        }
+      }
+      
+      // If no token exists, clear authentication state
+      if (!effectiveToken) {
+        logAuthContextEvent("noToken-settingUnauthenticated");
+        
+        updateAuthStatus({
+          lastAuthCheck: new Date().toISOString()
+        }, null, null);
+        
         setIsAuthenticated(false);
         setUser(null);
         setIsLoading(false);
         return;
       }
       
+      // At this point, we have a valid token - let's try to fetch the user data
       try {
-        // Check if session is valid by requesting current user
-        // Note: Fixed API path with proper /api/v1 prefix
-        logAuthEvent("userDataRequest-starting");
-        console.log(`Requesting user data from: ${API_BASE_URL}/api/v1/users/me with token`);
-        console.log(`Authorization header: Bearer ${token.substring(0, 10)}...`);
+        // First log the API request details
+        logAuthContextEvent("userDataRequest-starting", {
+          url: `${API_BASE_URL}/api/v1/users/me`,
+          tokenPreview: effectiveToken.substring(0, 10) + '...'
+        });
         
-        let response;
+        // Use a performance mark to measure timing
+        performance.mark('user-fetch-start');
+        
         try {
-          // Create fetch request for better debugging than axios
-          logAuthEvent("userDataFetch-attempt");
+          // Use built-in fetch first for diagnostics
+          const fetchStartTime = performance.now();
           
-          // First try with basic fetch for debugging
           const fetchResponse = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Bearer ${effectiveToken}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json'
-            }
+            },
+            credentials: 'include'
           });
           
-          logAuthEvent(`fetchResponse-status:${fetchResponse.status}`);
-          const responseText = await fetchResponse.text();
-          logAuthEvent(`fetchResponse-body:${responseText.substring(0, 50)}...`);
+          const fetchTime = performance.now() - fetchStartTime;
           
-          // Now continue with axios as before (using the same path as fetch)
-          response = await axios.get<User>(`${API_BASE_URL}/api/v1/users/me`, {
+          logAuthContextEvent("fetchResponseReceived", {
+            status: fetchResponse.status,
+            time: fetchTime,
+            ok: fetchResponse.ok,
+            statusText: fetchResponse.statusText,
+            headers: Object.fromEntries([...fetchResponse.headers.entries()])
+          });
+          
+          // Try to parse response for more diagnostic info if needed
+          let responseData = null;
+          try {
+            const responseText = await fetchResponse.text();
+            try {
+              responseData = JSON.parse(responseText);
+              
+              if (!fetchResponse.ok) {
+                logAuthContextEvent("fetchResponseError", {
+                  status: fetchResponse.status,
+                  data: responseData,
+                  detail: responseData?.detail
+                }, LogLevel.ERROR);
+                
+                // Update the auth status with the error
+                updateAuthStatus({
+                  lastError: responseData?.detail || `HTTP error ${fetchResponse.status}`
+                }, null, effectiveToken);
+              }
+            } catch (parseError) {
+              logAuthContextEvent("fetchResponseParseError", {
+                error: (parseError as Error).message,
+                responseText: responseText.substring(0, 100)
+              }, LogLevel.ERROR);
+            }
+          } catch (textError) {
+            logAuthContextEvent("fetchResponseReadError", {
+              error: (textError as Error).message
+            }, LogLevel.ERROR);
+          }
+          
+          // If fetch response is not OK, early-out
+          if (!fetchResponse.ok) {
+            throw new Error(`HTTP error ${fetchResponse.status}: ${fetchResponse.statusText}`);
+          }
+          
+          // If fetch was successful, move on to axios for actual data parsing
+          // This helps us diagnose whether the issue is with fetch or axios specifically
+          const axiosStartTime = performance.now();
+          
+          const response = await axios.get<User>(`${API_BASE_URL}/api/v1/users/me`, {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${effectiveToken}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             }
           });
-          logAuthEvent(`axiosResponse-status:${response.status}`);
-          console.log('API response successful:', response.status);
           
-          console.log('User data API response:', response.status, response.data ? 'data present' : 'no data');
-          console.log('User data details:', response.data);
+          const axiosTime = performance.now() - axiosStartTime;
           
+          logAuthContextEvent("axiosResponseReceived", {
+            status: response.status,
+            time: axiosTime,
+            dataPresent: !!response.data
+          });
+          
+          performance.mark('user-fetch-end');
+          performance.measure('user-fetch', 'user-fetch-start', 'user-fetch-end');
+          const measure = performance.getEntriesByName('user-fetch')[0];
+          
+          // If we got a successful response with user data, update auth state
           if (response.status === 200 && response.data) {
-            logAuthEvent(`settingUserData:${response.data.email}`);
-            console.log('Setting user data:', response.data);
-            setUser(response.data); // Set the user data
+            logAuthContextEvent("userDataLoaded", {
+              email: response.data.email,
+              userId: response.data.id,
+              hasTeam: !!response.data.team_id,
+              fetchTime: measure.duration
+            });
+            
+            // Set user data and authenticate
+            setUser(response.data);
             setIsAuthenticated(true);
-            console.log('User authenticated successfully, user data set');
+            
+            // Update auth status with successful fetch
+            updateAuthStatus({
+              lastAuthCheck: new Date().toISOString()
+            }, null, effectiveToken);
           } else {
-            logAuthEvent("userDataResponse-notOK");
-            console.log('User data response not OK, setting isAuthenticated to false');
-            setUser(null); // Explicitly clear user
+            logAuthContextEvent("userDataResponseEmpty", {
+              status: response.status
+            }, LogLevel.ERROR);
+            
+            setUser(null);
             setIsAuthenticated(false);
+            
+            // Update auth status with error
+            updateAuthStatus({
+              lastError: "Empty user data response"
+            }, null, effectiveToken);
           }
         } catch (axiosError: any) {
-          logAuthEvent(`userDataRequest-failed:${axiosError.message}`);
-          console.error('API request failed:', axiosError.message);
-          console.error('API response status:', axiosError.response?.status);
-          console.error('API response data:', axiosError.response?.data);
-          console.error('API request config:', JSON.stringify({
-            url: axiosError.config?.url,
-            method: axiosError.config?.method,
-            headers: {
-              ...axiosError.config?.headers,
-              Authorization: 'Bearer [TOKEN_REDACTED]'
-            }
-          }));
+          // Handle axios errors
+          const isAxiosError = axios.isAxiosError(axiosError);
+          
+          logAuthContextEvent("userDataRequestFailed", {
+            message: axiosError.message,
+            isAxiosError,
+            status: isAxiosError ? axiosError.response?.status : undefined,
+            statusText: isAxiosError ? axiosError.response?.statusText : undefined,
+            data: isAxiosError ? axiosError.response?.data : undefined
+          }, LogLevel.ERROR);
           
           // Clear invalid token
-          logAuthEvent("clearingTokenAfterError");
-          console.log('API error, clearing token and setting authenticated to false');
+          if (isAxiosError && axiosError.response?.status === 401) {
+            logAuthContextEvent("clearingInvalidToken", {
+              reason: "401 Unauthorized response"
+            }, LogLevel.WARN);
+            
+            localStorage.removeItem('knowledge_plane_token');
+            sessionStorage.removeItem('knowledge_plane_token');
+            
+            // Update auth status
+            updateAuthStatus({
+              lastError: "Invalid authentication token",
+              tokenStatus: { exists: false }
+            }, axiosError);
+          }
+          
           setIsAuthenticated(false);
           setUser(null);
-          localStorage.removeItem('knowledge_plane_token'); // RACE CONDITION FIX: Clear token on error
+          
           throw axiosError;
         }
       } catch (error: any) {
-        logAuthEvent(`errorInMainTryCatch:${error.message}`);
-        console.error('Error fetching user data:', error.message, error.response?.status);
+        // This is the outer catch for any other errors
+        logAuthContextEvent("authCheckFailed", {
+          message: error.message,
+          name: error.name
+        }, LogLevel.ERROR);
+        
+        // For connection errors to non-essential services like notifications or WebSockets,
+        // don't invalidate the authentication - just log the error but keep the user logged in
+        if (error.message && (
+          error.message.includes('ECONNREFUSED') ||
+          error.message.includes('notifications') ||
+          error.message.includes('socket') ||
+          error.message.includes('ai-proxy')
+        )) {
+          // These are non-critical endpoints, just log the error
+          logAuthContextEvent("nonCriticalError", {
+            message: error.message,
+            action: "continuing with valid authentication"
+          }, LogLevel.WARN);
+          
+          // Keep the authenticated state if we have a user and token
+          if (user && token) {
+            logAuthContextEvent("maintainingAuthenticationDespiteError", {
+              userId: user.id,
+              reason: "Error in non-critical service"
+            });
+            
+            // Don't invalidate auth state for non-critical errors
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // For critical errors, invalidate authentication
         setIsAuthenticated(false);
         setUser(null);
-        // Clear invalid token
-        console.log('Clearing invalid token from localStorage');
-        localStorage.removeItem('knowledge_plane_token');
+        
+        // Clear invalid token only for auth-related errors
+        if (error.message && (
+          error.message.includes('401') || 
+          error.message.includes('auth') || 
+          error.message.includes('token') || 
+          error.message.includes('unauthorized')
+        )) {
+          logAuthContextEvent("clearingInvalidToken", {
+            reason: "Auth-related error"
+          });
+          
+          localStorage.removeItem('knowledge_plane_token');
+          sessionStorage.removeItem('knowledge_plane_token');
+          
+          // Update auth status
+          updateAuthStatus({
+            lastError: error.message
+          }, error as Error, null);
+        }
       } finally {
-        logAuthEvent(`authCheckComplete:isAuth=${isAuthenticated},hasUser=${!!user}`);
+        // Always complete the loading state
+        logAuthContextEvent("authCheckCompleted", {
+          isAuthenticated,
+          hasUser: !!user,
+          timeTaken: performance.getEntriesByName('user-fetch')[0]?.duration
+        });
+        
         setIsLoading(false);
-        console.log('Auth loading complete, isAuthenticated =', isAuthenticated);
+        performance.clearMarks();
+        performance.clearMeasures();
       }
     };
     
@@ -240,76 +715,224 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     
     // Set up an interval to periodically check token validity
     const checkInterval = setInterval(() => {
-      const token = localStorage.getItem('knowledge_plane_token');
+      const token = localStorage.getItem('knowledge_plane_token') || 
+                    sessionStorage.getItem('knowledge_plane_token');
+      
       if (token) {
-        try {
-          const tokenParts = token.split('.');
-          if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            // If token is about to expire in the next 5 minutes, clear it
-            if (payload.exp * 1000 < Date.now() + 5 * 60 * 1000) {
-              console.log('Token is expired or about to expire, clearing');
-              localStorage.removeItem('knowledge_plane_token');
-              setIsAuthenticated(false);
-              setUser(null);
-            }
+        const tokenAnalysis = analyzeJwtToken(token);
+        
+        if (tokenAnalysis.timeToExpire && tokenAnalysis.timeToExpire < 300) {  // Less than 5 minutes
+          logAuthContextEvent("tokenExpiryWarning", {
+            expiresAt: tokenAnalysis.expiryDate,
+            timeToExpire: tokenAnalysis.timeToExpire,
+            userId: tokenAnalysis.userId
+          }, LogLevel.WARN);
+          
+          if (tokenAnalysis.isExpired) {
+            logAuthContextEvent("expiredTokenDetected-interval", {
+              action: "clearing_token"
+            });
+            
+            localStorage.removeItem('knowledge_plane_token');
+            sessionStorage.removeItem('knowledge_plane_token');
+            setIsAuthenticated(false);
+            setUser(null);
+            
+            // Update auth status
+            updateAuthStatus({
+              lastError: "Token expired during session"
+            }, null, null);
           }
-        } catch (e) {
-          console.error('Error checking token expiry:', e);
         }
       }
     }, 60000); // Check every minute
     
     // Clean up interval on unmount
-    return () => clearInterval(checkInterval);
+    return () => {
+      logAuthContextEvent("authCheckIntervalCleanup");
+      clearInterval(checkInterval);
+    };
   }, []); // No dependencies to prevent unnecessary re-runs
 
-  // Get current token from storage - always check localStorage directly to avoid stale state
-  const token = localStorage.getItem('knowledge_plane_token');
+  // Get current token from storage - checking both localStorage and sessionStorage
+  // We'll use React state for the token instead of re-reading from storage on each render
+  // This helps prevent unnecessary token state updates and potential infinite loops
+  const [token, setTokenState] = useState<string | null>(
+    localStorage.getItem('knowledge_plane_token') || 
+    sessionStorage.getItem('knowledge_plane_token') || 
+    null
+  );
+  
+  // Effect to update token state when localStorage changes (e.g. from other tabs)
+  useEffect(() => {
+    // Function to read token from storage
+    const getTokenFromStorage = () => {
+      return localStorage.getItem('knowledge_plane_token') || 
+             sessionStorage.getItem('knowledge_plane_token') || 
+             null;
+    };
+    
+    // Function to handle storage events
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'knowledge_plane_token') {
+        const newToken = getTokenFromStorage();
+        console.log('[LOOP DEBUG] Storage event detected - token changed externally');
+        setTokenState(newToken);
+      }
+    };
+    
+    // Listen for storage events (changes from other tabs)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Immediate user fetch on token change - critical fix for race condition
   useEffect(() => {
+    // Use a stable counter that won't be reset between component renders
+    if (typeof window.__tokenEffectCounter === 'undefined') {
+      window.__tokenEffectCounter = 0;
+    }
+    window.__tokenEffectCounter++;
+    
+    // Use localStorage to track if we've already attempted a fetch with this token
+    // to prevent infinite loops when clearing browser cache doesn't reset this state
+    const getTokenLoopKey = (token: string | null) => {
+      return token ? `token_fetch_${token.substring(0, 8)}` : 'token_fetch_none';
+    };
+    
+    // Check if we've already attempted to fetch data with this exact token
+    const currentTokenKey = getTokenLoopKey(token);
+    const lastFetchTime = localStorage.getItem(currentTokenKey);
+    const now = Date.now();
+    const recentFetchTimeThreshold = 2000; // ms
+    
+    // If we've very recently tried to fetch with this same token, prevent infinite loop
+    if (lastFetchTime && (now - parseInt(lastFetchTime)) < recentFetchTimeThreshold) {
+      console.log(`[LOOP PREVENTION] Skipping duplicate fetch for token - last attempt was ${now - parseInt(lastFetchTime)}ms ago`);
+      return; // Exit early to prevent infinite loop
+    }
+    
+    // Record that we're attempting a fetch with this token
+    if (token) {
+      localStorage.setItem(currentTokenKey, now.toString());
+    }
+    
+    // Clean up old token fetch tracking entries (keep only recent ones)
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('token_fetch_') && key !== currentTokenKey) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      console.error("Error cleaning token fetch tracking:", e);
+    }
+    
     const immediateUserFetch = async () => {
-      logAuthEvent("immediateUserFetch-tokenChanged");
+      const effectId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       
-      // RACE CONDITION FIX: Always try to fetch user if token exists but no user
-      // This is the critical fix - we fetch user whenever token changes OR when token
-      // exists but user doesn't
       if (token) {
-        logAuthEvent("immediateUserFetch-fetchingUser");
+        // First, analyze the token to check if it's valid
+        const tokenAnalysis = analyzeJwtToken(token);
+        
+        // If token is expired, clear it
+        if (tokenAnalysis.isExpired) {
+          localStorage.removeItem('knowledge_plane_token');
+          sessionStorage.removeItem('knowledge_plane_token');
+          setUser(null);
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          
+          updateAuthStatus({
+            lastError: "Token expired during fetch"
+          }, null, null);
+          
+          return;
+        }
+        
+        // Check if we've been looping too many times - possible infinite loop protection
+        if (window.__tokenEffectCounter > 5) {
+          console.warn(`[LOOP PREVENTION] Potential infinite loop detected! Counter: ${window.__tokenEffectCounter}`);
+          console.warn('[LOOP PREVENTION] Breaking potential infinite loop. Will not fetch user data.');
+          
+          // Skip user fetch in potential loop scenario but maintain auth state
+          // Don't update any state to break the potential loop
+          return;
+        }
         
         // Ensure we mark loading state
         setIsLoading(true);
         
         try {
           const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            credentials: 'include',
+            // Add cache busting parameter to prevent browser cache issues
+            cache: 'no-cache'
           });
           
           if (response.ok) {
             const userData = await response.json();
-            logAuthEvent(`immediateUserFetch-success:${userData.email}`);
-            setUser(userData);
-            setIsAuthenticated(true);
+            
+            // Check if we already have this same user - prevent unnecessary state updates
+            if (user?.id === userData.id) {
+              console.log(`[LOOP DEBUG] User data unchanged, skipping state update`);
+            } else {
+              setUser(userData);
+              setIsAuthenticated(true);
+            }
+            
+            // Update auth status with successful fetch
+            updateAuthStatus({
+              lastAuthCheck: new Date().toISOString()
+            }, null, token);
           } else {
-            // If user fetch fails with a token present, clear auth state
-            logAuthEvent(`immediateUserFetch-failedWithStatus:${response.status}`);
+            // Clear auth state on auth error
             setIsAuthenticated(false);
             setUser(null);
-            localStorage.removeItem('knowledge_plane_token'); // Clear bad token
+            
+            // Only clear token for auth-related errors
+            if (response.status === 401 || response.status === 403) {
+              localStorage.removeItem('knowledge_plane_token');
+              sessionStorage.removeItem('knowledge_plane_token');
+              
+              // Update auth status
+              updateAuthStatus({
+                lastError: `Authentication failed: HTTP ${response.status}`
+              }, null, null);
+            } else {
+              // For other errors, keep token but update error status
+              updateAuthStatus({
+                lastError: `User fetch failed: HTTP ${response.status}`
+              }, null, token);
+            }
           }
         } catch (err) {
-          logAuthEvent(`immediateUserFetch-failed:${err}`);
+          // Update auth status with error
+          updateAuthStatus({
+            lastError: (err as Error).message
+          }, err as Error, token);
         } finally {
           setIsLoading(false);
         }
       } else if (!token && (user || isAuthenticated)) {
-        // RACE CONDITION FIX: If token is gone but we still have user/auth state,
-        // clear the auth state to maintain consistency
-        logAuthEvent("tokenGoneButUserPresent-clearingState");
+        // Token is gone but we still have user/auth state - clear it
         setUser(null);
         setIsAuthenticated(false);
         setIsLoading(false);
+        
+        // Update auth status
+        updateAuthStatus({
+          lastError: "Token disappeared while user was logged in"
+        }, null, null);
       }
     };
     
@@ -323,7 +946,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     isLoading,
     logout,
     setToken,
-    token
+    token,
+    authStatus  // Added auth status for debugging
   };
 
   return (

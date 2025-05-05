@@ -141,13 +141,31 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
       };
     }
 
+    // Handle position data regardless of format
+    let xPos = 0, yPos = 0;
+    
+    // Check if we have position data in any of these formats
+    if (node.position && typeof node.position === 'object') {
+      // Use position object if available
+      xPos = node.position.x || 0;
+      yPos = node.position.y || 0;
+    } else if (typeof node.x === 'number' && typeof node.y === 'number') {
+      // Fall back to direct x,y properties if available
+      xPos = node.x;
+      yPos = node.y;
+    } else {
+      // Last resort: use random position
+      xPos = (Math.random() - 0.5) * 1000;
+      yPos = (Math.random() - 0.5) * 1000;
+    }
+
     return {
       label: node.label,
       size: nodeSize,
       color: style.color,
       entityType: node.type,
-      x: node.position?.x ?? Math.random(),
-      y: node.position?.y ?? Math.random(),
+      x: xPos,
+      y: yPos,
       originalApiData: node, // Store original node data
       borderColor: style.borderColor,
       borderWidth: style.borderWidth || 1,
@@ -159,167 +177,234 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
 
   // Load graph & compute initial layout
   useEffect(() => {
-    const graph = new Graph();
-    const nodeTypeMap = nodeTypeMapRef.current;
-
-    // Clear existing maps
-    nodeTypeMap.clear();
-    childrenMap.current.clear();
-    collapsedTeams.current.clear();
-
-    // Add nodes with enhanced styling based on node styles
-    nodes.forEach((node) => {
-      nodeTypeMap.set(node.id, node.type);
-      if (!graph.hasNode(node.id)) {
-        const nodeAttrs = createNodeAttributes(node);
-        graph.addNode(node.id, nodeAttrs);
-
-        // Auto-collapse teams initially
-        if (node.type === MapNodeTypeEnum.TEAM) {
-          collapsedTeams.current.add(node.id);
-        }
-      }
-    });
-
-    // Add edges with improved styling
-    edges.forEach((edge, idx) => {
-      const key = `e${idx}`;
-      if (!graph.hasEdge(key)) {
-        // Get relationship type from edge if available
-        const edgeType = edge.type as MapEdgeTypeEnum;
-        let style = edgeStyles[edgeType];
-
-        // Fallback to infer relationship by node types if no explicit type
-        if (!style) {
-          const sourceType = nodeTypeMap.get(edge.source);
-          const targetType = nodeTypeMap.get(edge.target);
-
-          if (sourceType && targetType) {
-            style = getEdgeStyleByNodeTypes(sourceType, targetType);
-          } else {
-            // Default style if no defined relationship
-            style = {
-              color: '#ccc',
-              size: 1,
-              type: 'line'
-            };
-          }
-        }
-
-        graph.addEdgeWithKey(key, edge.source, edge.target, {
-          color: style.color,
-          size: style.size,
-          type: style.type,
-          animated: style.animated,
-          edgeType: edgeType, // Store the edge type for reference
-          hidden: false // ALWAYS show edges by default
-        });
-      }
-
-      // Build children map: if one end is TEAM and other is not TEAM, record
-      const sourceType = nodeTypeMap.get(edge.source);
-      const targetType = nodeTypeMap.get(edge.target);
-      if (sourceType === MapNodeTypeEnum.TEAM && targetType !== MapNodeTypeEnum.TEAM) {
-        if (!childrenMap.current.has(edge.source)) childrenMap.current.set(edge.source, new Set());
-        childrenMap.current.get(edge.source)!.add(edge.target);
-      } else if (targetType === MapNodeTypeEnum.TEAM && sourceType !== MapNodeTypeEnum.TEAM) {
-        if (!childrenMap.current.has(edge.target)) childrenMap.current.set(edge.target, new Set());
-        childrenMap.current.get(edge.target)!.add(edge.source);
-      }
-    });
-
-    // Initially hide children of collapsed teams
-    collapsedTeams.current.forEach((teamId) => {
-      childrenMap.current.get(teamId)?.forEach((childId) => {
-        if (graph.hasNode(childId)) graph.setNodeAttribute(childId, 'hidden', true);
-      });
-    });
-
-    // Optimize layout based on graph size
-    const nodeCount = graph.order; // Number of nodes in graph
-    let iterations = 150;
-    const settings = {
-      slowDown: 5,
-      gravity: 1.5,
-      barnesHutOptimize: true,
-      linLogMode: true,
-      outboundAttractionDistribution: true,
-      adjustSizes: true,
-    };
+    console.log(`SigmaGraphLoader: Initializing with ${nodes.length} nodes and ${edges.length} edges`);
     
-    // Update large graph flag for future reference
-    const isLargeGraphDetected = nodeCount > 200;
-    setIsLargeGraph(isLargeGraphDetected);
-    
-    // Scale down iterations and adjust settings for larger graphs
-    if (nodeCount > 500) {
-      // For very large graphs, use minimal iterations
-      iterations = 50;
-      settings.slowDown = 10;
-      settings.gravity = 2.0;
-    } else if (nodeCount > 200) {
-      // For medium graphs, use moderate iterations
-      iterations = 100;
-      settings.slowDown = 8;
-      settings.gravity = 1.8;
-    }
-    
-    // Set initial positions for nodes without defined positions
-    graph.nodes().forEach((nodeId) => {
-      if (!graph.hasNodeAttribute(nodeId, 'x') || !graph.hasNodeAttribute(nodeId, 'y')) {
-        // Use a consistent approach for all entity types - pure random positioning
-        // This prevents any predetermined layout patterns that might look like mock data
-        graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 1000);
-        graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 1000);
-      }
-    });
-    
-    // For large graphs, use the web worker for layout computation
-    if (isLargeGraphDetected) {
-      console.log(`Using worker for large graph layout (${nodeCount} nodes)`);
-      // loadGraph first for immediate feedback, then update positions
-      loadGraph(graph);
-      
-      // Compute layout in worker
-      computeLayout(graph, {
-        iterations,
-        settings
-      }).then(updatedGraph => {
-        // Refresh the sigma instance with updated positions
-        if (sigma) sigma.refresh();
-      }).catch(err => {
-        console.error("Worker layout error:", err);
-        
-        // Fallback to direct calculation if worker fails
-        console.warn("Falling back to direct layout calculation");
-        forceAtlas2.assign(graph, {
-          iterations: iterations / 2, // Reduce iterations in fallback
-          settings
-        });
-        if (sigma) sigma.refresh();
-      });
-      
-      // Return early since we're handling this asynchronously
+    if (!loadGraph) {
+      console.error("SigmaGraphLoader: loadGraph function is not available");
       return;
     }
     
-    // For smaller graphs, compute directly
-    console.time('ForceAtlas2 layout');
-    forceAtlas2.assign(graph, {
-      iterations,
-      settings
-    });
-    console.timeEnd('ForceAtlas2 layout');
+    try {
+      // Create a new graph instance
+      const graph = new Graph();
+      const nodeTypeMap = nodeTypeMapRef.current;
 
-    // Now load the positioned graph into Sigma
-    loadGraph(graph);
-    
-    // Notify parent component about data for analytics
-    if (onDataChange && typeof onDataChange === 'function') {
-      // Use the original nodes and edges from props for analytics
-      onDataChange(nodes, edges);
+      // Clear existing maps
+      nodeTypeMap.clear();
+      childrenMap.current.clear();
+      collapsedTeams.current.clear();
+
+      // If we don't have any nodes, don't proceed
+      if (nodes.length === 0) {
+        console.log("SigmaGraphLoader: No nodes to display");
+        // Still load an empty graph to prevent rendering errors
+        loadGraph(graph);
+        return;
+      }
+
+      console.log("SigmaGraphLoader: Adding nodes to graph");
+      // Add nodes with enhanced styling based on node styles
+      nodes.forEach((node, index) => {
+        if (!node.id) {
+          console.warn(`Node at index ${index} is missing ID:`, node);
+          return; // Skip this node
+        }
+        
+        try {
+          // Store node type for reference
+          nodeTypeMap.set(node.id, node.type);
+          
+          if (!graph.hasNode(node.id)) {
+            const nodeAttrs = createNodeAttributes(node);
+            graph.addNode(node.id, nodeAttrs);
+
+            // Auto-collapse teams initially
+            if (node.type === MapNodeTypeEnum.TEAM) {
+              collapsedTeams.current.add(node.id);
+            }
+          }
+        } catch (nodeErr) {
+          console.error(`Error adding node ${node.id}:`, nodeErr);
+        }
+      });
+
+      console.log("SigmaGraphLoader: Adding edges to graph");
+      // Add edges with improved styling
+      edges.forEach((edge, idx) => {
+        try {
+          const key = `e${idx}`;
+          
+          // Skip edges with missing source or target
+          if (!edge.source || !edge.target) {
+            console.warn(`Edge at index ${idx} is missing source or target:`, edge);
+            return; // Skip this edge
+          }
+          
+          // Skip edges where source or target doesn't exist in the graph
+          if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) {
+            console.warn(`Edge at index ${idx} has invalid source/target nodes:`, edge);
+            return; // Skip this edge
+          }
+          
+          if (!graph.hasEdge(key)) {
+            // Get relationship type from edge if available
+            const edgeType = edge.type as MapEdgeTypeEnum;
+            let style = edgeStyles[edgeType];
+
+            // Fallback to infer relationship by node types if no explicit type
+            if (!style) {
+              const sourceType = nodeTypeMap.get(edge.source);
+              const targetType = nodeTypeMap.get(edge.target);
+
+              if (sourceType && targetType) {
+                style = getEdgeStyleByNodeTypes(sourceType, targetType);
+              } else {
+                // Default style if no defined relationship
+                style = {
+                  color: '#ccc',
+                  size: 1,
+                  type: 'line'
+                };
+              }
+            }
+
+            graph.addEdgeWithKey(key, edge.source, edge.target, {
+              color: style.color,
+              size: style.size,
+              type: style.type,
+              animated: style.animated,
+              edgeType: edgeType, // Store the edge type for reference
+              hidden: false // ALWAYS show edges by default
+            });
+          }
+
+          // Build children map: if one end is TEAM and other is not TEAM, record
+          const sourceType = nodeTypeMap.get(edge.source);
+          const targetType = nodeTypeMap.get(edge.target);
+          if (sourceType === MapNodeTypeEnum.TEAM && targetType !== MapNodeTypeEnum.TEAM) {
+            if (!childrenMap.current.has(edge.source)) childrenMap.current.set(edge.source, new Set());
+            childrenMap.current.get(edge.source)!.add(edge.target);
+          } else if (targetType === MapNodeTypeEnum.TEAM && sourceType !== MapNodeTypeEnum.TEAM) {
+            if (!childrenMap.current.has(edge.target)) childrenMap.current.set(edge.target, new Set());
+            childrenMap.current.get(edge.target)!.add(edge.source);
+          }
+        } catch (edgeErr) {
+          console.error(`Error adding edge at index ${idx}:`, edgeErr);
+        }
+      });
+
+      console.log("SigmaGraphLoader: Processing collapsed teams");
+      // Initially hide children of collapsed teams
+      collapsedTeams.current.forEach((teamId) => {
+        childrenMap.current.get(teamId)?.forEach((childId) => {
+          if (graph.hasNode(childId)) graph.setNodeAttribute(childId, 'hidden', true);
+        });
+      });
+
+      // Optimize layout based on graph size
+      const nodeCount = graph.order; // Number of nodes in graph
+      console.log(`SigmaGraphLoader: Preparing layout for ${nodeCount} nodes`);
+      
+      let iterations = 150;
+      const settings = {
+        slowDown: 5,
+        gravity: 1.5,
+        barnesHutOptimize: true,
+        linLogMode: true,
+        outboundAttractionDistribution: true,
+        adjustSizes: true,
+      };
+      
+      // Update large graph flag for future reference
+      const isLargeGraphDetected = nodeCount > 200;
+      setIsLargeGraph(isLargeGraphDetected);
+      
+      // Scale down iterations and adjust settings for larger graphs
+      if (nodeCount > 500) {
+        // For very large graphs, use minimal iterations
+        iterations = 50;
+        settings.slowDown = 10;
+        settings.gravity = 2.0;
+      } else if (nodeCount > 200) {
+        // For medium graphs, use moderate iterations
+        iterations = 100;
+        settings.slowDown = 8;
+        settings.gravity = 1.8;
+      }
+      
+      console.log("SigmaGraphLoader: Setting initial node positions");
+      // Set initial positions for nodes without defined positions
+      graph.nodes().forEach((nodeId) => {
+        if (!graph.hasNodeAttribute(nodeId, 'x') || !graph.hasNodeAttribute(nodeId, 'y')) {
+          // Use a consistent approach for all entity types - pure random positioning
+          // This prevents any predetermined layout patterns that might look like mock data
+          graph.setNodeAttribute(nodeId, 'x', (Math.random() - 0.5) * 1000);
+          graph.setNodeAttribute(nodeId, 'y', (Math.random() - 0.5) * 1000);
+        }
+      });
+      
+      // For large graphs, use the web worker for layout computation
+      if (isLargeGraphDetected) {
+        console.log(`SigmaGraphLoader: Using worker for large graph layout (${nodeCount} nodes)`);
+        // loadGraph first for immediate feedback, then update positions
+        loadGraph(graph);
+        
+        // Compute layout in worker
+        computeLayout(graph, {
+          iterations,
+          settings
+        }).then(updatedGraph => {
+          console.log("SigmaGraphLoader: Worker layout completed successfully");
+          // Refresh the sigma instance with updated positions
+          if (sigma) sigma.refresh();
+        }).catch(err => {
+          console.error("SigmaGraphLoader: Worker layout error:", err);
+          
+          // Fallback to direct calculation if worker fails
+          console.warn("SigmaGraphLoader: Falling back to direct layout calculation");
+          try {
+            forceAtlas2.assign(graph, {
+              iterations: iterations / 2, // Reduce iterations in fallback
+              settings
+            });
+            if (sigma) sigma.refresh();
+          } catch (fallbackErr) {
+            console.error("SigmaGraphLoader: Fallback layout error:", fallbackErr);
+          }
+        });
+        
+        // Return early since we're handling this asynchronously
+        return;
+      }
+      
+      // For smaller graphs, compute directly
+      console.log("SigmaGraphLoader: Computing layout directly");
+      console.time('ForceAtlas2 layout');
+      try {
+        forceAtlas2.assign(graph, {
+          iterations,
+          settings
+        });
+        console.timeEnd('ForceAtlas2 layout');
+      } catch (layoutErr) {
+        console.error("SigmaGraphLoader: Error in layout calculation:", layoutErr);
+        console.timeEnd('ForceAtlas2 layout');
+      }
+
+      // Now load the positioned graph into Sigma
+      console.log("SigmaGraphLoader: Loading graph into Sigma");
+      loadGraph(graph);
+      
+      // Notify parent component about data for analytics
+      if (onDataChange && typeof onDataChange === 'function') {
+        console.log("SigmaGraphLoader: Notifying parent of data change");
+        // Use the original nodes and edges from props for analytics
+        onDataChange(nodes, edges);
+      }
+    } catch (graphErr) {
+      console.error("SigmaGraphLoader: Critical error building graph:", graphErr);
     }
-  }, [edges, loadGraph, nodes, createNodeAttributes, onDataChange]);
+  }, [edges, loadGraph, nodes, createNodeAttributes, onDataChange, computeLayout, sigma]);
 
   // Reference to track when graph is loaded
   const graphLoadedRef = useRef(false);
@@ -493,7 +578,7 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
       },
     });
 
-    // Set Reducers for hover effects and node/edge appearance
+    // Set Reducers for hover effects and node/edge appearance - Combined both setSettings calls into a single one
     setSettings({
       // Node appearance reducer with enhanced visualization
       nodeReducer: (node, data) => {
@@ -680,81 +765,6 @@ const SigmaGraphLoader: React.FC<SigmaGraphLoaderProps> = ({
       // Use the custom edge renderer if provided (or undefined for default)
       edgeRenderer: customEdgeRenderer
     });
-
-      // Set settings for renderers
-      setSettings({
-        // Node appearance reducer with enhanced visualization
-        nodeReducer: (node, data) => {
-          // Define type for reducer data matching Sigma's attributes
-          const nodeData = data as {
-            highlighted?: boolean;
-            color?: string;
-            size?: number;
-            x?: number;
-            y?: number;
-            zIndex?: number;
-            label?: string;
-            borderColor?: string;
-            borderWidth?: number;
-            collapsed?: boolean;
-            shape?: string;
-            pattern?: string;
-            progress?: number;
-            status?: string;
-          };
-
-          // Start with existing data
-          const newData = { ...nodeData, highlighted: nodeData.highlighted || false };
-
-          // When analytics is enabled, let standard reducer handle things unless hovering
-          if (analyticsEnabled && !hoveredNode) {
-            return newData;
-          }
-
-          // Get node type and apply base styling
-          const nodeType = graph.getNodeAttribute(node, 'entityType') as MapNodeTypeEnum;
-          const isCollapsed = graph.getNodeAttribute(node, 'collapsed') || false;
-
-          // Get style information for the node type
-          const style = nodeStyles[nodeType] || { 
-            color: '#999', 
-            baseSize: 10, 
-            borderColor: '#777',
-            shape: 'circle',
-            pattern: 'solid'
-          };
-
-          // Apply base color, shape and pattern
-          newData.color = style.color;
-          newData.shape = style.shape || 'circle';  // Default to circle
-          newData.pattern = style.pattern || 'solid'; // Default to solid pattern
-
-          // Apply adaptive sizing for zoom level
-          newData.size = getAdaptiveNodeSize(style.baseSize, zoomLevel);
-
-          // Apply border properties from style
-          if (style.borderColor) newData.borderColor = style.borderColor;
-          if (style.borderWidth) newData.borderWidth = style.borderWidth;
-
-          // Apply hover effects
-          if (hoveredNode) {
-            if (node === hoveredNode) {
-              // Hovered node gets highlighted and slightly larger
-              newData.highlighted = true;
-              newData.size = newData.size * 1.2;
-              newData.zIndex = 1; // Bring to front
-            }
-          }
-
-          return newData;
-        },
-        
-        // Use the custom node renderer if provided or fall back to the default
-        nodeRenderer: customNodeRenderer || createNodeRenderer(nodeStyles),
-        
-        // Use the custom edge renderer if provided (or undefined for default)
-        edgeRenderer: customEdgeRenderer
-      });
 
       // Return proper cleanup function
       return () => {

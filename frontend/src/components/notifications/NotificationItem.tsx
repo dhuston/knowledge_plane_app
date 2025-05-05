@@ -29,16 +29,17 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   onMarkAsRead, 
   onDismiss 
 }) => {
+  // Add defensive null/undefined checking and provide defaults for all notification properties
   const {
-    id,
-    type,
-    severity,
-    title,
-    message,
-    created_at,
-    read_at,
-    action_url,
-  } = notification;
+    id = '',
+    type = 'system',
+    severity = 'info',
+    title = 'Notification',
+    message = 'No additional details available',
+    created_at = new Date().toISOString(),
+    read_at = null,
+    action_url = undefined,
+  } = notification || {};
   
   const bgColor = useColorModeValue('white', 'gray.800');
   const hoverBgColor = useColorModeValue('gray.50', 'gray.700');
@@ -81,39 +82,67 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   
   // Format relative time (e.g. "2 hours ago")
   const getRelativeTime = () => {
-    const now = new Date();
-    const createdDate = new Date(created_at);
-    const diffMs = now.getTime() - createdDate.getTime();
-    
-    // Convert to seconds, minutes, hours, days
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffSecs < 60) {
-      return 'just now';
-    } else if (diffMins < 60) {
-      return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    } else {
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    try {
+      if (!created_at) return 'unknown time';
+      
+      const now = new Date();
+      const createdDate = new Date(created_at);
+      
+      // Check for invalid date
+      if (isNaN(createdDate.getTime())) {
+        console.warn(`Invalid created_at date: ${created_at}`);
+        return 'unknown time';
+      }
+      
+      const diffMs = now.getTime() - createdDate.getTime();
+      
+      // Convert to seconds, minutes, hours, days
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffSecs < 60) {
+        return 'just now';
+      } else if (diffMins < 60) {
+        return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      } else {
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      }
+    } catch (error) {
+      console.error('Error formatting relative time:', error);
+      return 'unknown time';
     }
   };
   
   // Format absolute time for tooltip (e.g. "Jan 15, 2023 at 2:30 PM")
   const getFormattedTime = () => {
-    const date = new Date(created_at);
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    };
-    return date.toLocaleDateString('en-US', options);
+    try {
+      if (!created_at) return 'Unknown date/time';
+      
+      const date = new Date(created_at);
+      
+      // Check for invalid date
+      if (isNaN(date.getTime())) {
+        console.warn(`Invalid created_at date: ${created_at}`);
+        return 'Unknown date/time';
+      }
+      
+      const options: Intl.DateTimeFormatOptions = { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      };
+      return date.toLocaleDateString('en-US', options);
+    } catch (error) {
+      console.error('Error formatting absolute time:', error);
+      return 'Unknown date/time';
+    }
   };
   
   // Handle click on notification

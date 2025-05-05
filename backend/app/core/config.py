@@ -65,8 +65,15 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
 
-    # OpenAI
+    # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: Optional[str] = "gpt-3.5-turbo"
+    
+    # Azure OpenAI Configuration
+    OPENAI_IS_AZURE: bool = False
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None
+    AZURE_OPENAI_DEPLOYMENT: Optional[str] = None
+    AZURE_OPENAI_API_VERSION: str = "2023-05-15"
 
 
 

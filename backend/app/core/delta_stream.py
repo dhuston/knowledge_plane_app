@@ -9,7 +9,7 @@ from fastapi import WebSocket
 _connected: Set[WebSocket] = set()
 
 async def register(ws: WebSocket):
-    await ws.accept()
+    # Remove the ws.accept() call - the connection should already be accepted by the caller
     _connected.add(ws)
 
 async def unregister(ws: WebSocket):

@@ -8,6 +8,7 @@ import Modal from './modal';
 import Tag from './Tag';
 import Badge from './Badge';
 import Map from './map';
+import Tooltip from './tooltip';
 
 const components = {
   Button,
@@ -16,6 +17,7 @@ const components = {
   Modal,
   Tag,
   Badge,
+  Tooltip,
   ...Map, // Spread map components
 };
 

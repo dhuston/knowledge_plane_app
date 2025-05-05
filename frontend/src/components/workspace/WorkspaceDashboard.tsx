@@ -14,6 +14,7 @@ import { TaskManagement } from './tasks/TaskManagement';
 import { QuickActions } from './actions/QuickActions';
 import { LivingMap } from '../map/LivingMap';
 import InsightsDailySummary from '../insights/InsightsDailySummary';
+import UltraThink from './UltraThink';
 
 interface WorkspaceDashboardProps {
   initialLayout?: 'standard' | 'compact' | 'expanded';
@@ -21,6 +22,9 @@ interface WorkspaceDashboardProps {
   teamId?: string;
   showHeader?: boolean;
   compact?: boolean;
+  userName?: string;
+  userRole?: string;
+  organizationName?: string;
 }
 
 export function WorkspaceDashboard({ 
@@ -28,7 +32,10 @@ export function WorkspaceDashboard({
   userId, 
   teamId,
   showHeader = true,
-  compact = false
+  compact = false,
+  userName = 'Team Member',
+  userRole = 'Knowledge Worker',
+  organizationName = 'Biosphere Alpha'
 }: WorkspaceDashboardProps) {
   const [viewMode, setViewMode] = useState<'dashboard' | 'map'>('dashboard');
   const [layout, setLayout] = useState<'standard' | 'compact' | 'expanded'>(initialLayout);
@@ -123,6 +130,20 @@ export function WorkspaceDashboard({
           {/* Quick Actions - Right column on larger screens */}
           <GridItem colSpan={{ base: 12, lg: 4 }} p={4} bg="white" borderRadius="md" borderWidth="1px" borderColor={borderColor} shadow="sm">
             <QuickActions />
+          </GridItem>
+          
+          {/* UltraThink - Creative thinking AI assistant */}
+          <GridItem colSpan={12} mt={2}>
+            <UltraThink 
+              maxHeight="400px"
+              personalizationContext={{
+                userName: userName,
+                role: userRole,
+                organization: organizationName,
+                currentProject: "Living Map",
+                currentFocus: "innovation and creative problem-solving"
+              }}
+            />
           </GridItem>
         </Grid>
       ) : (

@@ -149,6 +149,8 @@ async def get_feature_flags(
     current_user: User = Depends(get_current_active_user),
 ):
     """Get all feature flags for the current tenant."""
+    # Additional debug logging for CORS troubleshooting
+    print(f"[DEBUG] Admin feature-flags endpoint accessed by user {current_user.id}, tenant {tenant_id}, admin={getattr(current_user, 'is_admin', False)}")
     return get_tenant_feature_flags(tenant_id)
 
 @router.post("/feature-flags", response_model=FeatureFlag, dependencies=[Depends(get_current_active_superuser)])

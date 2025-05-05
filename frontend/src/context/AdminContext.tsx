@@ -92,21 +92,26 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Function to load feature flags
   const loadFeatureFlags = useCallback(async (): Promise<void> => {
     try {
-      const response = await apiClient.get('/api/v1/admin/feature-flags');
-      setFeatureFlags(response.data);
+      console.log('[DEBUG] AdminContext: Loading feature flags');
+      // Note: apiClient automatically adds /api/v1 prefix, so we should NOT include it here
+      const response = await apiClient.get('/admin/feature-flags');
+      console.log('[DEBUG] AdminContext: Feature flags loaded successfully', response);
+      setFeatureFlags(response);
     } catch (error) {
-      console.error('Error loading feature flags:', error);
+      console.error('[DEBUG] AdminContext: Error loading feature flags:', error);
     }
   }, [apiClient]);
   
   // Function to update a feature flag
   const updateFeatureFlag = useCallback(async (key: string, enabled: boolean): Promise<void> => {
     try {
-      await apiClient.put(`/api/v1/admin/feature-flags/${key}`, { enabled });
+      console.log(`[DEBUG] AdminContext: Updating feature flag ${key} to ${enabled}`);
+      // Note: apiClient automatically adds /api/v1 prefix, so we should NOT include it here
+      await apiClient.put(`/admin/feature-flags/${key}`, { enabled });
       // Refresh the feature flags after update
       await loadFeatureFlags();
     } catch (error) {
-      console.error(`Error updating feature flag ${key}:`, error);
+      console.error(`[DEBUG] AdminContext: Error updating feature flag ${key}:`, error);
       throw error;
     }
   }, [apiClient, loadFeatureFlags]);

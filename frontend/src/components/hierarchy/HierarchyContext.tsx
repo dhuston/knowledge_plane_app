@@ -36,7 +36,7 @@ interface HierarchyContextType {
 }
 
 // Create the context with default values
-export const HierarchyContext = createContext<HierarchyContextType>({
+const HierarchyContext = createContext<HierarchyContextType>({
   // Default state
   units: {},
   currentPath: [],
@@ -64,7 +64,7 @@ interface HierarchyProviderProps {
   initialSelectedUnitId?: string | null;
 }
 
-export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ 
+const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ 
   children, 
   initialSelectedUnitId = null 
 }) => {
@@ -86,8 +86,19 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({
   
   // Initialize hierarchy based on current user
   useEffect(() => {
+    // Add diagnostic logs
+    console.log("[HierarchyContext] Initialize effect triggered", { 
+      hasUser: !!user, 
+      userId: user?.id,
+      selectedUnitId: navigationState.selectedUnitId,
+      hasToken: !!localStorage.getItem('knowledge_plane_token')
+    });
+    
     if (user && !navigationState.selectedUnitId) {
       // If user is logged in and no unit is selected, start with user's position
+      console.log("[HierarchyContext] Fetching user hierarchy position", { 
+        userId: user.id 
+      });
       fetchUserHierarchyPosition();
     } else if (navigationState.selectedUnitId) {
       // If a specific unit is selected, fetch its details
@@ -100,9 +111,60 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({
     setIsLoading(true);
     setError(null);
     
+    // Log authentication state before making the request
+    const token = localStorage.getItem('knowledge_plane_token');
+    console.log("[fetchUserHierarchyPosition] Starting fetch", {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      apiClientBaseURL: apiClient.defaults.baseURL
+    });
+    
     try {
-      // Fetch user's position in the hierarchy
-      const response = await apiClient.get(`/hierarchy/path`);
+      // Check current headers - add diagnostic
+      console.log("[fetchUserHierarchyPosition] API client headers:", {
+        contentType: apiClient.defaults.headers?.['Content-Type'],
+        authorization: token ? 'Bearer Token available' : 'No Bearer Token'
+      });
+      
+      // Try multiple possible endpoints with fallbacks
+      let response;
+      let endpointUsed;
+      
+      try {
+        // First try the organizations endpoint
+        console.log("[fetchUserHierarchyPosition] Trying /api/v1/organizations/structure endpoint");
+        response = await apiClient.get(`/api/v1/organizations/structure`);
+        endpointUsed = '/api/v1/organizations/structure';
+      } catch (e: any) {
+        console.log("[fetchUserHierarchyPosition] First endpoint failed, trying fallback", {
+          status: e.response?.status,
+          message: e.message
+        });
+        
+        try {
+          // Try the map endpoint as fallback
+          console.log("[fetchUserHierarchyPosition] Trying /api/v1/map/path endpoint");
+          response = await apiClient.get(`/api/v1/map/path`);
+          endpointUsed = '/api/v1/map/path';
+        } catch (e2: any) {
+          console.log("[fetchUserHierarchyPosition] Second endpoint failed, trying final fallback", {
+            status: e2.response?.status,
+            message: e2.message
+          });
+          
+          // One more try with hierarchies endpoint
+          console.log("[fetchUserHierarchyPosition] Trying /api/v1/hierarchies/current endpoint");
+          response = await apiClient.get(`/api/v1/hierarchies/current`);
+          endpointUsed = '/api/v1/hierarchies/current';
+        }
+      }
+      
+      console.log("[fetchUserHierarchyPosition] Response received:", {
+        endpointUsed,
+        status: response.status,
+        hasData: !!response.data,
+        hasPath: !!response.data?.path
+      });
       
       if (response.data && response.data.path) {
         // Update state with user's path and units
@@ -124,9 +186,51 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({
           expandedUnitIds: [teamId],
           path: userPath
         }));
+      } else if (response.data) {
+        // Handle case where data is in a different format
+        console.log("[fetchUserHierarchyPosition] Response has data but no path, trying alternative format:", response.data);
+        
+        // Try to extract data from possible formats based on endpoint
+        const userPath = response.data.path || 
+                        (response.data.structure ? response.data.structure.path : []) || 
+                        (response.data.hierarchy ? response.data.hierarchy.path : []);
+        
+        const pathUnits = response.data.units || 
+                          response.data.entities || 
+                          {};
+        
+        if (userPath && userPath.length > 0) {
+          setUnits(prevUnits => ({
+            ...prevUnits,
+            ...pathUnits
+          }));
+          
+          // Select the user's team by default
+          const teamId = userPath.find(id => pathUnits[id]?.type === 'TEAM' || pathUnits[id]?.entityType === 'team') || 
+                         userPath[userPath.length - 1];
+          
+          setNavigationState(prev => ({
+            ...prev,
+            selectedUnitId: teamId,
+            expandedUnitIds: [teamId],
+            path: userPath
+          }));
+        } else {
+          // No path data found in any format
+          console.warn("[fetchUserHierarchyPosition] Could not extract path from response data");
+          setError('Could not determine your position in the organization.');
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      // Enhanced error logging
       console.error('Error fetching hierarchy position:', err);
+      console.log('[fetchUserHierarchyPosition] Error details:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message
+      });
+      
       setError('Failed to load your position in the organization. Please try again later.');
     } finally {
       setIsLoading(false);
@@ -141,40 +245,115 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({
     setError(null);
     
     try {
-      // Fetch unit details
-      const response = await apiClient.get(`/hierarchy/unit/${unitId}`);
+      // Try multiple possible endpoints with fallbacks
+      let response;
+      let endpointUsed;
       
-      if (response.data) {
-        // Update units with fetched data
-        const fetchedUnit = response.data.unit;
-        const childUnits = response.data.children || [];
-        
-        // Create a units map to merge with existing state
-        const unitsMap: Record<string, OrganizationalUnitEntity> = {
-          [fetchedUnit.id]: fetchedUnit
-        };
-        
-        // Add child units to the map
-        childUnits.forEach((unit: OrganizationalUnitEntity) => {
-          unitsMap[unit.id] = unit;
+      console.log(`[fetchHierarchyUnit] Fetching details for unit ${unitId}`);
+      
+      try {
+        // First try the organizations endpoint
+        console.log("[fetchHierarchyUnit] Trying /api/v1/organizations/unit endpoint");
+        response = await apiClient.get(`/api/v1/organizations/unit/${unitId}`);
+        endpointUsed = '/api/v1/organizations/unit';
+      } catch (e: any) {
+        console.log("[fetchHierarchyUnit] First endpoint failed, trying fallback", {
+          status: e.response?.status,
+          message: e.message
         });
         
-        // Update state
-        setUnits(prevUnits => ({
-          ...prevUnits,
-          ...unitsMap
-        }));
-        
-        // Update path if this is the selected unit
-        if (navigationState.selectedUnitId === unitId) {
-          setNavigationState(prev => ({
-            ...prev,
-            path: fetchedUnit.path || prev.path
-          }));
+        try {
+          // Try the map endpoint as fallback
+          console.log("[fetchHierarchyUnit] Trying /api/v1/map/unit endpoint");
+          response = await apiClient.get(`/api/v1/map/unit/${unitId}`);
+          endpointUsed = '/api/v1/map/unit';
+        } catch (e2: any) {
+          console.log("[fetchHierarchyUnit] Second endpoint failed, trying final fallback", {
+            status: e2.response?.status,
+            message: e2.message
+          });
+          
+          // One more try with hierarchies endpoint
+          console.log("[fetchHierarchyUnit] Trying /api/v1/hierarchies/unit endpoint");
+          response = await apiClient.get(`/api/v1/hierarchies/unit/${unitId}`);
+          endpointUsed = '/api/v1/hierarchies/unit';
         }
       }
-    } catch (err) {
+      
+      console.log("[fetchHierarchyUnit] Response received:", {
+        endpointUsed,
+        status: response.status,
+        hasData: !!response.data
+      });
+      
+      if (response.data) {
+        // Handle different response formats based on endpoint
+        let fetchedUnit, childUnits;
+        
+        if (response.data.unit) {
+          // Standard format
+          fetchedUnit = response.data.unit;
+          childUnits = response.data.children || [];
+        } else if (response.data.entity) {
+          // Alternative format
+          fetchedUnit = response.data.entity;
+          childUnits = response.data.childEntities || [];
+        } else {
+          // Direct unit data
+          fetchedUnit = response.data;
+          childUnits = response.data.children || [];
+        }
+        
+        console.log("[fetchHierarchyUnit] Processed unit data:", { 
+          unitId: fetchedUnit?.id,
+          childCount: childUnits?.length
+        });
+        
+        // Create a units map to merge with existing state
+        const unitsMap: Record<string, OrganizationalUnitEntity> = {};
+        
+        // Only add the unit if it exists and has an id
+        if (fetchedUnit && fetchedUnit.id) {
+          unitsMap[fetchedUnit.id] = fetchedUnit;
+          
+          // Add child units to the map
+          if (Array.isArray(childUnits)) {
+            childUnits.forEach((unit: OrganizationalUnitEntity) => {
+              if (unit && unit.id) {
+                unitsMap[unit.id] = unit;
+              }
+            });
+          }
+          
+          // Update state
+          setUnits(prevUnits => ({
+            ...prevUnits,
+            ...unitsMap
+          }));
+          
+          // Update path if this is the selected unit and it has path info
+          if (navigationState.selectedUnitId === unitId && fetchedUnit.path) {
+            setNavigationState(prev => ({
+              ...prev,
+              path: fetchedUnit.path || prev.path
+            }));
+          }
+        } else {
+          console.warn("[fetchHierarchyUnit] Received malformed unit data:", fetchedUnit);
+          setError("Received invalid unit data from server.");
+        }
+      } else {
+        console.warn("[fetchHierarchyUnit] No data in response");
+        setError("No unit data received from server.");
+      }
+    } catch (err: any) {
       console.error(`Error fetching hierarchy unit ${unitId}:`, err);
+      console.log('[fetchHierarchyUnit] Error details:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message
+      });
       setError(`Failed to load organizational unit. Please try again later.`);
     } finally {
       setIsLoading(false);
@@ -327,4 +506,13 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({
 };
 
 // Custom hook for using the hierarchy context
-export const useHierarchy = () => useContext(HierarchyContext);
+function useHierarchy() {
+  const context = useContext(HierarchyContext);
+  if (context === undefined) {
+    throw new Error('useHierarchy must be used within a HierarchyProvider');
+  }
+  return context;
+}
+
+// Export all the necessary components and hooks
+export { HierarchyContext, HierarchyProvider, useHierarchy };

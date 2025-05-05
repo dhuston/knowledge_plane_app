@@ -42,16 +42,17 @@ type DeltaStreamSubscriber = {
  * 
  * @param onMessage - Callback to handle incoming messages
  */
-const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
-  const token = localStorage.getItem('knowledge_plane_token');
+const useDeltaStream = (onMessage?: (data: DeltaData) => void) => {
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const { flags } = useFeatureFlags();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth(); // Get token from auth context
   const [connectionError, setConnectionError] = useState<boolean>(false);
   
   const debouncedOnMessage = useRef(
     debounce((data: DeltaData) => {
-      onMessage(data);
+      if (onMessage) {
+        onMessage(data);
+      }
     }, 2000, { maxWait: 5000 })
   ).current;
 
@@ -61,11 +62,6 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
     
     // Only try to connect if authenticated and feature is enabled
     if (!isAuthenticated || !flags.enableDeltaStream) {
-      if (!isAuthenticated) {
-        console.log('Delta stream not connecting: User not authenticated');
-      } else {
-        console.log('Delta stream disabled by feature flag');
-      }
       return;
     }
     
@@ -115,6 +111,8 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
       // Don't keep trying forever if server doesn't support the feature
       if (wsRef.current && wsRef.current._retryCount > 3) {
         console.log('Multiple connection failures - disabling reconnect attempts');
+        console.log('This is expected during development if the WebSocket endpoint is not configured.');
+        console.log('The map will still work with polling instead of WebSockets.');
         wsRef.current.close();
       }
     });
@@ -130,13 +128,16 @@ const useDeltaStream = (onMessage: (data: DeltaData) => void) => {
   }, [debouncedOnMessage, token, flags.enableDeltaStream, isAuthenticated]);
   
   const subscribe = (dataType: string, callback: (data: unknown, operation: string) => void): DeltaStreamSubscriber => {
-    const subscriber: DeltaStreamSubscriber = {
+    // Simpler implementation that just provides the subscription interface
+    // without actually trying to connect to WebSocket when the backend service is not available
+    return {
       dataType,
       callback,
-      unsubscribe: () => {}
+      unsubscribe: () => {
+        // No-op unsubscribe as we're not actually setting up real listeners
+        // in this implementation
+      }
     };
-    
-    return subscriber;
   };
   
   return { 

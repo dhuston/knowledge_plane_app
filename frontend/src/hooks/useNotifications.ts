@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { apiClient } from '../api/client';
 import useDeltaStream from './useDeltaStream';
 
@@ -28,14 +28,25 @@ export interface UserNotificationSettings {
 }
 
 export default function useNotifications() {
+  // Initialize with safe default values
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
-
-  // Listen for real-time notifications
-  const { subscribe } = useDeltaStream();
+  const [apiAvailable, setApiAvailable] = useState<boolean>(true);
+  
+  // Always create this ref regardless of other conditions - fixes hook order issue
+  const hookOrderRef = useRef('hook-order-fixed');
+  
+  // Get delta stream subscription - ALWAYS call this hook, never conditionally
+  const deltaStream = useDeltaStream();
+  // Safely extract subscribe function
+  const subscribe = deltaStream?.subscribe || (() => ({
+    dataType: '',
+    callback: () => {},
+    unsubscribe: () => {}
+  }));
   
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
@@ -44,11 +55,24 @@ export default function useNotifications() {
     
     try {
       const response = await apiClient.get('/notifications');
-      setNotifications(response.data);
-      setUnreadCount(response.data.filter((n: Notification) => !n.read_at).length);
+      
+      // Add defensive check
+      if (Array.isArray(response.data)) {
+        setNotifications(response.data);
+        setUnreadCount(response.data.filter((n: Notification) => !n.read_at).length);
+      } else {
+        // Set safe default values
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+      
       setIsLoading(false);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
+      
+      // Set safe default values
+      setNotifications([]);
+      setUnreadCount(0);
       setError(err instanceof Error ? err : new Error('Failed to fetch notifications'));
       setIsLoading(false);
     }
@@ -57,10 +81,53 @@ export default function useNotifications() {
   // Fetch user preferences
   const fetchPreferences = useCallback(async () => {
     try {
-      console.log('Attempting to fetch notification preferences...');
       const response = await apiClient.get<UserNotificationSettings>('/notifications/preferences');
-      console.log('Successfully fetched notification preferences:', response.data);
-      setPreferences(response.data.preferences);
+      
+      // Add enhanced defensive checks for response data - make sure to check for preferences property
+      if (response?.data?.preferences && Array.isArray(response.data.preferences)) {
+        setPreferences(response.data.preferences);
+      } else if (response?.data && typeof response.data === 'object') {
+        // If the data exists but isn't in the expected structure with a preferences array,
+        // it might be a direct array of preferences (API format changed)
+        const dataArray = Array.isArray(response.data) ? response.data : [];
+        
+        if (dataArray.length > 0) {
+          setPreferences(dataArray);
+        } else {
+          
+          // Create default preferences if missing
+          const defaultPreferences = [
+            { user_id: '', notification_type: 'activity', enabled: true, email_enabled: false },
+            { user_id: '', notification_type: 'insight', enabled: true, email_enabled: true },
+            { user_id: '', notification_type: 'reminder', enabled: true, email_enabled: true },
+            { user_id: '', notification_type: 'system', enabled: true, email_enabled: false },
+            { user_id: '', notification_type: 'mention', enabled: true, email_enabled: true },
+            { user_id: '', notification_type: 'relationship', enabled: true, email_enabled: false }
+          ];
+          
+          // Set default preferences as fallback
+          setPreferences(defaultPreferences);
+          
+          // Try to check API availability
+          setApiAvailable(false);
+        }
+      } else {
+        // Create default preferences if missing
+        const defaultPreferences = [
+          { user_id: '', notification_type: 'activity', enabled: true, email_enabled: false },
+          { user_id: '', notification_type: 'insight', enabled: true, email_enabled: true },
+          { user_id: '', notification_type: 'reminder', enabled: true, email_enabled: true },
+          { user_id: '', notification_type: 'system', enabled: true, email_enabled: false },
+          { user_id: '', notification_type: 'mention', enabled: true, email_enabled: true },
+          { user_id: '', notification_type: 'relationship', enabled: true, email_enabled: false }
+        ];
+        
+        // Set default preferences as fallback
+        setPreferences(defaultPreferences);
+        
+        // Try to check API availability
+        setApiAvailable(false);
+      }
     } catch (err) {
       console.error('Failed to fetch notification preferences:', err);
       // Log more detailed error information
@@ -71,6 +138,21 @@ export default function useNotifications() {
           stack: err.stack
         });
       }
+      
+      // Create default preferences when API call fails
+      const defaultPreferences = [
+        { user_id: '', notification_type: 'activity', enabled: true, email_enabled: false },
+        { user_id: '', notification_type: 'insight', enabled: true, email_enabled: true },
+        { user_id: '', notification_type: 'reminder', enabled: true, email_enabled: true },
+        { user_id: '', notification_type: 'system', enabled: true, email_enabled: false },
+        { user_id: '', notification_type: 'mention', enabled: true, email_enabled: true },
+        { user_id: '', notification_type: 'relationship', enabled: true, email_enabled: false }
+      ];
+      
+      // Set default preferences as fallback
+      console.log('[Debug] Setting default preferences array due to error');
+      setPreferences(defaultPreferences);
+      setApiAvailable(false);
     }
   }, []);
 
@@ -180,35 +262,68 @@ export default function useNotifications() {
     }
   }, []);
 
-  // Initial data loading
+  // Initial data loading with error handling
   useEffect(() => {
-    fetchNotifications();
-    fetchPreferences();
+    const loadData = async () => {
+      try {
+        // Try to fetch notifications
+        await fetchNotifications().catch(() => {
+          setApiAvailable(false);
+        });
+        
+        // Try to fetch preferences
+        await fetchPreferences().catch(() => {
+          setApiAvailable(false);
+        });
+        
+        // Always set loading to false when done, regardless of success
+        setIsLoading(false);
+      } catch (error) {
+        setApiAvailable(false);
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
   }, [fetchNotifications, fetchPreferences]);
 
   // Set up real-time notification subscription
   useEffect(() => {
-    const subscription = subscribe('notification', (data, operation) => {
-      if (operation === 'create') {
-        // Add new notification to the list
-        setNotifications(prev => [data as Notification, ...prev]);
-        
-        // Update unread count
-        setUnreadCount(prev => prev + 1);
-      }
-    });
-    
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Safety check to ensure subscribe is a function
+    if (typeof subscribe !== 'function') {
+      console.error('Error: subscribe is not a function');
+      return;
+    }
+
+    try {
+      const subscription = subscribe('notification', (data, operation) => {
+        if (operation === 'create') {
+          // Add new notification to the list
+          setNotifications(prev => [data as Notification, ...prev]);
+          
+          // Update unread count
+          setUnreadCount(prev => prev + 1);
+        }
+      });
+      
+      return () => {
+        if (subscription && typeof subscription.unsubscribe === 'function') {
+          subscription.unsubscribe();
+        }
+      };
+    } catch (error) {
+      console.error('Failed to set up notification subscription');
+    }
   }, [subscribe]);
 
+  // Return interface with safe values
   return {
-    notifications,
-    unreadCount,
-    preferences,
+    notifications: notifications || [],
+    unreadCount: unreadCount || 0,
+    preferences: preferences || [],
     isLoading,
     error,
+    apiAvailable,
     fetchNotifications,
     markAsRead,
     dismiss,

@@ -35,9 +35,14 @@ async def get_user_by_auth_id(db: AsyncSession, auth_provider: str, auth_provide
     )
     return result.scalar_one_or_none()
 
-async def create_user(db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID) -> UserModel:
+async def create_user(db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID, user_id: Optional[UUID] = None) -> UserModel:
     create_data = obj_in.model_dump()
     create_data['tenant_id'] = tenant_id
+    
+    # Use custom ID if provided
+    if user_id:
+        create_data['id'] = user_id
+
     db_obj = UserModel(**create_data)
     db.add(db_obj)
     await db.commit()
@@ -159,8 +164,8 @@ class CRUDUser():
     async def get_by_auth_id(self, db: AsyncSession, auth_provider: str, auth_provider_id: str) -> UserModel | None:
         return await get_user_by_auth_id(db, auth_provider=auth_provider, auth_provider_id=auth_provider_id)
 
-    async def create(self, db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID) -> UserModel:
-        return await create_user(db=db, obj_in=obj_in, tenant_id=tenant_id)
+    async def create(self, db: AsyncSession, *, obj_in: UserCreate, tenant_id: UUID, user_id: Optional[UUID] = None) -> UserModel:
+        return await create_user(db=db, obj_in=obj_in, tenant_id=tenant_id, user_id=user_id)
 
     async def update(self, db: AsyncSession, *, db_obj: UserModel, obj_in: Union[UserUpdate, Dict[str, Any]]) -> UserModel:
         return await update_user(db=db, db_obj=db_obj, obj_in=obj_in)
