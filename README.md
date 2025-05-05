@@ -1,4 +1,4 @@
-# Biosphere Alpha (KnowledgePlane AI)
+# Biosphere Alpha
 
 A multi-tenant SaaS platform that creates an adaptive organization fabric & living map to visualize the true emergent structure of how work gets done in organizations.
 
