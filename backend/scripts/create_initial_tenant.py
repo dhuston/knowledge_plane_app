@@ -42,8 +42,8 @@ async def create_default_tenant():
             logger.info(f"Creating default tenant with ID: {STATIC_TENANT_ID}")
             tenant_obj = Tenant(
                 id=STATIC_TENANT_ID,
-                name="UltraThink",
-                domain="ultrathink.biosphere.ai",
+                name="Biosphere Alpha",
+                domain="demo.biosphere.ai",
                 is_active=True,
                 settings={
                     "demo_mode": True,

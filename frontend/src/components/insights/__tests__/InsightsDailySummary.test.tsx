@@ -1,12 +1,14 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ChakraProvider } from '@chakra-ui/react';
 import InsightsDailySummary from '../InsightsDailySummary';
 import { useInsights } from '../../../context/InsightsContext';
 import OpenAIService from '../../../services/OpenAIService';
 
 // Mock dependencies
-jest.mock('../../../context/InsightsContext');
-jest.mock('../../../services/OpenAIService');
+vi.mock('../../../context/InsightsContext');
+vi.mock('../../../services/OpenAIService');
 
 describe('InsightsDailySummary', () => {
   // Mock response data
@@ -42,81 +44,87 @@ describe('InsightsDailySummary', () => {
   
   const mockLastUpdated = new Date('2023-05-01T14:00:00Z');
   
-  // Default mock setup
+  // Create mock implementations that we can modify for individual tests
+  const mockInsightsHook = {
+    insights: mockInsights,
+    loading: false,
+    error: null,
+    fetchInsights: vi.fn(),
+    lastUpdated: mockLastUpdated
+  };
+  
+  // Set up mocks
   beforeEach(() => {
     // Mock useInsights hook
-    (useInsights as jest.Mock).mockReturnValue({
-      insights: mockInsights,
-      loading: false,
-      error: null,
-      fetchInsights: jest.fn(),
-      lastUpdated: mockLastUpdated
-    });
+    vi.mocked(useInsights).mockReturnValue(mockInsightsHook);
     
     // Mock OpenAI service
-    (OpenAIService.isAvailable as jest.Mock).mockReturnValue(true);
-    (OpenAIService.generateInsightSummary as jest.Mock).mockResolvedValue(
+    vi.mocked(OpenAIService.isAvailable).mockReturnValue(true);
+    vi.mocked(OpenAIService.generateInsightSummary).mockResolvedValue(
       "Here's what's happening in your research today\n\nYou have been collaborating well with Team Alpha. Consider scheduling regular check-ins."
     );
   });
   
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
   
   test('renders loading state', () => {
-    (useInsights as jest.Mock).mockReturnValue({
-      insights: [],
-      loading: true,
-      error: null,
-      fetchInsights: jest.fn(),
-      lastUpdated: null
-    });
+    mockInsightsHook.insights = [];
+    mockInsightsHook.loading = true;
+    mockInsightsHook.lastUpdated = null;
     
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     expect(screen.getByText(/generating your summary/i)).toBeInTheDocument();
   });
   
   test('renders error state', () => {
-    (useInsights as jest.Mock).mockReturnValue({
-      insights: [],
-      loading: false,
-      error: 'Failed to load insights',
-      fetchInsights: jest.fn(),
-      lastUpdated: null
-    });
+    mockInsightsHook.insights = [];
+    mockInsightsHook.loading = false;
+    mockInsightsHook.error = 'Failed to load insights';
+    mockInsightsHook.lastUpdated = null;
     
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     expect(screen.getByText(/try again/i)).toBeInTheDocument();
   });
   
   test('renders empty state when no insights available', () => {
-    (useInsights as jest.Mock).mockReturnValue({
-      insights: [],
-      loading: false,
-      error: null,
-      fetchInsights: jest.fn(),
-      lastUpdated: null
-    });
+    mockInsightsHook.insights = [];
+    mockInsightsHook.loading = false;
+    mockInsightsHook.error = null;
+    mockInsightsHook.lastUpdated = null;
     
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     expect(screen.getByText(/no insights available/i)).toBeInTheDocument();
   });
   
   test('renders OpenAI unavailable message when API key is not configured', async () => {
-    (OpenAIService.isAvailable as jest.Mock).mockReturnValue(false);
-    (useInsights as jest.Mock).mockReturnValue({
-      insights: [],
-      loading: false,
-      error: null,
-      fetchInsights: jest.fn(),
-      lastUpdated: null
-    });
+    vi.mocked(OpenAIService.isAvailable).mockReturnValue(false);
+    mockInsightsHook.insights = [];
+    mockInsightsHook.loading = false;
+    mockInsightsHook.error = null;
+    mockInsightsHook.lastUpdated = null;
     
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for the effect to run
     await waitFor(() => {
@@ -125,7 +133,11 @@ describe('InsightsDailySummary', () => {
   });
   
   test('renders generated summary in the summary tab', async () => {
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for the summary to be generated
     await waitFor(() => {
@@ -137,7 +149,11 @@ describe('InsightsDailySummary', () => {
   });
   
   test('shows category tabs for different insight types', async () => {
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for summary to be generated
     await waitFor(() => {
@@ -152,7 +168,11 @@ describe('InsightsDailySummary', () => {
   });
   
   test('allows switching between tabs', async () => {
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for initial render
     await waitFor(() => {
@@ -176,17 +196,14 @@ describe('InsightsDailySummary', () => {
   });
   
   test('refreshes summary when refresh button is clicked', async () => {
-    const mockFetchInsights = jest.fn().mockResolvedValue(undefined);
+    const mockFetchInsights = vi.fn().mockResolvedValue(undefined);
+    mockInsightsHook.fetchInsights = mockFetchInsights;
     
-    (useInsights as jest.Mock).mockReturnValue({
-      insights: mockInsights,
-      loading: false,
-      error: null,
-      fetchInsights: mockFetchInsights,
-      lastUpdated: mockLastUpdated
-    });
-    
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for initial render
     await waitFor(() => {
@@ -205,7 +222,11 @@ describe('InsightsDailySummary', () => {
   });
   
   test('shows date badge on insights', async () => {
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for initial render
     await waitFor(() => {
@@ -221,7 +242,11 @@ describe('InsightsDailySummary', () => {
   });
   
   test('expands insight description when More button is clicked', async () => {
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for initial render
     await waitFor(() => {
@@ -242,7 +267,11 @@ describe('InsightsDailySummary', () => {
   test('passes personalization context to OpenAI service', async () => {
     const personalizationContext = { userId: 'user-1', teamId: 'team-1' };
     
-    render(<InsightsDailySummary personalizationContext={personalizationContext} />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary personalizationContext={personalizationContext} />
+      </ChakraProvider>
+    );
     
     // Wait for the summary to be generated
     await waitFor(() => {
@@ -254,7 +283,11 @@ describe('InsightsDailySummary', () => {
   });
   
   test('displays header with last updated time', async () => {
-    render(<InsightsDailySummary />);
+    render(
+      <ChakraProvider>
+        <InsightsDailySummary />
+      </ChakraProvider>
+    );
     
     // Wait for initial render
     await waitFor(() => {

@@ -301,10 +301,10 @@ async def get_demo_login_token(db: AsyncSession, tenant_id: Optional[UUID] = Non
         else:
             # Use default tenant
             logger.info("No tenant ID provided, finding or creating default tenant")
-            demo_tenant = await tenant_crud.get_by_name(db, name="UltraThink")
+            demo_tenant = await tenant_crud.get_by_name(db, name="Biosphere Alpha")
             if not demo_tenant:
-                logger.info("Creating new UltraThink demo tenant")
-                demo_tenant = await tenant_crud.create_demo_tenant(db, name="UltraThink")
+                logger.info("Creating new demo tenant")
+                demo_tenant = await tenant_crud.create_demo_tenant(db, name="Biosphere Alpha")
         
         # Get or create demo user for this tenant
         email_username = demo_tenant.domain.split('.')[0] if demo_tenant.domain else "demo"

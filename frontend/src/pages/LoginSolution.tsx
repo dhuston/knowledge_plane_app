@@ -81,9 +81,9 @@ export default function LoginPage() {
           // Note: using a fresh UUID for "Pharma AI Demo" instead of the placeholder one
           const staticTenants: TenantInfo[] = [
             {
-              id: "d3667ea1-079a-434e-84d2-60e84757b5d5", // Updated valid UUID for UltraThink
-              name: "UltraThink",
-              domain: "ultrathink.biosphere.ai",
+              id: "d3667ea1-079a-434e-84d2-60e84757b5d5", // Default tenant ID
+              name: "Biosphere Alpha",
+              domain: "demo.biosphere.ai",
               is_active: true
             },
             {

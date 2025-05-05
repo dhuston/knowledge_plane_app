@@ -38,7 +38,6 @@ import HighlightedText, { HighlightedTextSegment } from '../text/HighlightedText
 import { useFeatureFlags } from '../../utils/featureFlags';
 import { HierarchyNavigator } from '../hierarchy/HierarchyNavigator';
 import InsightsDailySummary from '../insights/InsightsDailySummary';
-import UltraThink from '../workspace/UltraThink';
 
 // Different workspace view types
 type WorkspaceViewType = 'command-center' | 'map-focus' | 'grid';
@@ -280,32 +279,6 @@ export default function MainLayout() {
                   />
                 </Box>
               </VStack>
-            </CardBody>
-          </Card>
-        </GridItem>
-        
-        {/* UltraThink - Creative thinking assistant */}
-        <GridItem colSpan={{ base: 1, md: 2 }} mt={8}>
-          <Card
-            shadow="md"
-            bg={cardBgColor}
-            borderColor={borderColor}
-            borderWidth="1px"
-            borderRadius="xl"
-            transition="all 0.2s"
-            overflow="hidden"
-          >
-            <CardBody p={0}>
-              <UltraThink
-                maxHeight="400px"
-                personalizationContext={{
-                  userName: user?.name || "Team Member",
-                  role: user?.role || "Knowledge Worker",
-                  organization: user?.tenant_name || "Biosphere Alpha",
-                  currentProject: "Living Map",
-                  currentFocus: "innovation and creative problem-solving"
-                }}
-              />
             </CardBody>
           </Card>
         </GridItem>

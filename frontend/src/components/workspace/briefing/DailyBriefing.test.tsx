@@ -1,7 +1,24 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { DailyBriefing } from './DailyBriefing';
 import { ChakraProvider } from '@chakra-ui/react';
+
+// Mock matchMedia for tests
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+});
 
 // Mock calendar events data
 const mockCalendarEvents = [
@@ -38,6 +55,12 @@ vi.mock('../../../hooks/useCalendarEvents', () => ({
 }));
 
 describe('DailyBriefing', () => {
+  // Reset the mock implementation before each test
+  beforeEach(() => {
+    mockImplementation.events = mockCalendarEvents;
+    mockImplementation.isLoading = false;
+    mockImplementation.error = null;
+  });
   it('renders calendar events in the schedule tab', () => {
     render(
       <ChakraProvider>
@@ -69,8 +92,10 @@ describe('DailyBriefing', () => {
       </ChakraProvider>
     );
     
-    // Default is compact view
-    expect(screen.getByText('3 attendees')).toBeInTheDocument();
+    // Default is compact view - we can check for attendees tags, but need to use getAllByText
+    // because there might be multiple elements with the same text
+    const attendeesTags = screen.getAllByText('3 attendees');
+    expect(attendeesTags.length).toBeGreaterThan(0);
     
     // Click expand button
     const expandButton = screen.getByText('Expand');
@@ -86,13 +111,8 @@ describe('DailyBriefing', () => {
 
   it('shows loading state when events are loading', () => {
     // Override mock for this test
-    vi.mock('../../../hooks/useCalendarEvents', () => ({
-      useCalendarEvents: () => ({
-        events: [],
-        isLoading: true,
-        error: null,
-      }),
-    }), { virtual: true });
+    mockImplementation.events = [];
+    mockImplementation.isLoading = true;
     
     render(
       <ChakraProvider>
@@ -105,13 +125,9 @@ describe('DailyBriefing', () => {
 
   it('shows error state when API fails', () => {
     // Override mock for this test
-    vi.mock('../../../hooks/useCalendarEvents', () => ({
-      useCalendarEvents: () => ({
-        events: [],
-        isLoading: false,
-        error: 'Failed to fetch calendar events',
-      }),
-    }), { virtual: true });
+    mockImplementation.events = [];
+    mockImplementation.isLoading = false;
+    mockImplementation.error = 'Failed to fetch calendar events';
     
     render(
       <ChakraProvider>
@@ -135,8 +151,10 @@ describe('DailyBriefing', () => {
     
     // Now the meeting preparation section should be visible
     expect(screen.getByTestId('meeting-preparation')).toBeInTheDocument();
-    expect(screen.getByText('Key Participants:')).toBeInTheDocument();
-    expect(screen.getByText('Suggested Talking Points:')).toBeInTheDocument();
+    
+    // Get all instances of text since these appear multiple times in the accordion items
+    expect(screen.getAllByText('Key Participants:').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Suggested Talking Points:').length).toBeGreaterThan(0);
   });
   
   it('shows tab navigation with correct counts', () => {

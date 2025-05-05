@@ -1061,8 +1061,8 @@ async def list_available_tenants(db: AsyncSession = Depends(get_db_session)):
             # Create a demo tenant if none exists
             demo_tenant = await crud_tenant.create_demo_tenant(
                 db=db, 
-                name="UltraThink",
-                domain="ultrathink.demo.biosphere.ai"
+                name="Biosphere Alpha",
+                domain="demo.biosphere.ai"
             )
             tenants = [demo_tenant]
             logger.info(f"Created default demo tenant: {demo_tenant.name}")

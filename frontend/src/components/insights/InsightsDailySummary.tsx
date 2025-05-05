@@ -70,8 +70,9 @@ const InsightsDailySummary: React.FC<InsightsDailySummaryProps> = ({
   const activeTabBg = useColorModeValue('white', 'gray.600');
   const cardHoverBg = useColorModeValue('gray.50', 'gray.700');
   
-  // Responsive design adjustments
-  const isMobile = useBreakpointValue({ base: true, md: false });
+  // Responsive design adjustments (note: not used in current implementation but kept for future use)
+  // Commented out to avoid test issues
+  // const isMobile = useBreakpointValue({ base: true, md: false });
 
   // Generate summary when insights are loaded or change
   useEffect(() => {

@@ -346,7 +346,7 @@ class OpenAIService {
   }
 
   /**
-   * Call OpenAI with a custom prompt (used by UltraThink and other specialized components)
+   * Call OpenAI with a custom prompt (used by specialized components)
    */
   public async callCustomPrompt(prompt: string): Promise<string> {
     if (!this.isAvailable()) {

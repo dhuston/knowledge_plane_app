@@ -14,7 +14,6 @@ import { TaskManagement } from './tasks/TaskManagement';
 import { QuickActions } from './actions/QuickActions';
 import { LivingMap } from '../map/LivingMap';
 import InsightsDailySummary from '../insights/InsightsDailySummary';
-import UltraThink from './UltraThink';
 
 interface WorkspaceDashboardProps {
   initialLayout?: 'standard' | 'compact' | 'expanded';
@@ -132,19 +131,6 @@ export function WorkspaceDashboard({
             <QuickActions />
           </GridItem>
           
-          {/* UltraThink - Creative thinking AI assistant */}
-          <GridItem colSpan={12} mt={2}>
-            <UltraThink 
-              maxHeight="400px"
-              personalizationContext={{
-                userName: userName,
-                role: userRole,
-                organization: organizationName,
-                currentProject: "Living Map",
-                currentFocus: "innovation and creative problem-solving"
-              }}
-            />
-          </GridItem>
         </Grid>
       ) : (
         <Box 
