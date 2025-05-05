@@ -1,6 +1,6 @@
 # Biosphere Alpha
 
-A multi-tenant SaaS platform that creates an adaptive organization fabric & living map to visualize the true emergent structure of how work gets done in organizations.
+A platform that creates an adaptive organization fabric & living map to visualize the true emergent structure of how work gets done in organizations.
 
 ## Overview
 
