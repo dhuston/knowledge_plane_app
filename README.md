@@ -4,7 +4,7 @@ A platform that creates an adaptive organization fabric & living map to visualiz
 
 ## Overview
 
-Biosphere Alpha (KnowledgePlane AI) helps organizations get on the same page by enabling seamless collaboration, alignment, and adaptation. The platform creates a dynamic network view of people, teams, projects, goals, and knowledge flows rather than relying on static org charts.
+Biosphere Alpha helps organizations get on the same page by enabling seamless collaboration, alignment, and adaptation. The platform creates a dynamic network view of people, teams, projects, goals, and knowledge flows rather than relying on static org charts.
 
 ### Core Features
 
