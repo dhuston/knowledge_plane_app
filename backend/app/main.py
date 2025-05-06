@@ -35,7 +35,7 @@ configure_tenant_middleware(app)
 register_tenant_events()
 register_entity_event_hooks()
 
-# Add CORS Middleware
+# Add CORS Middleware - ensure OPTIONS preflight requests work correctly
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -49,8 +49,9 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8001"
     ],  
+    allow_origin_regex="https?://localhost:[0-9]+",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=600,

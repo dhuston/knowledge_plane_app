@@ -987,174 +987,180 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           p={4}
           position="relative"
         >
-          <AnimatePresence mode="wait">
-            {/* Details Tab Content - lazy loaded */}
-            <LazyPanel
-              active={activeTab === 'details'}
-              tabId="details"
-              key="details-panel"
-              keepMounted={true}
-              animationVariant="fade"
-              transitionDuration={0.4}
-              maintainHeight={false}
-              data-testid="details-panel"
-            >
-              <AnimatedTransition
-                in={isPanelMounted && activeTab === 'details'}
-                variant="panelEntry"
-                unmountOnExit={false}
-                transitionKey={`details-${selectedNode.id}`}
+          {/* Changed AnimatePresence mode from "wait" to "sync" to fix hook error */}
+          <AnimatePresence mode="sync">
+            {activeTab === 'details' && (
+              <LazyPanel
+                active={true}
+                tabId="details"
+                key="details-panel"
+                keepMounted={true}
+                animationVariant="fade"
+                transitionDuration={0.4}
+                maintainHeight={false}
+                data-testid="details-panel"
               >
-                <VStack 
-                  spacing={6} 
-                  align="stretch"
-                  id="panel-details"
+                <AnimatedTransition
+                  in={isPanelMounted}
+                  variant="panelEntry"
+                  unmountOnExit={false}
+                  transitionKey={`details-${selectedNode.id}`}
                 >
-                  {/* Entity-specific details with enhanced animations */}
-                  <EnhancedAnimatedTransition 
-                    in={true}
-                    variant="entityCard"
-                    entityType={selectedNode.type}
-                    customIndex={0}
-                    key={`entity-panel-${selectedNode.id}`}
+                  <VStack 
+                    spacing={6} 
+                    align="stretch"
+                    id="panel-details"
                   >
-                    <AnimatedContainer entityType={selectedNode.type} isActive={true}>
-                      {renderEntityPanel()}
-                    </AnimatedContainer>
-                  </EnhancedAnimatedTransition>
-                  
-                  {/* ML-based entity suggestions with enhanced animations */}
-                  {flags.enableSuggestions && shouldLoadSecondary && (
-                    <EnhancedAnimatedTransition in={true} variant="slideInUp" customIndex={1} delay={0.1}>
-                      <Suspense fallback={<LoadingFallback />}>
-                        {flags.enableMachineLearning ? (
-                          <LazyEnhancedEntitySuggestions
-                            entityId={selectedNode.id}
-                            entityType={selectedNode.type}
-                            onSuggestionClick={(id, type, label) => {
-                              if (handleSuggestionClick) {
-                                handleSuggestionClick({ id, type, label });
-                              }
-                            }}
-                            maxSuggestions={8}
-                            excludeIds={navHistory.map(item => item.nodeId)}
-                            viewMode="compact"
-                            title="AI-Powered Suggestions"
-                          />
-                        ) : (
-                          <LazyEntitySuggestionsContainer
-                            entityId={selectedNode.id}
-                            onSuggestionClick={handleSuggestionClick}
-                            viewMode="compact"
-                            options={{
-                              maxResults: 8,
-                              excludeIds: navHistory.map(item => item.nodeId),
-                              refreshOnFeedback: true
-                            }}
-                          />
-                        )}
-                      </Suspense>
+                    {/* Entity-specific details with enhanced animations */}
+                    <EnhancedAnimatedTransition 
+                      in={true}
+                      variant="entityCard"
+                      entityType={selectedNode.type}
+                      customIndex={0}
+                      key={`entity-panel-${selectedNode.id}`}
+                    >
+                      <AnimatedContainer entityType={selectedNode.type} isActive={true}>
+                        {renderEntityPanel()}
+                      </AnimatedContainer>
                     </EnhancedAnimatedTransition>
-                  )}
-                  
-                  {/* Recently viewed entities with enhanced animations */}
-                  {navHistory.length > 1 && shouldLoadTertiary && (
-                    <EnhancedAnimatedTransition in={true} variant="fadeSlideIn" customIndex={2} delay={0.2}>
-                      <Suspense fallback={<LoadingFallback />}>
-                        <LazyRecentlyViewedEntities 
-                          items={navHistory} 
-                          onEntityClick={handleBreadcrumbNavigation}
-                          maxItems={4}
-                          currentEntityId={selectedNode.id}
-                        />
-                      </Suspense>
+                    
+                    {/* ML-based entity suggestions with enhanced animations */}
+                    {flags.enableSuggestions && shouldLoadSecondary && (
+                      <EnhancedAnimatedTransition in={true} variant="slideInUp" customIndex={1} delay={0.1}>
+                        <Suspense fallback={<LoadingFallback />}>
+                          {flags.enableMachineLearning ? (
+                            <LazyEnhancedEntitySuggestions
+                              entityId={selectedNode.id}
+                              entityType={selectedNode.type}
+                              onSuggestionClick={(id, type, label) => {
+                                if (handleSuggestionClick) {
+                                  handleSuggestionClick({ id, type, label });
+                                }
+                              }}
+                              maxSuggestions={8}
+                              excludeIds={navHistory.map(item => item.nodeId)}
+                              viewMode="compact"
+                              title="AI-Powered Suggestions"
+                            />
+                          ) : (
+                            <LazyEntitySuggestionsContainer
+                              entityId={selectedNode.id}
+                              onSuggestionClick={handleSuggestionClick}
+                              viewMode="compact"
+                              options={{
+                                maxResults: 8,
+                                excludeIds: navHistory.map(item => item.nodeId),
+                                refreshOnFeedback: true
+                              }}
+                            />
+                          )}
+                        </Suspense>
+                      </EnhancedAnimatedTransition>
+                    )}
+                    
+                    {/* Recently viewed entities with enhanced animations */}
+                    {navHistory.length > 1 && shouldLoadTertiary && (
+                      <EnhancedAnimatedTransition in={true} variant="fadeSlideIn" customIndex={2} delay={0.2}>
+                        <Suspense fallback={<LoadingFallback />}>
+                          <LazyRecentlyViewedEntities 
+                            items={navHistory} 
+                            onEntityClick={handleBreadcrumbNavigation}
+                            maxItems={4}
+                            currentEntityId={selectedNode.id}
+                          />
+                        </Suspense>
+                      </EnhancedAnimatedTransition>
+                    )}
+  
+                    {/* Enhanced Entity-Specific Action Buttons with advanced animations */}
+                    <EnhancedAnimatedTransition 
+                      in={true}
+                      variant="scaleIn" 
+                      customIndex={3}
+                      delay={0.3}
+                    >
+                      <EnhancedEntityActions 
+                        entityType={selectedNode.type} 
+                        entityId={selectedNode.id}
+                        entityName={selectedNode.label}
+                        permissions={{
+                          canEdit: true,  // These would ideally come from a permissions service
+                          canDelete: true,
+                          canShare: true,
+                          isAdmin: false,
+                          isOwner: false
+                        }}
+                        onActionComplete={(action, result) => {
+                          // This could trigger a refresh of the entity data if needed
+                          console.log(`Action ${action} completed:`, result);
+                        }}
+                      />
                     </EnhancedAnimatedTransition>
-                  )}
-
-                  {/* Enhanced Entity-Specific Action Buttons with advanced animations */}
-                  <EnhancedAnimatedTransition 
-                    in={true}
-                    variant="scaleIn" 
-                    customIndex={3}
-                    delay={0.3}
-                  >
-                    <EnhancedEntityActions 
-                      entityType={selectedNode.type} 
-                      entityId={selectedNode.id}
-                      entityName={selectedNode.label}
-                      permissions={{
-                        canEdit: true,  // These would ideally come from a permissions service
-                        canDelete: true,
-                        canShare: true,
-                        isAdmin: false,
-                        isOwner: false
-                      }}
-                      onActionComplete={(action, result) => {
-                        // This could trigger a refresh of the entity data if needed
-                        console.log(`Action ${action} completed:`, result);
-                      }}
-                    />
-                  </EnhancedAnimatedTransition>
-                </VStack>
-              </AnimatedTransition>
-            </LazyPanel>
+                  </VStack>
+                </AnimatedTransition>
+              </LazyPanel>
+            )}
             
             {/* Related Tab Content - lazily loaded */}
-            <LazyPanel
-              active={activeTab === 'related'}
-              tabId="related"
-              key="related-panel"
-              animationVariant="fade"
-              transitionDuration={0.4}
-              data-testid="related-panel"
-            >
-              <AnimatedTransition
-                in={activeTab === 'related'}
-                variant="contentFade"
-                unmountOnExit={false}
-                transitionKey={`related-${selectedNode.id}`}
+            {activeTab === 'related' && (
+              <LazyPanel
+                active={true}
+                tabId="related"
+                key="related-panel"
+                animationVariant="fade"
+                transitionDuration={0.4}
+                data-testid="related-panel"
               >
-                <VStack 
-                  spacing={6} 
-                  align="stretch"
-                  id="panel-related"
+                <AnimatedTransition
+                  in={true}
+                  variant="contentFade"
+                  unmountOnExit={false}
+                  transitionKey={`related-${selectedNode.id}`}
                 >
-                  <RelationshipList 
-                    relationships={optimizedRelationships} 
-                    isLoading={isRelationshipsLoading} 
-                    entityType={selectedNode.type}
-                  />
-                </VStack>
-              </AnimatedTransition>
-            </LazyPanel>
+                  <VStack 
+                    spacing={6} 
+                    align="stretch"
+                    id="panel-related"
+                  >
+                    <RelationshipList 
+                      relationships={optimizedRelationships} 
+                      isLoading={isRelationshipsLoading} 
+                      entityType={selectedNode.type}
+                    />
+                  </VStack>
+                </AnimatedTransition>
+              </LazyPanel>
+            )}
             
             {/* Activity Tab Content - lazily loaded */}
-            <LazyPanel
-              active={activeTab === 'activity'}
-              tabId="activity"
-              key="activity-panel"
-              animationVariant="fade"
-              transitionDuration={0.4}
-              data-testid="activity-panel"
-            >
-              <AnimatedTransition
-                in={activeTab === 'activity'}
-                variant="contentFade"
-                unmountOnExit={false}
-                transitionKey={`activity-${selectedNode.id}`}
+            {activeTab === 'activity' && (
+              <LazyPanel
+                active={true}
+                tabId="activity"
+                key="activity-panel"
+                animationVariant="fade"
+                transitionDuration={0.4}
+                data-testid="activity-panel"
               >
-                <VStack 
-                  spacing={6} 
-                  align="stretch"
-                  id="panel-activity"
+                <AnimatedTransition
+                  in={true}
+                  variant="contentFade"
+                  unmountOnExit={false}
+                  transitionKey={`activity-${selectedNode.id}`}
                 >
-                  <ActivityTimeline 
-                    activities={activityHistory} 
-                    isLoading={isActivityLoading} 
-                  />
-                </VStack>
-              </AnimatedTransition>
-            </LazyPanel>
+                  <VStack 
+                    spacing={6} 
+                    align="stretch"
+                    id="panel-activity"
+                  >
+                    <ActivityTimeline 
+                      activities={activityHistory} 
+                      isLoading={isActivityLoading} 
+                    />
+                  </VStack>
+                </AnimatedTransition>
+              </LazyPanel>
+            )}
           </AnimatePresence>
         </Box>
       </Box>

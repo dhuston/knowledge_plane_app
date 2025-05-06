@@ -2,7 +2,8 @@ from datetime import datetime
 import uuid
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -15,6 +16,18 @@ from app.models.notification import NotificationPreference
 
 
 router = APIRouter()
+
+
+@router.head("/")
+async def head_notifications():
+    """Handle HEAD requests for notifications endpoint."""
+    return JSONResponse(status_code=200, content={})
+
+
+@router.options("/")
+async def options_notifications():
+    """Handle OPTIONS requests for notifications endpoint."""
+    return JSONResponse(status_code=200, content={})
 
 
 @router.get("/", response_model=List[schemas.notification.NotificationResponse])
@@ -253,6 +266,18 @@ async def dismiss_all_notifications(
             "count": 0,
             "message": f"Error dismissing notifications: {str(e)}"
         }
+
+
+@router.head("/preferences")
+async def head_notification_preferences():
+    """Handle HEAD requests for notification preferences endpoint."""
+    return JSONResponse(status_code=200, content={})
+
+
+@router.options("/preferences")
+async def options_notification_preferences():
+    """Handle OPTIONS requests for notification preferences endpoint."""
+    return JSONResponse(status_code=200, content={})
 
 
 @router.get("/preferences", response_model=schemas.notification.UserNotificationSettings)

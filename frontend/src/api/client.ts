@@ -97,13 +97,34 @@ export const apiClient = {
     async isEndpointAvailable(endpoint: string): Promise<boolean> {
       try {
         const url = buildUrl(endpoint);
-        const response = await fetch(url, { 
-          method: 'HEAD', 
-          cache: 'no-store',
-          headers: { 'X-Availability-Check': 'true' }
-        });
-        return response.ok;
+        
+        // Try a GET request first (which usually has better CORS support)
+        try {
+          const getResponse = await fetch(url, { 
+            method: 'GET', 
+            cache: 'no-store',
+            credentials: 'include',
+            headers: { 
+              'X-Availability-Check': 'true',
+              'Accept': 'application/json'
+            }
+          });
+          return getResponse.ok;
+        } catch (getError) {
+          // Fall back to HEAD if GET fails
+          const headResponse = await fetch(url, { 
+            method: 'HEAD', 
+            cache: 'no-store',
+            credentials: 'include',
+            headers: { 
+              'X-Availability-Check': 'true',
+              'Accept': 'application/json'
+            }
+          });
+          return headResponse.ok;
+        }
       } catch (error) {
+        console.warn(`API availability check failed for ${endpoint}:`, error);
         return false;
       }
     },

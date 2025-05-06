@@ -68,6 +68,7 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
       boxShadow="0 2px 8px rgba(0, 0, 0, 0.08)"
       borderRadius="0px 4px 4px 0px"
       padding="12px 10px"
+      overflowX="hidden"
       display="flex"
       flexDirection="column"
       alignItems="center"
@@ -144,7 +145,7 @@ export const HierarchyNavigatorView: React.FC<HierarchyNavigatorViewProps> = ({
       />
       
       {/* Main navigation items */}
-      <VStack spacing={2} width="100%" flex="1" mb={4} overflowY="auto">
+      <VStack spacing={2} width="100%" flex="1" mb={4} overflowY="auto" overflowX="hidden">
         {Array.isArray(hierarchyItems) && hierarchyItems.map((unit: OrganizationalUnitEntity) => {
           // Skip rendering if unit is null/undefined or missing required properties
           if (!unit || !unit.id) return null;
