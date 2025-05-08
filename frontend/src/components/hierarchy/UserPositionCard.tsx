@@ -16,7 +16,7 @@ import {
 } from '@chakra-ui/react';
 import { FiUser, FiUsers, FiTarget } from 'react-icons/fi';
 import { InlineTooltip } from '../common/InlineTooltip';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../auth/AuthContext';
 import { useHierarchy } from './HierarchyContext';
 
 export const UserPositionCard: React.FC = () => {

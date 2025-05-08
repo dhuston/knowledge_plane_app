@@ -1,6 +1,7 @@
 import { ActivityData } from './PatternDetectionService';
-import { Insight } from '../types/insight';
-import env from '../config/env';
+import { Insight, InsightCategory, InsightSourceType } from '../types/insight';
+import env, { IS_DEVELOPMENT } from '../config/env';
+import { apiClient } from '../api/client';
 
 /**
  * Service for interacting with OpenAI APIs to generate advanced insights
@@ -40,21 +41,81 @@ class OpenAIService {
    * All OpenAI API calls now go through the backend to avoid CORS and security issues
    */
   private async callAPI(endpoint: string, data: any): Promise<any> {
+    // Check if we're in development mode - use the development endpoints if so
+    const devMode = IS_DEVELOPMENT || localStorage.getItem('dev_mode') === 'true';
     
-    // Check for development mode flag in localStorage as manual override
-    const devMode = localStorage.getItem('dev_mode') === 'true';
-    if (devMode) {
-      return this.getMockResponse(endpoint, data);
-    }
-    
-    if (!this.isAvailable()) {
-      
-      // Return appropriate fallback values based on endpoint type instead of throwing
-      return this.getMockResponse(endpoint, data);
-    }
-
     try {
-      // Map OpenAI endpoints to our backend proxy endpoints
+      if (devMode) {
+        console.log('[DEV MODE] Using unauthenticated dev endpoints for AI proxy');
+      
+        // Get the current tenant from local storage
+        const currentTenant = localStorage.getItem('knowledge_plane_tenant') || '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+        console.log(`[DEV MODE] Using tenant ${currentTenant} for AI proxy`);
+        
+        // Call the appropriate dev endpoint based on the requested operation
+        try {
+          if (endpoint === 'chat/completions') {
+            // For chat completion requests, extract the prompt from the messages
+            const userMessage = data.messages.find((m: any) => m.role === 'user');
+            const prompt = userMessage ? userMessage.content : 'No prompt provided';
+            
+            // Use the dev endpoint for custom prompts
+            const result = await apiClient.devCustomPrompt(currentTenant, prompt);
+            return {
+              choices: [{
+                message: {
+                  content: result.response || "No response content available."
+                }
+              }]
+            };
+          } else if (endpoint === 'summarize-insights') {
+            // For insight summary, use the dev endpoint
+            const result = await apiClient.devSummarizeInsights(
+              currentTenant,
+              data.insights || [],
+              data.user_preferences || {}
+            );
+            return {
+              choices: [{
+                message: {
+                  content: result.summary || "No summary content available."
+                }
+              }]
+            };
+          } else if (endpoint === 'generate-insights') {
+            // For insights generation, use the dev endpoint
+            const result = await apiClient.devGenerateInsights(
+              currentTenant,
+              data.activities || [],
+              data.context_data || {}
+            );
+            return {
+              insights: result.insights || []
+            };
+          } else if (endpoint === 'enhance-insight') {
+            // For insight enhancement, use the dev endpoint
+            const result = await apiClient.devEnhanceInsight(
+              currentTenant,
+              data.insight || {}
+            );
+            return result || {}; // Return the enhanced insight directly
+          }
+        } catch (devError) {
+          console.error("[DEV MODE] Error using dev endpoints:", devError);
+          console.log("[DEV MODE] Falling back to standard approach");
+          // Continue to standard approach as fallback
+        }
+      }
+      
+      // If not in dev mode or dev endpoint failed, use standard approach
+      
+      // Check if API key is configured
+      if (!this.isAvailable()) {
+        console.log('[Debug] AI Service not available (API key missing), returning service notice');
+        return this.getServiceNotice(endpoint, data);
+      }
+
+      // Map OpenAI endpoints to our backend proxy endpoints with full paths
       const proxyEndpoints: Record<string, string> = {
         'chat/completions': '/api/v1/ai-proxy/custom-prompt',
         'generate-insights': '/api/v1/ai-proxy/generate-insights',
@@ -64,6 +125,15 @@ class OpenAIService {
       
       // Get the appropriate proxy endpoint or use custom-prompt as fallback
       const proxyEndpoint = proxyEndpoints[endpoint] || '/api/v1/ai-proxy/custom-prompt';
+      
+      // Check if the endpoint actually exists before trying to call it
+      // AI proxy endpoints typically only accept POST requests, so specify POST method for check
+      const endpointExists = await apiClient.isEndpointAvailable(proxyEndpoint, 'POST');
+      
+      if (!endpointExists) {
+        console.log(`[Debug] AI proxy endpoint ${proxyEndpoint} is not available, returning service notice`);
+        return this.getServiceNotice(endpoint, data);
+      }
       
       // Prepare the request data based on the endpoint
       let requestData: Record<string, any> = {};
@@ -79,66 +149,13 @@ class OpenAIService {
         requestData = data;
       }
       
-      // TEMPORARY FIX: Skip actual API calls and use mock data
-      // This prevents 500 errors while the backend is being configured
-      return this.getMockResponse(endpoint, data);
-      
-      // The code below is temporarily disabled to avoid errors
-      /*
+      // Try calling the actual API endpoint
+      console.log(`[Debug] AI proxy endpoint ${proxyEndpoint} exists, making API call`);
       try {
-        // Use AbortController for timeout control
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+        // Use apiClient instead of fetch for consistent error handling
+        const result = await apiClient.post(proxyEndpoint, requestData);
         
-        console.log(`[Debug] Sending POST to ${proxyEndpoint}`);
-        const response = await fetch(proxyEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestData),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeoutId));
-  
-        console.log(`[Debug] Response status: ${response.status}`);
-        // Always check status before proceeding
-        if (!response.ok) {
-          // Try to get error details if possible
-          try {
-            const errorText = await response.text();
-            console.error(`[Debug] Error response: ${errorText}`);
-            throw new Error(`AI proxy error (${response.status}): ${errorText || response.statusText}`);
-          } catch (e) {
-            throw new Error(`AI proxy error: ${response.status} ${response.statusText}`);
-          }
-        }
-  
-        // Check content type and length
-        const contentType = response.headers.get('content-type');
-        console.log(`[Debug] Response content-type: ${contentType}`);
-        
-        // Get the text first, then parse if it's JSON
-        const text = await response.text();
-        console.log(`[Debug] Response text length: ${text.length}`);
-        
-        let result: any = {};
-        
-        // Parse as JSON if appropriate content type and non-empty body
-        if (contentType?.includes('application/json') && text.trim()) {
-          try {
-            result = JSON.parse(text);
-            console.log('[Debug] Successfully parsed JSON response');
-          } catch (parseError) {
-            console.error('[Debug] Failed to parse JSON response:', parseError);
-            result = { content: text }; // Fallback to using text as content
-          }
-        } else {
-          // Handle non-JSON responses
-          result = { content: text };
-          console.log('[Debug] Using text response as content');
-        }
-        
-        // Format the response to match what the original methods expect
+        // Format the response to match expected structure
         if (endpoint === 'chat/completions') {
           return {
             choices: [{
@@ -164,39 +181,96 @@ class OpenAIService {
         }
         
         return result;
-      } catch (fetchError: any) {
-        // Special handling for AbortController timeout
-        if (fetchError.name === 'AbortError') {
-          console.error('[Debug] Request timed out');
-          throw new Error('Request timed out');
+      } catch (apiError) {
+        // Try dev endpoints as a last resort in development mode
+        if (IS_DEVELOPMENT) {
+          console.log('[DEV MODE] Standard endpoint failed, trying dev endpoint as last resort');
+          return this.callDevEndpoints(endpoint, data);
         }
         
-        console.error('[Debug] Fetch error:', fetchError);
-        throw fetchError;
+        console.error(`[Debug] Error calling AI proxy via apiClient:`, apiError);
+        return this.getServiceNotice(endpoint, data);
       }
-      */
     } catch (error) {
-      // Error caught, will be handled with fallback responses
-      return this.getMockResponse(endpoint, data);
+      console.error('[Debug] Error in callAPI:', error);
+      return this.getServiceNotice(endpoint, data);
     }
   }
   
   /**
-   * Generate mock responses for each endpoint type to avoid calling the backend
+   * Helper method to call dev endpoints as a last fallback
    */
-  private getMockResponse(endpoint: string, data: any): any {
-    
-    // Return appropriate mock values based on endpoint type
-    if (endpoint === 'chat/completions') {
-      // Extract the prompt content to personalize the mock response
-      const userMessage = data.messages?.find((m: any) => m.role === 'user');
-      const prompt = userMessage?.content || 'No prompt provided';
-      const shortPrompt = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
+  private async callDevEndpoints(endpoint: string, data: any): Promise<any> {
+    try {
+      // Get the current tenant from local storage
+      const currentTenant = localStorage.getItem('knowledge_plane_tenant') || '3fa85f64-5717-4562-b3fc-2c963f66afa6';
       
+      if (endpoint === 'chat/completions') {
+        // For chat completion requests, extract the prompt from the messages
+        const userMessage = data.messages.find((m: any) => m.role === 'user');
+        const prompt = userMessage ? userMessage.content : 'No prompt provided';
+        
+        // Use the dev endpoint for custom prompts
+        const result = await apiClient.devCustomPrompt(currentTenant, prompt);
+        return {
+          choices: [{
+            message: {
+              content: result.response || "No response content available."
+            }
+          }]
+        };
+      } else if (endpoint === 'summarize-insights') {
+        // For insight summary, use the dev endpoint
+        const result = await apiClient.devSummarizeInsights(
+          currentTenant,
+          data.insights || [],
+          data.user_preferences || {}
+        );
+        return {
+          choices: [{
+            message: {
+              content: result.summary || "No summary content available."
+            }
+          }]
+        };
+      } else if (endpoint === 'generate-insights') {
+        // For insights generation, use the dev endpoint
+        const result = await apiClient.devGenerateInsights(
+          currentTenant,
+          data.activities || [],
+          data.context_data || {}
+        );
+        return {
+          insights: result.insights || []
+        };
+      } else if (endpoint === 'enhance-insight') {
+        // For insight enhancement, use the dev endpoint
+        const result = await apiClient.devEnhanceInsight(
+          currentTenant,
+          data.insight || {}
+        );
+        return result || {}; // Return the enhanced insight directly
+      }
+      
+      // Fallback to service notice if we don't have a matching endpoint
+      return this.getServiceNotice(endpoint, data);
+    } catch (devError) {
+      console.error("[DEV MODE] Error in callDevEndpoints:", devError);
+      return this.getServiceNotice(endpoint, data);
+    }
+  }
+  
+  /**
+   * Generate service notices for each endpoint type when API calls can't be made
+   */
+  private getServiceNotice(endpoint: string, data: any): any {
+    
+    // Return appropriate values based on endpoint type with proper error messaging
+    if (endpoint === 'chat/completions') {
       return {
         choices: [{
           message: {
-            content: `This is a mock response because the AI service is not available. Your prompt was: "${shortPrompt}"\n\nMock answer: The AI service is currently in development mode. When fully configured, this will provide an actual response from the AI model.`
+            content: `The AI service is currently not available. To enable this feature, please configure the BMS Azure OpenAI integration.`
           }
         }]
       };
@@ -204,50 +278,39 @@ class OpenAIService {
       return {
         choices: [{
           message: {
-            content: "# Daily Summary\n\n## Your Organization Today\nThe team has been making steady progress on key initiatives. Recent collaboration patterns show increasing cross-team engagement.\n\n## Priorities for Today\n- Follow up on project milestones mentioned in recent communications\n- Connect with team members who have complementary skills for your current tasks\n- Review shared resources that might benefit your current work\n\n## Learning Opportunities\nRelated to your current focus areas, consider exploring new methodologies that could enhance your workflow efficiency.\n\n*This is a mock summary generated while the AI service is being configured.*"
+            content: "# Daily Summary\n\n## AI Service Status\nAI-powered insights are currently unavailable. Please configure the BMS Azure OpenAI integration to enable this feature.\n\n## Next Steps\n- Contact your system administrator to complete the Azure OpenAI integration\n- Ensure API keys are properly configured in the backend environment\n- Refer to the documentation at /docs/BMS_AZURE_OPENAI_INTEGRATION.md for setup instructions"
           }
         }]
       };
     } else if (endpoint === 'generate-insights') {
-      // Generate 3-5 mock insights
-      const categories = ["collaboration", "productivity", "knowledge", "project", "communication"];
-      const insights = Array(Math.floor(Math.random() * 3) + 3).fill(null).map((_, i) => ({
-        id: `mock-insight-${Date.now()}-${i}`,
-        title: `Mock Insight ${i+1}`,
-        description: `This is a mock insight created while the AI service is being configured. It would analyze patterns in recent activities and provide actionable suggestions.`,
-        category: categories[Math.floor(Math.random() * categories.length)],
-        relevanceScore: 0.7 + (Math.random() * 0.3), // 0.7-1.0
+      // Return minimal insights with proper error message
+      const insight = {
+        id: `ai-service-notice-${Date.now()}`,
+        title: `AI Service Configuration Required`,
+        description: `The AI insights service requires proper configuration of BMS Azure OpenAI integration. Please refer to the documentation at /docs/BMS_AZURE_OPENAI_INTEGRATION.md for setup instructions.`,
+        category: "system",
+        relevanceScore: 1.0,
         createdAt: new Date().toISOString(),
         source: {
           type: "system",
-          id: "mock-system"
+          id: "system-notice"
         },
-        relatedEntities: [{
-          id: "entity-1",
-          type: "user", 
-          name: "Team Member",
-          connection: "collaborator"
-        }],
+        relatedEntities: [],
         suggestedActions: [{
-          label: "Review Details",
+          label: "View Documentation",
           type: "view"
         }]
-      }));
-      
-      return { insights };
-    } else if (endpoint === 'enhance-insight') {
-      // Return the original insight with slight enhancements
-      const originalInsight = data.insight || {};
-      return {
-        ...originalInsight,
-        title: `${originalInsight.title} (Enhanced)`,
-        description: `${originalInsight.description}\n\nThis insight has been enhanced with additional context (mock enhancement).`,
-        relevanceScore: Math.min(1.0, (originalInsight.relevanceScore || 0.5) + 0.1)
       };
+      
+      return { insights: [insight] };
+    } else if (endpoint === 'enhance-insight') {
+      // Return the original insight without modifications
+      const originalInsight = data.insight || {};
+      return originalInsight;
     }
     
     // Default fallback
-    return { mock: true, message: "Mock response generated" };
+    return { status: "unavailable", message: "AI service not available" };
   }
 
   /**
@@ -258,44 +321,28 @@ class OpenAIService {
     userContext?: Record<string, any>
   ): Promise<Insight[]> {
     try {
-      // IMPORTANT FIX: Similar to the activities endpoint, the AI proxy is also not properly set up
-      // Return mock insights instead of making API calls to avoid the 500 error
-      
-      // Generate 3-5 mock insights based on the activities
-      const mockInsightCount = Math.floor(Math.random() * 3) + 3; // 3-5 insights
-      const mockInsights: Insight[] = Array(mockInsightCount).fill(null).map((_, index) => {
-        const categories = ["collaboration", "productivity", "knowledge", "project", "communication"];
-        const category = categories[Math.floor(Math.random() * categories.length)] as InsightCategory;
-        
-        return {
-          id: `mock-insight-${Date.now()}-${index}`,
-          title: `Mock Insight ${index + 1}`,
-          description: `This is a mock insight generated locally because the AI proxy is not configured correctly. It analyzes patterns in your ${activities.length} activities.`,
-          category,
+      // Use callAPI method to handle the API call or fallback to proper error message
+      console.log("[Debug] Calling AI proxy endpoint for insights generation");
+      // First check if we even have activities to process
+      if (!activities || activities.length === 0) {
+        console.log("[Debug] No activities to analyze, returning service status message");
+        return [{
+          id: `ai-notice-${Date.now()}`,
+          title: 'No Data Available',
+          description: 'There are no activities available to analyze.',
+          category: 'system' as InsightCategory,
           createdAt: new Date().toISOString(),
-          relevanceScore: 0.7 + (Math.random() * 0.3), // 0.7-1.0
+          relevanceScore: 1.0,
           source: {
-            type: "system",
-            id: "mock-system"
+            type: 'system' as InsightSourceType,
+            id: 'system-notice'
           },
-          relatedEntities: [{
-            id: "entity-1",
-            type: "user",
-            name: "Mock User",
-            connection: "colaborator"
-          }],
-          suggestedActions: [{
-            label: "Review Mock Insight",
-            type: "view"
-          }]
-        };
-      });
+          relatedEntities: [],
+          suggestedActions: []
+        }];
+      }
       
-      return mockInsights;
-      
-      /* Original code that was causing 500 errors:
-      // Call our backend proxy to generate insights
-      console.log("[Debug] Calling AI proxy endpoint /api/v1/ai-proxy/generate-insights");
+      // Call the AI proxy with available activities
       const response = await this.callAPI('generate-insights', {
         activities: activities.slice(0, 50), // Limit to avoid token limits
         context_data: userContext || {}
@@ -308,14 +355,27 @@ class OpenAIService {
       // Add unique IDs if not present
       return insights.map((insight: Insight, index: number) => ({
         ...insight,
-        id: insight.id || `openai-insight-${Date.now()}-${index}`,
+        id: insight.id || `ai-insight-${Date.now()}-${index}`,
         createdAt: insight.createdAt || new Date().toISOString()
       }));
-      */
-      
     } catch (error) {
-      // Return empty array in case of error
-      return [];
+      console.error('Error generating insights:', error);
+      
+      // Return a single system message about the service being unavailable
+      return [{
+        id: `ai-service-error-${Date.now()}`,
+        title: 'AI Service Status',
+        description: 'The AI insights service is currently unavailable. Please check your integration configuration.',
+        category: 'system' as InsightCategory,
+        createdAt: new Date().toISOString(),
+        relevanceScore: 1.0,
+        source: {
+          type: 'system' as InsightSourceType,
+          id: 'system-error'
+        },
+        relatedEntities: [],
+        suggestedActions: []
+      }];
     }
   }
 

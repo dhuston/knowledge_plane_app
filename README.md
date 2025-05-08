@@ -42,7 +42,10 @@ For Docker Compose development, only the root `.env` file is required as variabl
 ### Running with Docker Compose
 
 ```bash
-# Start all services
+# Using the helper script
+./scripts/docker-start.sh
+
+# Or manually with docker-compose
 docker-compose up
 
 # Start specific service

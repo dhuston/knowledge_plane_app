@@ -1,129 +1,67 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import {
-  Box,
-  Button,
-  Heading,
-  Text,
-  VStack,
-  Icon,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { FiAlertTriangle } from 'react-icons/fi';
+import React from 'react';
+import { Box, Heading, Text, Button, VStack, Code } from '@chakra-ui/react';
 
-interface Props {
-  children: ReactNode;
-}
-
-interface State {
+interface ErrorBoundaryState {
   hasError: boolean;
-  error: Error | null;
-  errorInfo: ErrorInfo | null;
+  error?: Error;
+  errorInfo?: React.ErrorInfo;
 }
 
-export default class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null,
-    errorInfo: null,
-  };
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
 
-  public static getDerivedStateFromError(error: Error): State {
-    return {
-      hasError: true,
-      error,
-      errorInfo: null,
-    };
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
-    this.setState({
-      error,
-      errorInfo,
-    });
-
-    // Here you could send the error to your error reporting service
-    // e.g., Sentry, LogRocket, etc.
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
   }
 
-  private handleReset = () => {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null,
+      error,
+      errorInfo
     });
+    
+    // Log the error to console
+    console.error("Error caught by ErrorBoundary:", error, errorInfo);
+  }
+  
+  handleRetry = () => {
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
   };
 
-  public render() {
+  render() {
     if (this.state.hasError) {
-      return <ErrorFallback error={this.state.error} onReset={this.handleReset} />;
+      return (
+        <Box p={6} borderRadius="md" bg="gray.50" color="gray.800" maxW="800px" mx="auto" my={4} _dark={{ bg: "gray.700", color: "gray.100" }}>
+          <VStack spacing={4} align="flex-start">
+            <Heading size="lg" color="red.500">Something went wrong</Heading>
+            <Text>We encountered an error while rendering this component. Please try again or contact support if the issue persists.</Text>
+            
+            {this.state.error && (
+              <Box p={3} bg="gray.100" w="100%" borderRadius="md" _dark={{ bg: "gray.800" }}>
+                <Text fontWeight="bold">Error:</Text>
+                <Code colorScheme="red" display="block" whiteSpace="pre-wrap" p={2} borderRadius="md">
+                  {this.state.error.toString()}
+                </Code>
+              </Box>
+            )}
+            
+            <Button colorScheme="blue" onClick={this.handleRetry}>
+              Try Again
+            </Button>
+          </VStack>
+        </Box>
+      );
     }
 
     return this.props.children;
   }
 }
 
-interface ErrorFallbackProps {
-  error: Error | null;
-  onReset: () => void;
-}
-
-function ErrorFallback({ error, onReset }: ErrorFallbackProps) {
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-
-  return (
-    <Box
-      p={8}
-      bg={bgColor}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor={borderColor}
-      boxShadow="lg"
-      maxW="600px"
-      mx="auto"
-      my={8}
-    >
-      <VStack spacing={6} align="stretch">
-        <VStack spacing={2} align="center">
-          <Icon as={FiAlertTriangle} boxSize={10} color="error.500" />
-          <Heading size="lg" textAlign="center">
-            Something went wrong
-          </Heading>
-        </VStack>
-
-        <VStack spacing={4} align="stretch">
-          <Text color="gray.600" _dark={{ color: 'gray.300' }}>
-            We apologize for the inconvenience. An unexpected error has occurred.
-          </Text>
-
-          {error && (
-            <Box
-              p={4}
-              bg="gray.50"
-              _dark={{ bg: 'gray.900' }}
-              borderRadius="md"
-              fontSize="sm"
-              fontFamily="mono"
-            >
-              <Text color="error.500">{error.message}</Text>
-            </Box>
-          )}
-
-          <Button
-            colorScheme="primary"
-            onClick={onReset}
-            size="lg"
-            width="full"
-          >
-            Try Again
-          </Button>
-
-          <Text fontSize="sm" color="gray.500" textAlign="center">
-            If the problem persists, please contact support.
-          </Text>
-        </VStack>
-      </VStack>
-    </Box>
-  );
-} 
+export default ErrorBoundary;

@@ -17,7 +17,6 @@ import {
 } from '@chakra-ui/react';
 import { FaPlus, FaSync, FaTools } from 'react-icons/fa';
 import { useApiClient } from '../../hooks/useApiClient';
-import { useFeatureFlags } from '../../utils/featureFlags';
 
 // Define types for integration data
 interface IntegrationType {
@@ -41,16 +40,10 @@ const IntegrationsPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [integrationTypes, setIntegrationTypes] = useState<IntegrationType[]>([]);
   const apiClient = useApiClient();
-  const { flags } = useFeatureFlags();
 
   // Colors
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
-
-  // Skip rendering if feature flag is disabled
-  if (!flags.enableIntegrations) {
-    return null;
-  }
 
   // Load integrations on component mount
   useEffect(() => {

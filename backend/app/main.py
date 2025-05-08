@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import time
 
 from app.core.config import settings
-from app.core.tenant_context import configure_tenant_middleware
-from app.core.tenant_filter import register_tenant_events
+from app.core.tenant_middleware import configure_tenant_middleware
+from app.core.tenant_decorator import register_tenant_events  # Updated import
 from app.core.security import initialize_oauth
 from app.core.entity_event_hooks import register_entity_event_hooks
 
@@ -27,6 +27,7 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting application initialization")
+    # Remove any reference to create_dev_user.py script - it's no longer needed
     await initialize_oauth()
     logger.info("Application initialization complete")
 

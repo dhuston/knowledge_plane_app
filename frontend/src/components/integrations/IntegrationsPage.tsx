@@ -15,6 +15,7 @@ import { AddIcon } from '@chakra-ui/icons';
 
 import IntegrationCard from './IntegrationCard';
 import IntegrationModal from './IntegrationModal';
+import IntegrationApiSwitch from './IntegrationApiSwitch';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorAlert from '../common/ErrorAlert';
 import { useIntegrations } from '../../hooks/useIntegrations';
@@ -70,6 +71,8 @@ const IntegrationsPage: React.FC = () => {
           real-time data from various sources.
         </Text>
       </Box>
+      
+      <IntegrationApiSwitch />
       
       {isLoading ? (
         <LoadingSpinner />

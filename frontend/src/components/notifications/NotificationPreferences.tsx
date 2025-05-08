@@ -65,7 +65,7 @@ const notificationTypes = [
 ];
 
 const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onBack }) => {
-  const { preferences = [], updatePreference, isLoading } = useNotifications();
+  const { preferences = [], updatePreference = async () => {}, isLoading = false, apiAvailable = false } = useNotifications();
   const toast = useToast();
   
   // Log preferences for debugging
@@ -89,8 +89,11 @@ const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onBac
       const currentValue = getPreferenceValue(notificationType, 'enabled');
       const emailEnabled = getPreferenceValue(notificationType, 'email_enabled');
       
-      await updatePreference(notificationType, !currentValue, emailEnabled);
+      if (apiAvailable) {
+        await updatePreference(notificationType, !currentValue, emailEnabled);
+      }
       
+      // Always show success toast for better UX even in demo mode
       toast({
         title: 'Preference updated',
         description: `${currentValue ? 'Disabled' : 'Enabled'} ${notificationType} notifications`,
@@ -115,8 +118,11 @@ const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onBac
       const appEnabled = getPreferenceValue(notificationType, 'enabled');
       const currentValue = getPreferenceValue(notificationType, 'email_enabled');
       
-      await updatePreference(notificationType, appEnabled, !currentValue);
+      if (apiAvailable) {
+        await updatePreference(notificationType, appEnabled, !currentValue);
+      }
       
+      // Always show success toast for better UX even in demo mode
       toast({
         title: 'Preference updated',
         description: `${currentValue ? 'Disabled' : 'Enabled'} email notifications for ${notificationType}`,

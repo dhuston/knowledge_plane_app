@@ -54,13 +54,13 @@ import { MapNodeTypeEnum, MapEdgeTypeEnum } from '../../types/map';
 import EnhancedRelationshipVisual from './EnhancedRelationshipVisual';
 import { motion } from 'framer-motion';
 import {
+  areEqual,
+  useDelayedExecution,
   useChunkedProcessing,
   useChunkedRendering,
   useVirtualizedList,
-  useExpandableGroups,
-  areEqual,
-  useDelayedExecution
-} from '../../utils/performance';
+  useExpandableGroups
+} from '../../utils/performance-light';
 
 // Types
 interface RelationshipData {

@@ -33,7 +33,7 @@ import {
     FiGrid,
 } from 'react-icons/fi';
 import { useLocation, Link } from 'react-router-dom';
-import { User } from '../../context/AuthContext';
+import { User } from '../../auth/AuthContext';
 import ViewToggle from '../ui/ViewToggle';
 import useNotifications from '../../hooks/useNotifications';
 import NotificationBadge from '../notifications/NotificationBadge';

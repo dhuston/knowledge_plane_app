@@ -20,11 +20,10 @@ from jose import jwt
 from app.crud.crud_user import user as crud_user
 from app.crud.crud_tenant import tenant as crud_tenant
 from app import models, schemas
-from app.core import security, auth
 from app.core.auth import AuthError, authenticate_password, get_demo_login_token, get_auth_mode
 from app.core.config import settings
-from app.core.security import create_access_token, get_oauth_client, CREDENTIALS_EXCEPTION
-from app.core.security import get_current_user
+from app.core.token import create_access_token
+from app.core.security import CREDENTIALS_EXCEPTION, get_current_user
 from app.db.session import get_db_session
 from app.schemas import UserCreate, UserUpdate, TenantCreate
 from app.schemas.auth import PasswordLoginRequest, DemoUserCreate, AuthMode
@@ -86,9 +85,93 @@ async def login_password(
         )
         
         
+@router.get("/dev-login", response_model=Token)
+async def dev_login(
+    tenant_id: Optional[UUID] = None,
+    user_email: Optional[str] = None,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Development-only endpoint for direct login without authentication.
+    This endpoint bypasses all authentication flows for development purposes.
+    
+    Parameters:
+    - tenant_id: Optional UUID for the specific tenant to login to. If not provided,
+                the system will use the Pharma AI Demo tenant.
+    - user_email: Optional email of a specific user to login as. If provided,
+                 the system will try to find this user in the tenant.
+    
+    This is a simplified version of the demo login without all the error handling
+    and complexity, designed for development use only.
+    """
+    # Default tenant ID (Pharma AI Demo)
+    use_tenant_id = tenant_id or UUID("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+    
+    # Find or create user
+    from sqlalchemy.future import select
+    from app.models.user import User
+    
+    # Look for specific user if email provided
+    if user_email:
+        query = select(User).where(
+            User.tenant_id == use_tenant_id, 
+            User.email == user_email
+        )
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            # Create a new user with given email if not found
+            from app.crud.crud_user import user as crud_user
+            from app.schemas import UserCreate
+            
+            user_create = UserCreate(
+                email=user_email,
+                name=f"Dev User ({user_email})",
+                title="Developer",
+                auth_provider="dev"
+            )
+            
+            user = await crud_user.create(db, obj_in=user_create, tenant_id=use_tenant_id)
+            logger.info(f"Created new development user: {user.email} ({user.id})")
+    else:
+        # Find any user in the tenant
+        query = select(User).where(User.tenant_id == use_tenant_id).limit(1)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+    
+    if not user:
+        # Create a default user if none found
+        from app.crud.crud_user import user as crud_user
+        from app.schemas import UserCreate
+        
+        user_create = UserCreate(
+            email="dev@example.com",
+            name="Development User",
+            title="Developer",
+            auth_provider="dev"
+        )
+        
+        user = await crud_user.create(db, obj_in=user_create, tenant_id=use_tenant_id)
+        logger.info(f"Created default development user: {user.email} ({user.id})")
+    
+    # Create tokens
+    from app.core.token import create_access_token
+    
+    access_token = create_access_token(user_id=user.id, tenant_id=use_tenant_id)
+    refresh_token = create_access_token(
+        user_id=user.id,
+        tenant_id=use_tenant_id,
+        expires_delta=timedelta(days=30)  # Long expiry for dev
+    )
+    
+    # Return token
+    return Token(access_token=access_token, token_type="bearer", refresh_token=refresh_token)
+
 @router.get("/demo-login", response_model=Token)
 async def demo_login(
     tenant_id: Optional[UUID] = None,
+    user_email: Optional[str] = None,
     db: AsyncSession = Depends(get_db_session),
     request: Request = None
 ):
@@ -102,11 +185,13 @@ async def demo_login(
     Parameters:
     - tenant_id: Optional UUID for the specific tenant to login to. If not provided,
                 the system will use the default demo tenant.
+    - user_email: Optional email of a specific user to login as. If provided,
+                 the system will try to find this user in the tenant.
     
     Steps:
     1. Checks if system is in demo mode
     2. Gets or creates a demo tenant (or uses the specified tenant)
-    3. Gets or creates a demo user
+    3. Gets or creates a demo user, or uses the specified user by email
     4. Creates JWT tokens for authentication
     5. Updates the user's last login timestamp
     """
@@ -197,38 +282,135 @@ async def demo_login(
                 logger.info("No tenant ID provided, using default")
                 use_tenant_id = UUID("d3667ea1-079a-434e-84d2-60e84757b5d5")
             
-            # Create a consistent user ID that matches with user data in the system
-            # BUT make it unique per tenant to avoid tenant mismatch issues
-            # We'll derive a deterministic user ID from the tenant ID to ensure consistency
-            from hashlib import md5
+            # Find an existing user in the tenant rather than generating a new ID
+            # This ensures we're using real user data with complete profiles for demos
+            from sqlalchemy.future import select
+            from app.models.user import User
             
-            # Use the standard demo user ID as fallback
+            # Use a standard demo user ID as final fallback
             base_user_id = UUID("11111111-1111-1111-1111-111111111111")
             
             if use_tenant_id:
-                # Create a tenant-specific demo user ID by hashing the tenant ID with a salt
-                # This ensures each tenant has its own dedicated demo user
-                tenant_hash = md5(f"demo-user-{str(use_tenant_id)}".encode()).hexdigest()
+                logger.info(f"Finding existing user for demo login in tenant {use_tenant_id}")
                 try:
-                    # Use the first 32 chars of hash to create a UUID
-                    user_id = UUID(tenant_hash[:32])
-                    logger.info(f"Generated tenant-specific demo user ID: {user_id} for tenant: {use_tenant_id}")
-                except ValueError:
-                    # Fallback to standard demo user ID if UUID creation fails
+                    # Check if specific user email was requested
+                    if user_email:
+                        logger.info(f"Looking for specific user with email: {user_email}")
+                        # Try to find the user by email
+                        stmt = select(User).where(
+                            User.tenant_id == use_tenant_id,
+                            User.email == user_email
+                        )
+                        result = await db.execute(stmt)
+                        requested_user = result.scalar_one_or_none()
+                        
+                        if requested_user:
+                            user_id = requested_user.id
+                            demo_user = requested_user
+                            logger.info(f"Found requested user by email: {requested_user.name} ({user_id})")
+                            
+                            # Double check for notification preferences for requested user
+                            try:
+                                from app.api.v1.endpoints.notifications import ensure_preferences
+                                await ensure_preferences(db=db, user_id=user_id)
+                                logger.info(f"Ensured notification preferences for requested user {user_id}")
+                            except Exception as np_error:
+                                logger.error(f"Error ensuring notification preferences: {str(np_error)}")
+                        else:
+                            logger.warning(f"Requested user with email {user_email} not found in tenant {use_tenant_id}")
+                            # Fall back to standard user selection logic
+                    
+                    # If no specific user was requested or requested user wasn't found
+                    if not user_email or not 'user_id' in locals():
+                        # First try: find a user with team assignment (most complete data)
+                        stmt = select(User).where(
+                            User.tenant_id == use_tenant_id,
+                            User.team_id.is_not(None)  # Prefer users with team assignments
+                        ).limit(1)
+                        
+                        result = await db.execute(stmt)
+                        demo_user = result.scalar_one_or_none()
+                        
+                        if demo_user:
+                            user_id = demo_user.id
+                            logger.info(f"Using team-assigned user for demo: {demo_user.name} ({user_id})")
+                            
+                            # Double check for notification preferences
+                            # To ensure user has notification preferences, preemptively create them
+                            try:
+                                from app.api.v1.endpoints.notifications import ensure_preferences
+                                await ensure_preferences(db=db, user_id=user_id)
+                                logger.info(f"Ensured notification preferences for user {user_id}")
+                            except Exception as np_error:
+                                logger.error(f"Error ensuring notification preferences: {str(np_error)}")
+                        else:
+                            # Second try: find admin user
+                            stmt = select(User).where(
+                                User.tenant_id == use_tenant_id,
+                                User.email.like("admin@%") # Look for admin users
+                            ).limit(1)
+                            result = await db.execute(stmt)
+                            demo_user = result.scalar_one_or_none()
+                        
+                        if demo_user:
+                            user_id = demo_user.id
+                            logger.info(f"Using admin user for demo: {demo_user.name} ({user_id})")
+                            
+                            # Ensure notification preferences for admin user
+                            try:
+                                from app.api.v1.endpoints.notifications import ensure_preferences
+                                await ensure_preferences(db=db, user_id=user_id)
+                                logger.info(f"Ensured notification preferences for admin user {user_id}")
+                            except Exception as np_error:
+                                logger.error(f"Error ensuring notification preferences: {str(np_error)}")
+                        else:
+                            # Third try: any user in this tenant
+                            stmt = select(User).where(
+                                User.tenant_id == use_tenant_id
+                            ).limit(1)
+                            result = await db.execute(stmt)
+                            demo_user = result.scalar_one_or_none()
+                            
+                            if demo_user:
+                                user_id = demo_user.id
+                                logger.info(f"Using available user for demo: {demo_user.name} ({user_id})")
+                                
+                                # Ensure notification preferences for this user
+                                try:
+                                    from app.api.v1.endpoints.notifications import ensure_preferences
+                                    await ensure_preferences(db=db, user_id=user_id)
+                                    logger.info(f"Ensured notification preferences for user {user_id}")
+                                except Exception as np_error:
+                                    logger.error(f"Error ensuring notification preferences: {str(np_error)}")
+                            else:
+                                # No users found - fall back to generated ID method
+                                from hashlib import md5
+                                tenant_hash = md5(f"demo-user-{str(use_tenant_id)}".encode()).hexdigest()
+                                try:
+                                    # Use the first 32 chars of hash to create a UUID
+                                    user_id = UUID(tenant_hash[:32])
+                                    logger.warning(f"No users found in tenant, generating demo user ID: {user_id}")
+                                except ValueError:
+                                    # Ultimate fallback to standard demo user ID
+                                    user_id = base_user_id
+                                    logger.warning(f"Using fallback demo user ID: {user_id}")
+                except Exception as e:
+                    # If anything goes wrong, fall back to standard demo user ID
                     user_id = base_user_id
+                    logger.error(f"Error finding user for demo login: {str(e)}")
                     logger.warning(f"Using fallback demo user ID: {user_id}")
             else:
-                # Fallback to standard demo user ID
+                # No tenant ID, use standard demo user ID
                 user_id = base_user_id
                 logger.warning(f"No tenant ID, using standard demo user ID: {user_id}")
             
             # Create tokens with tenant_id
             access_token = create_access_token(
-                subject=user_id,
+                user_id=user_id,
                 tenant_id=use_tenant_id
             )
             refresh_token = create_access_token(
-                subject=user_id,
+                user_id=user_id,
                 tenant_id=use_tenant_id,
                 expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
             )
@@ -456,9 +638,9 @@ async def register_demo_user(
         )
         
         # Generate tokens
-        access_token = security.create_access_token(subject=user.id, tenant_id=user.tenant_id)
-        refresh_token = security.create_access_token(
-            subject=user.id,
+        access_token = create_access_token(user_id=user.id, tenant_id=user.tenant_id)
+        refresh_token = create_access_token(
+            user_id=user.id,
             tenant_id=user.tenant_id,
             expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
@@ -509,9 +691,9 @@ async def login_google(request: Request):
         mock_tenant_id = tenant_id or UUID("d3667ea1-079a-434e-84d2-60e84757b5d5")  # Use provided or default
         
         # Create tokens with tenant_id
-        access_token = security.create_access_token(subject=mock_user_id, tenant_id=mock_tenant_id)
-        refresh_token = security.create_access_token(
-            subject=mock_user_id,
+        access_token = create_access_token(user_id=mock_user_id, tenant_id=mock_tenant_id)
+        refresh_token = create_access_token(
+            user_id=mock_user_id,
             tenant_id=mock_tenant_id,
             expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
@@ -733,12 +915,12 @@ async def generate_auth_tokens(user_id: UUID, tenant_id: Optional[UUID] = None) 
             logger.info(f"Found tenant ID for user {user_id}: {tenant_id}")
     
     # Generate access token with tenant_id
-    access_token = security.create_access_token(subject=user_id, tenant_id=tenant_id)
+    access_token = create_access_token(user_id=user_id, tenant_id=tenant_id)
     
     # Generate refresh token with longer expiry and tenant_id
     refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    refresh_token = security.create_access_token(
-        subject=user_id, 
+    refresh_token = create_access_token(
+        user_id=user_id, 
         tenant_id=tenant_id,
         expires_delta=refresh_token_expires
     )
@@ -933,8 +1115,8 @@ async def create_new_access_token(user_id: UUID, tenant_id: Optional[UUID] = Non
     
     # Generate the token with tenant_id
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    new_access_token = security.create_access_token(
-        subject=user_id, 
+    new_access_token = create_access_token(
+        user_id=user_id, 
         tenant_id=tenant_id,
         expires_delta=access_token_expires
     )
@@ -1075,11 +1257,46 @@ async def list_available_tenants(db: AsyncSession = Depends(get_db_session)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve tenant list"
         )
+        
+@router.get("/tenant-users", response_model=List[schemas.UserRead])
+async def get_tenant_users(
+    tenant_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    limit: int = 100, 
+    skip: int = 0
+):
+    """
+    List all users for a specific tenant.
+    This endpoint returns the users belonging to a specific tenant.
+    
+    Parameters:
+    - tenant_id: UUID of the tenant
+    - limit: Maximum number of users to return (default: 100)
+    - skip: Number of users to skip (for pagination)
+    """
+    logger.info(f"Fetching users for tenant: {tenant_id}")
+    try:
+        # Query for users in the specified tenant
+        statement = select(models.User).where(
+            models.User.tenant_id == tenant_id
+        ).limit(limit).offset(skip)
+        
+        result = await db.execute(statement)
+        users = result.scalars().all()
+        
+        logger.info(f"Found {len(users)} users for tenant {tenant_id}")
+        return users
+    except Exception as e:
+        logger.error(f"Error fetching users for tenant {tenant_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user list for the specified tenant"
+        )
 
 @router.post("/logout")
 async def logout(
     request: Request,
-    token: str = Depends(security.oauth2_scheme),
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token")),
     db: AsyncSession = Depends(get_db_session)
 ) -> Any:
     """

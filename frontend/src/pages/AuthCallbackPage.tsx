@@ -1,36 +1,48 @@
 import React, { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import { Spinner, Text, Center, VStack } from '@chakra-ui/react';
 
+/**
+ * Processes OAuth callbacks and handles token extraction from URL parameters
+ */
 export default function AuthCallbackPage() {
-  // console.log("[AuthCallbackPage] Rendering...");
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setToken } = useAuth();
+  const { login, logout } = useAuth();
 
   useEffect(() => {
-    // console.log("[AuthCallbackPage] useEffect running...");
-    const accessToken = searchParams.get('token');
-    const refreshToken = searchParams.get('refreshToken');
-    const error = searchParams.get('error');
+    const processCallback = async () => {
+      const accessToken = searchParams.get('token');
+      const refreshToken = searchParams.get('refreshToken');
+      const error = searchParams.get('error');
 
-    if (accessToken) {
-      // console.log("[AuthCallbackPage] Received token:", accessToken);
-      setToken(accessToken, refreshToken);
-      // console.log("[AuthCallbackPage] Called setToken via context.");
-      navigate('/workspace', { replace: true });
-      // console.log("[AuthCallbackPage] Navigated to /map.");
-    } else if (error) {
-      // console.error("[AuthCallbackPage] Authentication error received:", error);
-      setToken(null, null); 
-      navigate('/login?error=callback_failed', { replace: true });
-    } else {
-      // console.error("[AuthCallbackPage] No token or error found in callback.");
-       setToken(null, null);
-       navigate('/login?error=invalid_callback', { replace: true });
-    }
-  }, [searchParams, navigate, setToken]);
+      try {
+        if (accessToken) {
+          // Store tokens using the TokenManager directly
+          // This is a special case for OAuth callbacks
+          localStorage.setItem('knowledge_plane_token', accessToken);
+          if (refreshToken) {
+            localStorage.setItem('knowledge_plane_refresh_token', refreshToken);
+          }
+          
+          // Navigate to workspace
+          navigate('/workspace', { replace: true });
+        } else if (error) {
+          await logout();
+          navigate('/login?error=callback_failed', { replace: true });
+        } else {
+          await logout();
+          navigate('/login?error=invalid_callback', { replace: true });
+        }
+      } catch (err) {
+        console.error("Error processing auth callback:", err);
+        navigate('/login?error=callback_error', { replace: true });
+      }
+    };
+    
+    processCallback();
+  }, [searchParams, navigate, logout]);
 
   return (
     <Center h="100vh">

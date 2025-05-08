@@ -4,20 +4,22 @@ import {
   Integration, 
   IntegrationCreate, 
   IntegrationUpdate, 
-  IntegrationType, 
   IntegrationStatus,
   IntegrationRunOptions
 } from '../types/integration';
 
 /**
- * Hook for managing integrations
+ * Hook for managing integrations with the streamlined API
  */
 export const useIntegrations = () => {
   const apiClient = useApiClient();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [integrationTypes, setIntegrationTypes] = useState<IntegrationType[]>([]);
+  const [integrationTypes, setIntegrationTypes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // API path for integration endpoints
+  const API_PATH = '/integrations';
 
   /**
    * Fetch all integrations for the current tenant
@@ -27,7 +29,7 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      const response = await apiClient.get<Integration[]>('/integrations');
+      const response = await apiClient.get<Integration[]>(`${API_PATH}`);
       setIntegrations(response);
       return response;
     } catch (err) {
@@ -46,7 +48,7 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      const response = await apiClient.get<IntegrationType[]>('/integrations/types');
+      const response = await apiClient.get<string[]>(`${API_PATH}/integration-types`);
       setIntegrationTypes(response);
       return response;
     } catch (err) {
@@ -65,7 +67,7 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      const response = await apiClient.get<IntegrationStatus>(`/integrations/${integrationId}/status`);
+      const response = await apiClient.get<IntegrationStatus>(`${API_PATH}/${integrationId}/status`);
       return response;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch integration status'));
@@ -83,16 +85,21 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      const response = await apiClient.post<Integration>('/integrations', integrationData);
-      setIntegrations(prev => [...prev, response]);
-      return response;
+      // The new API returns the UUID as a string, not a full Integration object
+      const integrationId = await apiClient.post<string>(`${API_PATH}`, integrationData);
+      
+      // Fetch the newly created integration to get full details
+      const newIntegration = await apiClient.get<Integration>(`${API_PATH}/${integrationId}`);
+      
+      setIntegrations(prev => [...prev, newIntegration]);
+      return newIntegration;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to create integration'));
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, setIntegrations]);
+  }, [apiClient]);
 
   /**
    * Update an existing integration
@@ -102,20 +109,25 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      const response = await apiClient.patch<Integration>(`/integrations/${integrationId}`, updateData);
+      // The new API returns a boolean success indicator
+      await apiClient.put<boolean>(`${API_PATH}/${integrationId}`, updateData);
+      
+      // Fetch the updated integration to get new details
+      const updatedIntegration = await apiClient.get<Integration>(`${API_PATH}/${integrationId}`);
+      
       setIntegrations(prev => 
         prev.map(integration => 
-          integration.id === integrationId ? response : integration
+          integration.id === integrationId ? updatedIntegration : integration
         )
       );
-      return response;
+      return updatedIntegration;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to update integration'));
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, setIntegrations]);
+  }, [apiClient]);
 
   /**
    * Delete an integration
@@ -125,7 +137,7 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      await apiClient.delete(`/integrations/${integrationId}`);
+      await apiClient.delete(`${API_PATH}/${integrationId}`);
       setIntegrations(prev => prev.filter(integration => integration.id !== integrationId));
       return true;
     } catch (err) {
@@ -134,7 +146,7 @@ export const useIntegrations = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, setIntegrations]);
+  }, [apiClient]);
 
   /**
    * Run an integration manually
@@ -144,8 +156,8 @@ export const useIntegrations = () => {
     setError(null);
 
     try {
-      const response = await apiClient.post<{ status: string, run_id: string }>(
-        `/integrations/${integrationId}/run`,
+      const response = await apiClient.post<{ status: string, entity_count: number, error_count: number, run_id: string }>(
+        `${API_PATH}/${integrationId}/run`,
         options || {}
       );
       return response;
@@ -163,13 +175,6 @@ export const useIntegrations = () => {
   const toggleIntegrationStatus = useCallback(async (integrationId: string, isEnabled: boolean) => {
     return updateIntegration(integrationId, { is_enabled: isEnabled });
   }, [updateIntegration]);
-
-  /**
-   * Get schema for a specific integration type
-   */
-  const getIntegrationTypeSchema = useCallback((type: string) => {
-    return integrationTypes.find(t => t.id === type);
-  }, [integrationTypes]);
 
   // Load integrations on mount
   useEffect(() => {
@@ -189,8 +194,7 @@ export const useIntegrations = () => {
     updateIntegration,
     deleteIntegration,
     runIntegration,
-    toggleIntegrationStatus,
-    getIntegrationTypeSchema
+    toggleIntegrationStatus
   };
 };
 

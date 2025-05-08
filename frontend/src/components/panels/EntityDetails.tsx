@@ -139,28 +139,43 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ data, selectedNode }) => 
 
   // Generate details based on entity type and data
   const renderEntityProperties = () => {
-    if (!data) return null;
+    // Enhanced defensive check - handle null and undefined data properly
+    if (!data) {
+      console.debug("EntityDetails: No data available to render properties");
+      return (
+        <Text color="gray.500" fontSize="sm" fontStyle="italic">
+          No data available
+        </Text>
+      );
+    }
 
-    // Create details array from data properties
-    const detailsArray = Object.entries(data)
-      .filter(([key, value]) => {
-        // Filter out complex objects, arrays, null values, and common fields we display elsewhere
-        return (
-          value !== null &&
-          typeof value !== 'object' &&
-          !['id', 'name', 'label', 'description', 'type', 'created_at', 'updated_at', 'tags', 'categories', 'keywords'].includes(key)
-        );
-      })
-      .map(([key, value]) => {
-        // Format the key for display
-        const formattedKey = key
-          .replace(/_/g, ' ')
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        
-        return { key: formattedKey, value };
-      });
+    try {
+      // Create details array from data properties with additional safety
+      const detailsArray = Object.entries(data)
+        .filter(([key, value]) => {
+          // Filter out complex objects, arrays, null values, and common fields we display elsewhere
+          return (
+            key !== null && key !== undefined && // Ensure key is valid
+            value !== null && value !== undefined && // Handle null values
+            typeof value !== 'object' && // Exclude objects and arrays
+            !['id', 'name', 'label', 'description', 'type', 'created_at', 'updated_at', 'tags', 'categories', 'keywords'].includes(key)
+          );
+        })
+        .map(([key, value]) => {
+          // Format the key for display
+          const formattedKey = key
+            .replace(/_/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          
+          // Convert value to string safely
+          const safeValue = typeof value === 'string' ? 
+            value : 
+            String(value);
+          
+          return { key: formattedKey, value: safeValue };
+        });
 
     // If there are no properties to display
     if (detailsArray.length === 0) {
@@ -213,6 +228,15 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ data, selectedNode }) => 
         )}
       </>
     );
+    } catch (error) {
+      // Log and handle any errors that occur during property rendering
+      console.error("Error rendering entity properties:", error);
+      return (
+        <Text color="red.500" fontSize="sm">
+          Could not display entity properties. Please try again later.
+        </Text>
+      );
+    }
   };
 
   // Enhanced markdown rendering with support for images, links and code highlighting
@@ -449,7 +473,10 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ data, selectedNode }) => 
   };
 
   // Get entity-specific section title
-  const getDetailsSectionTitle = (type: MapNodeTypeEnum): string => {
+  const getDetailsSectionTitle = (type?: MapNodeTypeEnum): string => {
+    // Use a safe default if type is undefined
+    if (!type) return 'Details';
+    
     switch (type) {
       case MapNodeTypeEnum.USER:
         return 'User Information';
@@ -500,6 +527,30 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ data, selectedNode }) => 
     );
   };
 
+  // Enhanced defensive rendering - handle case when selectedNode is null/undefined
+  if (!selectedNode) {
+    console.warn("EntityDetails: selectedNode is null or undefined");
+    return (
+      <VStack spacing={4} align="stretch">
+        <Box 
+          p={4} 
+          bg={headerBg} 
+          borderRadius="md" 
+          borderWidth="1px"
+          borderColor={borderColor}
+        >
+          <Heading size="sm">No entity selected</Heading>
+          <Text color="gray.500" fontSize="sm" mt={2}>
+            Please select an entity to view details
+          </Text>
+        </Box>
+      </VStack>
+    );
+  }
+
+  // Safe access to node type 
+  const nodeType = selectedNode?.type;
+
   return (
     <VStack spacing={4} align="stretch">
       {/* Header with optional status */}
@@ -515,7 +566,7 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ data, selectedNode }) => 
         transition="all 0.2s"
       >
         <VStack align="flex-start" spacing={1}>
-          <Heading size="sm">{getDetailsSectionTitle(selectedNode.type)}</Heading>
+          <Heading size="sm">{getDetailsSectionTitle(nodeType)}</Heading>
           {renderTags()}
         </VStack>
         {renderStatusBadge()}

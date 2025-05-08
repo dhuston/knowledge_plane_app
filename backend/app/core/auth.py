@@ -1,14 +1,13 @@
 """
-Core authentication functionality that supports both password-based and OAuth authentication.
+Core authentication functionality that handles user authentication processes.
+Focused on password verification and authentication modes.
 """
 from typing import Optional, Tuple, Dict, Any, Union
 import logging
 import os
-from datetime import datetime, timedelta, timezone
 from uuid import UUID
 import json
 
-from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import EmailStr
@@ -20,17 +19,13 @@ from app.schemas.token import Token
 from app.schemas.auth import AuthMode
 from app.crud.crud_user import user as user_crud
 from app.crud.crud_tenant import tenant as tenant_crud
+from app.core.token import create_access_token
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Reusable constants
-ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-SECRET_KEY = settings.SECRET_KEY
 
 
 class AuthError(Exception):
@@ -91,48 +86,6 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(
-    subject: Union[str, UUID], 
-    expires_delta: Optional[timedelta] = None,
-    tenant_id: Optional[UUID] = None,
-    additional_data: Optional[Dict[str, Any]] = None
-) -> str:
-    """
-    Creates a JWT access token.
-    
-    Args:
-        subject: The subject (user ID) for the token
-        expires_delta: Optional custom expiration time
-        tenant_id: Optional tenant ID to include in the token
-        additional_data: Optional additional data to include in the token
-        
-    Returns:
-        str: The encoded JWT token
-    """
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    
-    # Create token payload
-    to_encode = {"exp": expire, "sub": str(subject)}
-    
-    # Add tenant_id if provided
-    if tenant_id:
-        to_encode["tenant_id"] = str(tenant_id)
-    
-    # Add additional data if provided
-    if additional_data:
-        for key, value in additional_data.items():
-            if key not in to_encode:  # Don't overwrite standard claims
-                to_encode[key] = value
-    
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
 async def authenticate_password(
     db: AsyncSession, 
     email: EmailStr, 
@@ -175,10 +128,13 @@ async def authenticate_password(
         logger.warning(f"Failed password login attempt for user: {email}")
         raise AuthError("Incorrect email or password")
     
-    # Password is correct, generate tokens
-    access_token = create_access_token(subject=user.id, tenant_id=user.tenant_id)
+    # Password is correct, generate tokens from token module
+    from app.core.token import create_access_token
+    from datetime import timedelta
+    
+    access_token = create_access_token(user_id=user.id, tenant_id=user.tenant_id)
     refresh_token = create_access_token(
-        subject=user.id,
+        user_id=user.id,
         tenant_id=user.tenant_id,
         expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
@@ -326,11 +282,13 @@ async def get_demo_login_token(db: AsyncSession, tenant_id: Optional[UUID] = Non
             )
             demo_user = await user_crud.create(db, obj_in=user_create, tenant_id=demo_tenant.id)
         
-        # Generate tokens
+        # Generate tokens using the token module
+        from datetime import timedelta
+        
         logger.info("Generating tokens for demo user")
-        access_token = create_access_token(subject=demo_user.id, tenant_id=demo_user.tenant_id)
+        access_token = create_access_token(user_id=demo_user.id, tenant_id=demo_user.tenant_id)
         refresh_token = create_access_token(
-            subject=demo_user.id,
+            user_id=demo_user.id,
             tenant_id=demo_user.tenant_id,
             expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )

@@ -45,17 +45,27 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   
-  // Get notifications with safe fallbacks
+  // Get notifications with safe fallbacks and endpoint status information
   const {
     notifications = [],
     unreadCount = 0,
-    markAsRead,
-    dismiss,
-    markAllAsRead,
-    dismissAll,
-    isLoading,
-    apiAvailable
+    markAsRead = async () => {},
+    dismiss = async () => {},
+    markAllAsRead = async () => {},
+    dismissAll = async () => {},
+    isLoading = false,
+    apiAvailable = false,
+    endpointStatus = {
+      notifications: false,
+      preferences: false,
+      readAll: false,
+      dismissAll: false
+    },
+    error = null
   } = useNotifications();
+  
+  // More detailed API availability check
+  const isNotificationsApiAvailable = apiAvailable && endpointStatus.notifications;
   
   
   // Filter notifications by type if a filter is selected
@@ -208,11 +218,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
                   <Flex justify="center" align="center" height="200px">
                     <Text>Loading notifications...</Text>
                   </Flex>
-                ) : !apiAvailable ? (
-                  // Show API unavailable state
+                ) : !isNotificationsApiAvailable ? (
+                  // Show API unavailable state with more detailed message
                   <EmptyState
                     title="Notifications unavailable"
-                    description="Could not connect to notification service. Please try again later."
+                    description="The notification service is currently unavailable. This won't affect your ability to use the rest of the application."
                     icon={FaBell}
                     mt={10}
                   />

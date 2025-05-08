@@ -31,9 +31,16 @@ export class HierarchyService {
    */
   async fetchHierarchyUnit(unitId: string): Promise<HierarchyUnitResponse> {
     try {
-      // Updated to use the correct map endpoint
-      const response = await this.apiClient.get<HierarchyUnitResponse>(`/map/unit/${unitId}`);
-      return response.data;
+      // Try organizations endpoint first
+      try {
+        const response = await this.apiClient.get<HierarchyUnitResponse>(`/organizations/unit/${unitId}`);
+        return response.data;
+      } catch (orgError) {
+        console.log(`[HierarchyService] Organizations endpoint failed for unit ${unitId}, falling back to map endpoint`);
+        // Fall back to map endpoint
+        const response = await this.apiClient.get<HierarchyUnitResponse>(`/map/unit/${unitId}`);
+        return response.data;
+      }
     } catch (error) {
       console.error(`Error fetching hierarchy unit ${unitId}:`, error);
       throw new Error('Failed to fetch organizational unit. Please try again later.');
@@ -45,9 +52,23 @@ export class HierarchyService {
    */
   async fetchUserPath(): Promise<HierarchyPathResponse> {
     try {
-      // Updated to use the correct map endpoint
-      const response = await this.apiClient.get<HierarchyPathResponse>('/map/path');
-      return response.data;
+      // Try organizations endpoint first
+      try {
+        const response = await this.apiClient.get<HierarchyPathResponse>('/organizations/structure');
+        // Transform to expected response format if needed
+        if (response.data && response.data.structure) {
+          return {
+            path: response.data.structure.path || [],
+            units: response.data.units || {}
+          };
+        }
+        return response.data;
+      } catch (orgError) {
+        console.log('[HierarchyService] Organizations structure endpoint failed, falling back to map endpoint');
+        // Fall back to map endpoint
+        const response = await this.apiClient.get<HierarchyPathResponse>('/map/path');
+        return response.data;
+      }
     } catch (error) {
       console.error('Error fetching user hierarchy path:', error);
       throw new Error('Failed to fetch your position in the organization. Please try again later.');
@@ -59,15 +80,28 @@ export class HierarchyService {
    */
   async searchUnits(query: string, type?: OrganizationalUnitTypeEnum): Promise<OrganizationalUnitEntity[]> {
     try {
-      // Updated to use the correct map endpoint
-      let url = `/map/search?query=${encodeURIComponent(query)}`;
-      
-      if (type) {
-        url += `&type=${type}`;
+      // Try organizations search first
+      try {
+        let url = `/organizations/search?query=${encodeURIComponent(query)}`;
+        
+        if (type) {
+          url += `&type=${type}`;
+        }
+        
+        const response = await this.apiClient.get<{ results: OrganizationalUnitEntity[] }>(url);
+        return response.data.results;
+      } catch (orgError) {
+        console.log("[HierarchyService] Organizations search endpoint failed, falling back to map endpoint");
+        // Fall back to map endpoint
+        let url = `/map/search?query=${encodeURIComponent(query)}`;
+        
+        if (type) {
+          url += `&type=${type}`;
+        }
+        
+        const response = await this.apiClient.get<{ results: OrganizationalUnitEntity[] }>(url);
+        return response.data.results;
       }
-      
-      const response = await this.apiClient.get<{ results: OrganizationalUnitEntity[] }>(url);
-      return response.data.results;
     } catch (error) {
       console.error('Error searching organizational units:', error);
       throw new Error('Failed to search organizational units. Please try again later.');
@@ -89,8 +123,17 @@ export class HierarchyService {
       
       // If no children property, fall back to a more generic approach
       console.warn(`No children property in unit response for ${unitId}, using fallback`);
-      const response = await this.apiClient.get<{ children: OrganizationalUnitEntity[] }>(`/map/unit/${unitId}?children_only=true`);
-      return response.data.children || [];
+      
+      // Try organizations endpoint first
+      try {
+        const response = await this.apiClient.get<{ children: OrganizationalUnitEntity[] }>(`/organizations/unit/${unitId}?children_only=true`);
+        return response.data.children || [];
+      } catch (orgError) {
+        console.log(`[HierarchyService] Organizations unit children endpoint failed for ${unitId}, falling back to map endpoint`);
+        // Fall back to map endpoint
+        const response = await this.apiClient.get<{ children: OrganizationalUnitEntity[] }>(`/map/unit/${unitId}?children_only=true`);
+        return response.data.children || [];
+      }
     } catch (error) {
       console.error(`Error fetching children of unit ${unitId}:`, error);
       throw new Error('Failed to fetch organizational unit children. Please try again later.');
@@ -104,14 +147,19 @@ export class HierarchyService {
    */
   async getRecentlyViewedUnits(): Promise<OrganizationalUnitEntity[]> {
     try {
-      // This endpoint might not exist in the map API
-      // If needed, we could implement a local cache or use an alternative endpoint
+      // Try organizations recent first
       try {
-        const response = await this.apiClient.get<{ units: OrganizationalUnitEntity[] }>('/map/recent');
+        const response = await this.apiClient.get<{ units: OrganizationalUnitEntity[] }>('/organizations/recent');
         return response.data.units;
-      } catch (e) {
-        console.warn('Recent units endpoint not available, returning empty array');
-        return [];
+      } catch (orgError) {
+        // Fall back to map recent endpoint
+        try {
+          const response = await this.apiClient.get<{ units: OrganizationalUnitEntity[] }>('/map/recent');
+          return response.data.units;
+        } catch (mapError) {
+          console.warn('Recent units endpoint not available, returning empty array');
+          return [];
+        }
       }
     } catch (error) {
       console.error('Error fetching recently viewed units:', error);
@@ -126,12 +174,17 @@ export class HierarchyService {
    */
   async trackUnitView(unitId: string): Promise<void> {
     try {
-      // This endpoint might not exist in the map API
-      // Attempt to call it, but don't throw if it fails
+      // Try organizations endpoint first
       try {
-        await this.apiClient.post(`/map/unit/${unitId}/view`, {});
-      } catch (e) {
-        // Silently ignore - this is not critical functionality
+        await this.apiClient.post(`/organizations/unit/${unitId}/view`, {});
+        return;
+      } catch (orgError) {
+        // Fall back to map endpoint
+        try {
+          await this.apiClient.post(`/map/unit/${unitId}/view`, {});
+        } catch (mapError) {
+          // Silently ignore - this is not critical functionality
+        }
       }
     } catch (error) {
       console.error(`Error tracking view for unit ${unitId}:`, error);

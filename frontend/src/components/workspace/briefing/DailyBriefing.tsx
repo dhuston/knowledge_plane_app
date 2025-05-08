@@ -227,24 +227,12 @@ export function DailyBriefing() {
                           </Box>
                           
                           <Box>
-                            <Text fontWeight="medium">Suggested Talking Points:</Text>
-                            <VStack align="stretch" mt={1}>
-                              <Text fontSize="sm">• Update on project timeline and milestones</Text>
-                              <Text fontSize="sm">• Research findings from last sprint</Text>
-                              <Text fontSize="sm">• Resource allocation for upcoming tasks</Text>
-                            </VStack>
-                          </Box>
-                          
-                          <Box>
-                            <Text fontWeight="medium">Relevant Documents:</Text>
-                            <VStack align="stretch" mt={1}>
-                              <Text fontSize="sm" color="blue.500" cursor="pointer">
-                                - Project Status Report (April)
-                              </Text>
-                              <Text fontSize="sm" color="blue.500" cursor="pointer">
-                                - Research Findings Summary
-                              </Text>
-                            </VStack>
+                            <Text fontSize="sm" color="gray.500" fontStyle="italic">
+                              Meeting preparation details will be loaded from the calendar service.
+                            </Text>
+                            <Button size="sm" colorScheme="blue" variant="outline" mt={2}>
+                              Prepare for Meeting
+                            </Button>
                           </Box>
                         </VStack>
                       </AccordionPanel>

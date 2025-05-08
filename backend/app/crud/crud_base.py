@@ -5,14 +5,8 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.future import select
 
 from app.db.base_class import Base
-from app.core.tenant_context import TenantContext
-from app.core.tenant_filter import tenant_aware_query
-from app.core.tenant_validation import (
-    validate_create_operation,
-    validate_update_operation,
-    validate_delete_operation,
-    TenantAccessViolationError
-)
+from app.core.tenant_service import TenantContext, get_tenant_service, TenantException
+from app.core.tenant_decorator import tenant_aware_query
 
 ModelType = TypeVar("ModelType", bound=Base)
 
@@ -94,15 +88,17 @@ class CRUDBase(Generic[ModelType]):
             Created object
             
         Raises:
-            TenantAccessViolationError: If tenant validation fails
+            TenantException: If tenant validation fails
         """
+        # Ensure tenant context is initialized
+        tenant_service = get_tenant_service()
+        tenant_service.ensure_tenant_initialized()
+        
         create_data = obj_in.copy()
         
-        # Ensure tenant_id is set correctly
-        create_data["tenant_id"] = tenant_context.tenant_id
-        
-        # Validate the create operation
-        await validate_create_operation(db, self.model, create_data, tenant_context)
+        # Ensure tenant_id is set correctly if model has tenant_id attribute
+        if hasattr(self.model, "tenant_id"):
+            create_data["tenant_id"] = tenant_context.tenant_id
         
         # Create object
         db_obj = self.model(**create_data)
@@ -132,14 +128,18 @@ class CRUDBase(Generic[ModelType]):
             Updated object
             
         Raises:
-            TenantAccessViolationError: If tenant validation fails
+            TenantException: If tenant validation fails
         """
+        # Ensure tenant context is initialized
+        tenant_service = get_tenant_service()
+        tenant_service.ensure_tenant_initialized()
+        
+        # Validate tenant access
+        if hasattr(db_obj, "tenant_id"):
+            tenant_service.validate_tenant_access(db_obj)
+            
         # Convert input to dict if it's not already
         update_data = obj_in if isinstance(obj_in, dict) else obj_in.model_dump(exclude_unset=True)
-        
-        # Validate the update operation
-        obj_id = db_obj.id
-        await validate_update_operation(db, self.model, obj_id, update_data, tenant_context)
         
         # Update object
         for field in update_data:
@@ -170,13 +170,20 @@ class CRUDBase(Generic[ModelType]):
             Deleted object
             
         Raises:
-            TenantAccessViolationError: If tenant validation fails
+            TenantException: If tenant validation fails
         """
-        # Validate the delete operation
-        await validate_delete_operation(db, self.model, id, tenant_context)
+        # Ensure tenant context is initialized
+        tenant_service = get_tenant_service()
+        tenant_service.ensure_tenant_initialized()
         
         # Get the object
         obj = await db.get(self.model, id)
+        if obj is None:
+            raise TenantException(f"Object with ID {id} not found", status_code=404)
+        
+        # Validate tenant access
+        if hasattr(obj, "tenant_id"):
+            tenant_service.validate_tenant_access(obj)
         
         # Delete it
         await db.delete(obj)

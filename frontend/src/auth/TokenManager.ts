@@ -3,6 +3,7 @@
  */
 export class TokenManager {
   private readonly tokenKey = 'access_token';
+  private readonly refreshTokenKey = 'refresh_token';
   
   /**
    * Store a token in localStorage
@@ -13,6 +14,17 @@ export class TokenManager {
     } catch (error) {
       console.error('Failed to store token:', error);
       // No fallback needed - if localStorage fails, user will need to re-login
+    }
+  }
+  
+  /**
+   * Store a refresh token in localStorage
+   */
+  storeRefreshToken(token: string): void {
+    try {
+      localStorage.setItem(this.refreshTokenKey, token);
+    } catch (error) {
+      console.error('Failed to store refresh token:', error);
     }
   }
   
@@ -29,13 +41,26 @@ export class TokenManager {
   }
   
   /**
+   * Get the stored refresh token
+   */
+  getRefreshToken(): string | null {
+    try {
+      return localStorage.getItem(this.refreshTokenKey) || null;
+    } catch (error) {
+      console.error('Failed to retrieve refresh token:', error);
+      return null;
+    }
+  }
+  
+  /**
    * Remove the stored token
    */
   removeToken(): void {
     try {
       localStorage.removeItem(this.tokenKey);
+      localStorage.removeItem(this.refreshTokenKey);
     } catch (error) {
-      console.error('Failed to remove token:', error);
+      console.error('Failed to remove tokens:', error);
     }
   }
   

@@ -6,6 +6,7 @@ import {
   RelatedEntity
 } from '../types/insight';
 import OpenAIService from './OpenAIService';
+import { apiClient } from '../api/client';
 
 /**
  * Types related to user activities that will be analyzed for patterns
@@ -150,45 +151,33 @@ export const fetchUserActivities = async (
   try {
     console.log(`[Debug] Starting fetchUserActivities for user: ${userId}, period: ${timePeriod}`);
     
-    // IMPORTANT FIX: The backend doesn't have an /insights/activities endpoint yet
-    // Return mock activities instead of making an API call to a nonexistent endpoint
-    console.log('[Debug] Using mock activities data instead of calling nonexistent endpoint');
+    // Define the endpoint with full path
+    const endpoint = `/api/v1/insights/activities`;
+    console.log(`[Debug] Checking if endpoint ${endpoint} exists`);
     
-    // Generate some mock activities
-    const mockActivities: ActivityData[] = Array(20).fill(null).map((_, index) => ({
-      id: `activity-${index}`,
-      type: ['document-edit', 'meeting', 'collaboration', 'knowledge-share'][Math.floor(Math.random() * 4)],
-      timestamp: new Date(Date.now() - Math.random() * 86400000 * (timePeriod === 'daily' ? 1 : timePeriod === 'weekly' ? 7 : 30)).toISOString(),
-      user: {
-        id: userId,
-        name: userId === 'current-user' ? 'Current User' : `User ${userId}`
-      },
-      details: {
-        title: `Activity ${index}`,
-        description: `Description for activity ${index}`
-      }
-    }));
+    // First check if the endpoint actually exists before trying to call it
+    const endpointExists = await apiClient.isEndpointAvailable(endpoint);
     
-    console.log(`[Debug] Generated ${mockActivities.length} mock activities`);
-    return mockActivities;
-    
-    /* Original code that was causing 500 errors - the endpoint doesn't exist:
-    // Make API call to fetch real activities
-    const endpoint = `/api/v1/insights/activities?userId=${userId}&period=${timePeriod}`;
-    console.log(`[Debug] Fetching from endpoint: ${endpoint}`);
-    const response = await fetch(endpoint);
-    
-    if (!response.ok) {
-      console.error(`[Debug] Response not OK: ${response.status} ${response.statusText}`);
-      throw new Error(`Failed to fetch activities: ${response.status}`);
+    if (!endpointExists) {
+      console.log(`[Debug] Endpoint ${endpoint} is not available`);
+      return []; // Return empty array if endpoint doesn't exist
     }
     
-    const data = await response.json();
-    console.log(`[Debug] Received ${data.length || 0} activities from API`);
-    return data;
-    */
+    // If endpoint exists, make the actual API call
+    console.log(`[Debug] Endpoint exists, making API call to ${endpoint}`);
+    try {
+      const data = await apiClient.get<ActivityData[]>(`${endpoint}?userId=${userId}&period=${timePeriod}`);
+      console.log(`[Debug] Received ${data.length || 0} activities from API`);
+      return data;
+    } catch (apiError) {
+      // Handle API error gracefully
+      console.error(`[Debug] Error while calling API: `, apiError);
+      return [];
+    }
   } catch (error) {
-    console.error('Error fetching user activities:', error);
+    console.error('[Debug] Error in fetchUserActivities:', error);
+    // Return an empty array
+    console.log('[Debug] Returning empty activities array');
     return [];
   }
 };

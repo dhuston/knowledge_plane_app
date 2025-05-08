@@ -1,28 +1,19 @@
 """
-Integration Framework for KnowledgePlane.
+Simplified integration framework for Biosphere Alpha.
 
-This package provides a flexible framework for integrating with external systems
-to fetch and synchronize data with the KnowledgePlane platform.
+This module provides functionality for connecting to external systems,
+fetching data, and normalizing it to work with the platform.
 """
 
-from app.integrations.base_connector import BaseConnector
-from app.integrations.base_processor import BaseProcessor
-from app.integrations.manager import IntegrationManager
-from app.integrations.exceptions import (
-    IntegrationError,
-    ConnectionError,
-    AuthenticationError,
-    ProcessingError,
-    IntegrationNotFoundError
-)
+from .base import BaseConnector, BaseProcessor
+from .manager import IntegrationManager
+from .models import Integration, IntegrationCredential, IntegrationRun
 
 __all__ = [
     "BaseConnector",
     "BaseProcessor",
     "IntegrationManager",
-    "IntegrationError",
-    "ConnectionError",
-    "AuthenticationError",
-    "ProcessingError",
-    "IntegrationNotFoundError"
+    "Integration",
+    "IntegrationCredential",
+    "IntegrationRun"
 ]

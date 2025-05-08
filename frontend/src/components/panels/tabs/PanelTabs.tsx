@@ -5,7 +5,6 @@
 import React, { useRef, useEffect } from 'react';
 import { HStack, Button, useColorModeValue, Box, usePrefersReducedMotion } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useFeatureFlags } from '../../../utils/featureFlags';
 import { useAnimatedTab } from '../../../hooks/useAnimatedTab';
 import AnimatedTransition from '../../common/AnimatedTransition';
 
@@ -32,7 +31,11 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
   const pillBg = useColorModeValue('blue.50', 'blue.900');
   const highlightBg = useColorModeValue('blue.50', 'blue.900');
   const prefersReducedMotion = usePrefersReducedMotion();
-  const { flags } = useFeatureFlags();
+  
+  // Hard-coded feature flags since the feature flag system was removed
+  const enabledFeatures = {
+    enableActivityTimeline: true
+  };
 
   // Use our custom animated tab hook with enhanced options
   const { 
@@ -140,7 +143,7 @@ const PanelTabs: React.FC<PanelTabsProps> = ({
           Relationships
         </Button>
         {/* Only show activity tab if the activity timeline feature is enabled */}
-        {flags.enableActivityTimeline && (
+        {enabledFeatures.enableActivityTimeline && (
           <Button 
             ref={setTabRef('activity')}
             variant={activeTab === 'activity' ? 'ghost' : 'ghost'} 

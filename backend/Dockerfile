@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image with exact version
-FROM python:3.12.2-slim as builder
+FROM python:3.11-slim as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -32,7 +32,7 @@ RUN poetry lock && \
     poetry add --lock idna@^3.4
 
 # --- Final Stage ---
-FROM python:3.12.2-slim
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1

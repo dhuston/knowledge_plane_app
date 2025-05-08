@@ -7,12 +7,11 @@ import {
   logError 
 } from '../utils/errorHandling';
 
-// Get backend API base URL from environment variable with fallback
-// IMPORTANT: Standardizing across the app to use base URL WITHOUT "/api/v1" 
-// This avoids path duplication issues
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (window.location.protocol === 'https:' 
-  ? "https://localhost:8001" 
-  : "http://localhost:8001");
+// Import API_BASE_URL from centralized config
+import { API_BASE_URL } from '../config/env';
+
+// Import tokenManager for consistent token access
+import { tokenManager } from '../auth/TokenManager';
 
 /**
  * API client for making HTTP requests to the backend with enhanced error handling
@@ -94,37 +93,56 @@ export const apiClient = {
      * @param endpoint - API endpoint to check
      * @returns Promise resolving to true if API is available, false otherwise
      */
-    async isEndpointAvailable(endpoint: string): Promise<boolean> {
+    async isEndpointAvailable(endpoint: string, method: string = 'GET'): Promise<boolean> {
       try {
         const url = buildUrl(endpoint);
         
-        // Try a GET request first (which usually has better CORS support)
+        // For endpoints that might only accept POST, OPTIONS is safer than GET
+        const checkMethod = method === 'POST' ? 'OPTIONS' : 'GET';
+        
         try {
-          const getResponse = await fetch(url, { 
-            method: 'GET', 
+          console.log(`[Debug] Checking endpoint availability: ${url} with method ${checkMethod}`);
+          const response = await fetch(url, { 
+            method: checkMethod, 
             cache: 'no-store',
+            // Allow redirects
+            redirect: 'follow',
             credentials: 'include',
             headers: { 
               'X-Availability-Check': 'true',
               'Accept': 'application/json'
             }
           });
-          return getResponse.ok;
-        } catch (getError) {
-          // Fall back to HEAD if GET fails
-          const headResponse = await fetch(url, { 
-            method: 'HEAD', 
-            cache: 'no-store',
-            credentials: 'include',
-            headers: { 
-              'X-Availability-Check': 'true',
-              'Accept': 'application/json'
-            }
-          });
-          return headResponse.ok;
+          
+          // Even a 405 "Method Not Allowed" means the endpoint exists
+          // Also consider redirects (3xx) as existing endpoints
+          const status = response.status;
+          const exists = response.ok || status === 405 || (status >= 300 && status < 400);
+          
+          console.log(`[Debug] Endpoint check result: ${exists ? 'Available' : 'Not available'} (status: ${status})`);
+          return exists;
+        } catch (requestError) {
+          console.warn(`[Debug] Primary check failed for ${endpoint}:`, requestError);
+          
+          // As a final fallback, try OPTIONS method which should be widely supported
+          try {
+            const optionsResponse = await fetch(url, { 
+              method: 'OPTIONS', 
+              cache: 'no-store',
+              redirect: 'follow',
+              credentials: 'include'
+            });
+            const status = optionsResponse.status;
+            const exists = optionsResponse.ok || status === 204 || status === 405 || (status >= 300 && status < 400);
+            console.log(`[Debug] Fallback endpoint check result: ${exists ? 'Available' : 'Not available'} (status: ${status})`);
+            return exists;
+          } catch (optionsError) {
+            console.warn(`[Debug] OPTIONS check failed for ${endpoint}:`, optionsError);
+            return false;
+          }
         }
       } catch (error) {
-        console.warn(`API availability check failed for ${endpoint}:`, error);
+        console.warn(`[Debug] API availability check failed for ${endpoint}:`, error);
         return false;
       }
     },
@@ -135,30 +153,320 @@ export const apiClient = {
      */
     async isApiAvailable(): Promise<boolean> {
       try {
+        // Try with trailing slash first, as the server redirects to this
+        const withSlash = await this.isEndpointAvailable('/api/v1/health/');
+        if (withSlash) return true;
+        
+        // Fall back to without trailing slash
         return await this.isEndpointAvailable('/api/v1/health');
       } catch (_) {
         return false;
+      }
+    },
+    
+    /**
+     * Get map data directly without authentication (development only)
+     * @param tenantId - UUID of the tenant
+     * @returns Promise with the map data
+     */
+    async getDevMapData(tenantId: string): Promise<any> {
+      try {
+        const url = buildUrl(`/map/dev/graph/${tenantId}`);
+        console.log(`[DEV] Getting map data from: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error fetching map data:", error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Get notification data directly without authentication (development only)
+     * @param tenantId - UUID of the tenant 
+     * @returns Promise with the notification data
+     */
+    async getDevNotifications(tenantId: string): Promise<any> {
+      try {
+        const url = buildUrl(`/notifications/dev/${tenantId}`);
+        console.log(`[DEV] Getting notifications from: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error fetching notifications:", error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Get notification preferences directly without authentication (development only)
+     * @param tenantId - UUID of the tenant
+     * @returns Promise with the notification preferences
+     */
+    async getDevNotificationPreferences(tenantId: string): Promise<any> {
+      try {
+        const url = buildUrl(`/notifications/dev/${tenantId}/preferences`);
+        console.log(`[DEV] Getting notification preferences from: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error fetching notification preferences:", error);
+        throw error;
+      }
+    },
+
+    /**
+     * AI proxy development endpoints
+     * These endpoints provide mock responses without requiring authentication
+     */
+
+    /**
+     * Check AI proxy health (development only)
+     * @param tenantId - UUID of the tenant
+     * @returns Promise with health status
+     */
+    async checkDevAiProxyHealth(tenantId: string): Promise<any> {
+      try {
+        const url = buildUrl(`/ai-proxy/dev/${tenantId}/health`);
+        console.log(`[DEV] Checking AI proxy health from: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error checking AI proxy health:", error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Summarize insights using dev endpoint (development only)
+     * @param tenantId - UUID of the tenant
+     * @param insights - List of insights to summarize
+     * @param userPreferences - Optional user preferences
+     * @returns Promise with the summary
+     */
+    async devSummarizeInsights(tenantId: string, insights: any[], userPreferences?: any): Promise<any> {
+      try {
+        const url = buildUrl(`/ai-proxy/dev/${tenantId}/summarize-insights`);
+        console.log(`[DEV] Summarizing insights using: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            insights,
+            user_preferences: userPreferences || null
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error summarizing insights:", error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Enhance an insight using dev endpoint (development only)
+     * @param tenantId - UUID of the tenant
+     * @param insight - The insight to enhance
+     * @returns Promise with the enhanced insight
+     */
+    async devEnhanceInsight(tenantId: string, insight: any): Promise<any> {
+      try {
+        const url = buildUrl(`/ai-proxy/dev/${tenantId}/enhance-insight`);
+        console.log(`[DEV] Enhancing insight using: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(insight)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error enhancing insight:", error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Generate insights from activities using dev endpoint (development only)
+     * @param tenantId - UUID of the tenant
+     * @param activities - Activities to analyze
+     * @param contextData - Optional context data
+     * @returns Promise with the generated insights
+     */
+    async devGenerateInsights(tenantId: string, activities: any[], contextData?: any): Promise<any> {
+      try {
+        const url = buildUrl(`/ai-proxy/dev/${tenantId}/generate-insights`);
+        console.log(`[DEV] Generating insights using: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            activities,
+            context_data: contextData || null
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error generating insights:", error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Process a custom prompt using dev endpoint (development only)
+     * @param tenantId - UUID of the tenant
+     * @param prompt - The prompt to process
+     * @returns Promise with the response
+     */
+    async devCustomPrompt(tenantId: string, prompt: string): Promise<any> {
+      try {
+        const url = buildUrl(`/ai-proxy/dev/${tenantId}/custom-prompt`);
+        console.log(`[DEV] Processing custom prompt using: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ prompt })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error("[DEV] Error processing custom prompt:", error);
+        throw error;
       }
     }
 };
 
 /**
+ * Default API path prefix for API endpoints
+ */
+let apiPathPrefix = '/api/v1';
+
+/**
+ * Set the API path prefix for endpoints
+ * @param prefix - The new API path prefix
+ */
+export function setApiPathPrefix(prefix: string): void {
+    apiPathPrefix = prefix.startsWith('/') ? prefix : `/${prefix}`;
+}
+
+/**
  * Builds a full URL from API base and endpoint
  */
 function buildUrl(endpoint: string): string {
-    // Normalize endpoint paths
-    const normalizedEndpoint = endpoint.startsWith('/api/v1') 
-        ? endpoint 
-        : `/api/v1${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-
-    // Add the normalized endpoint to the base URL
-    if (API_BASE_URL.endsWith('/') && normalizedEndpoint.startsWith('/')) {
-        return `${API_BASE_URL}${normalizedEndpoint.substring(1)}`;
-    } else if (!API_BASE_URL.endsWith('/') && !normalizedEndpoint.startsWith('/')) {
-        return `${API_BASE_URL}/${normalizedEndpoint}`;
-    } else {
-        return `${API_BASE_URL}${normalizedEndpoint}`;
+    console.debug('[API Client] Building URL for endpoint:', endpoint);
+    
+    // Check if endpoint already has API version prefix
+    const hasApiPrefix = endpoint.startsWith('/api/v1') || endpoint.startsWith('/api/v2');
+    
+    // If API_BASE_URL is empty and endpoint already starts with /api,
+    // we don't need additional prefixes - this is for Vite proxy in Docker setup
+    if (!API_BASE_URL && hasApiPrefix) {
+        console.debug('[API Client] Using endpoint as-is with proxy:', endpoint);
+        return endpoint;
     }
+    
+    // Normalize endpoint paths by adding API prefix if needed
+    const normalizedEndpoint = hasApiPrefix 
+        ? endpoint 
+        : `${apiPathPrefix}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+
+    // If API_BASE_URL is empty, return just the normalized endpoint
+    // This is typically for proxying in development
+    if (!API_BASE_URL) {
+        console.debug('[API Client] Using normalized endpoint with proxy:', normalizedEndpoint);
+        return normalizedEndpoint;
+    }
+    
+    // Add the normalized endpoint to the base URL
+    let fullUrl;
+    if (API_BASE_URL.endsWith('/') && normalizedEndpoint.startsWith('/')) {
+        fullUrl = `${API_BASE_URL}${normalizedEndpoint.substring(1)}`;
+    } else if (!API_BASE_URL.endsWith('/') && !normalizedEndpoint.startsWith('/')) {
+        fullUrl = `${API_BASE_URL}/${normalizedEndpoint}`;
+    } else {
+        fullUrl = `${API_BASE_URL}${normalizedEndpoint}`;
+    }
+    
+    console.debug('[API Client] Built full URL:', fullUrl);
+    return fullUrl;
 }
 
 /**
@@ -172,17 +480,32 @@ async function request<T>(endpoint: string, options: RequestInit, operation = 'A
     const url = buildUrl(endpoint);
     const headers = new Headers(options.headers || {});
     
-    // Add authentication token if available
-    const token = localStorage.getItem('knowledge_plane_token');
+    // Add authentication token using TokenManager for consistency
+    const token = tokenManager.getToken();
+    
+    // Debug token availability
+    console.debug('[API Client] Auth token check:', {
+        endpoint,
+        hasToken: !!token,
+        tokenLength: token ? token.length : 0,
+        tokenPrefix: token ? `${token.substring(0, 10)}...` : 'none',
+        tokenSource: 'TokenManager.getToken()'
+    });
+    
     if (token) {
         headers.append('Authorization', `Bearer ${token}`);
+        console.debug('[API Client] Added Authorization header for request to:', endpoint);
+    } else {
+        console.warn('[API Client] No auth token available for request to:', endpoint);
     }
 
     // Include credentials to enable cookie-based authentication
+    // And ensure redirects are followed (especially for trailing slash redirects)
     const config: RequestInit = {
         ...options,
         headers,
         credentials: 'include',
+        redirect: 'follow',
     };
 
     try {

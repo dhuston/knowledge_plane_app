@@ -1,29 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Heading,
-  Text,
-  VStack,
-  HStack,
-  Grid,
-  GridItem,
-  Card,
-  CardHeader,
-  CardBody,
-  Avatar,
-  Badge,
-  Icon,
-  Button,
-  Divider,
-  Spinner,
-  Center,
-  useColorModeValue,
-  Link,
-  Flex,
-  Tag,
+  Box, Heading, Text, VStack, HStack, Grid, GridItem, Card, CardHeader, CardBody,
+  Avatar, Badge, Icon, Button, Spinner, Center, useColorModeValue
 } from "@chakra-ui/react";
-import { FiUsers, FiFileText, FiClock, FiLink, FiCheckCircle, FiMap, FiBarChart2, FiAlertTriangle, FiCalendar } from 'react-icons/fi';
+import { FiUsers, FiFileText, FiClock, FiLink, FiCheckCircle, FiMap, FiBarChart2 } from 'react-icons/fi';
 import { useApiClient } from '../hooks/useApiClient';
 import { TeamRead } from '../types/team';
 import { UserReadBasic } from '../types/user';
@@ -34,23 +15,24 @@ import TeamMembersList from '../components/team/TeamMembersList';
 import TeamProjectsList from '../components/team/TeamProjectsList';
 import TeamResearchHighlights from '../components/team/TeamResearchHighlights';
 
+/**
+ * Team profile page showing team information, members, projects and goals
+ */
 const TeamPage: React.FC = () => {
   const { teamId } = useParams<{ teamId: string }>();
   const navigate = useNavigate();
   const apiClient = useApiClient();
 
-  // State for team data
+  // State
   const [team, setTeam] = useState<TeamRead | null>(null);
   const [teamLead, setTeamLead] = useState<UserReadBasic | null>(null);
   const [members, setMembers] = useState<UserReadBasic[]>([]);
   const [projects, setProjects] = useState<ProjectRead[]>([]);
   const [goals, setGoals] = useState<GoalReadMinimal[]>([]);
-
-  // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Color mode values
+  // Theme colors
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const headingColor = useColorModeValue('gray.700', 'white');
@@ -62,28 +44,24 @@ const TeamPage: React.FC = () => {
 
   // Fetch team data
   useEffect(() => {
-    const fetchTeamData = async () => {
-      if (!teamId) return;
+    if (!teamId) return;
 
+    const fetchTeamData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Mock data for development - use this directly instead of attempting API calls that might fail
-        console.info("Using mock team data for development");
-        
-        // Set mock team data
+        // Mock data for development
         setTeam({
           id: teamId || "mock-id",
           name: "PDAC Basal Working Group 1",
           description: "Research team focused on pancreatic ductal adenocarcinoma basal subtype. This team is working on identifying biomarkers and developing novel therapeutic approaches for pancreatic cancer.",
           tenant_id: "tenant-1",
-          lead_id: "1", // Jane Smith from our mock members
+          lead_id: "1",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
 
-        // Set team lead from mock members
         setTeamLead({
           id: "1",
           name: "Jane Smith",
@@ -91,7 +69,6 @@ const TeamPage: React.FC = () => {
           email: "jane@example.com"
         });
         
-        // Set mock team members
         setMembers([
           { id: "1", name: "Jane Smith", title: "Research Lead", email: "jane@example.com" },
           { id: "2", name: "John Doe", title: "Senior Researcher", email: "john@example.com" },
@@ -100,28 +77,21 @@ const TeamPage: React.FC = () => {
           { id: "5", name: "Carol White", title: "Research Assistant", email: "carol@example.com" },
         ]);
 
-        // Set mock project data
-        console.info("Using mock project data for development");
         setProjects([
           { id: "1", title: "PDAC Biomarker Analysis", status: "active", description: "Analyzing biomarkers for early detection of pancreatic cancer in high-risk populations." },
           { id: "2", title: "Clinical Trial Support", status: "planning", description: "Supporting phase 2 clinical trials for novel therapeutic approaches." },
           { id: "3", title: "Genomic Data Analysis", status: "at_risk", description: "Comprehensive analysis of genomic data from patient samples." },
         ]);
         
-        // Set mock goals data
-        console.info("Using mock goals data for development");
         setGoals([
           { id: "1", title: "Complete biomarker validation", status: "on_track", type: GoalTypeEnum.TEAM },
           { id: "2", title: "Publish research findings", status: "at_risk", type: GoalTypeEnum.TEAM },
           { id: "3", title: "Recruit clinical trial participants", status: "on_track", type: GoalTypeEnum.TEAM },
           { id: "4", title: "Develop analysis pipeline", status: "on_track", type: GoalTypeEnum.TEAM },
         ]);
-
       } catch (err) {
-        console.error("Error loading team data:", err);
         setError("Failed to load team data. Please try again later.");
       } finally {
-        // Always set loading to false
         setIsLoading(false);
       }
     };
@@ -129,7 +99,6 @@ const TeamPage: React.FC = () => {
     fetchTeamData();
   }, [teamId, apiClient]);
 
-  // Render loading state
   if (isLoading) {
     return (
       <Center h="100%" minH="200px">
@@ -138,7 +107,6 @@ const TeamPage: React.FC = () => {
     );
   }
 
-  // Render error state
   if (error) {
     return (
       <Box p={5} textAlign="center">
@@ -148,20 +116,11 @@ const TeamPage: React.FC = () => {
     );
   }
 
-  // Render team page
   return (
     <ErrorBoundary>
-      {/* Hero Header Section */}
-      <Box
-        bg={heroBg}
-        py={8}
-        mb={8}
-        borderBottom="1px"
-        borderColor={borderColor}
-        boxShadow="sm"
-      >
+      {/* Hero Header */}
+      <Box bg={heroBg} py={8} mb={8} borderBottom="1px" borderColor={borderColor} boxShadow="sm">
         <Box maxW="1200px" mx="auto" px={6}>
-          {/* Navigation */}
           <Button
             leftIcon={<FiMap />}
             variant="outline"
@@ -174,9 +133,7 @@ const TeamPage: React.FC = () => {
             Back to Workspace
           </Button>
 
-          {/* Team Header Content */}
           <Grid templateColumns={{ base: "1fr", md: "auto 1fr auto" }} gap={6} alignItems="center">
-            {/* Team Icon/Logo */}
             <Box
               bg={accentColor}
               color="white"
@@ -192,7 +149,6 @@ const TeamPage: React.FC = () => {
               <Icon as={FiUsers} boxSize={12} />
             </Box>
 
-            {/* Team Info */}
             <VStack align="flex-start" spacing={2}>
               <Heading as="h1" size="xl" color={headingColor} fontWeight="bold">
                 {team?.name || "Team"}
@@ -201,7 +157,6 @@ const TeamPage: React.FC = () => {
                 {team?.description || "No description available"}
               </Text>
 
-              {/* Team Stats */}
               <HStack spacing={6} mt={2}>
                 <HStack>
                   <Icon as={FiUsers} color={accentColor} />
@@ -218,7 +173,6 @@ const TeamPage: React.FC = () => {
               </HStack>
             </VStack>
 
-            {/* Team Lead */}
             {teamLead && (
               <VStack
                 bg={cardBg}
@@ -248,12 +202,10 @@ const TeamPage: React.FC = () => {
 
       {/* Main Content */}
       <Box maxW="1200px" mx="auto" px={6} pb={10}>
-
-        {/* Main Content Grid - Improved Layout */}
         <Grid templateColumns={{ base: "1fr", lg: "2fr 1fr" }} gap={8}>
           {/* Left Column */}
           <GridItem>
-            {/* Overview Section - Improved Design */}
+            {/* Overview */}
             <Card
               mb={8}
               bg={cardBg}
@@ -265,217 +217,21 @@ const TeamPage: React.FC = () => {
               transition="all 0.2s"
               _hover={{ boxShadow: "md" }}
             >
-              <CardHeader
-                pb={2}
-                borderBottom="1px"
-                borderColor={borderColor}
-                bg={sectionBg}
-              >
+              <CardHeader pb={2} borderBottom="1px" borderColor={borderColor} bg={sectionBg}>
                 <HStack>
                   <Icon as={FiBarChart2} color={accentColor} boxSize={5} mr={2} />
                   <Heading size="md">Team Overview</Heading>
                 </HStack>
               </CardHeader>
               <CardBody p={6}>
-                <VStack align="stretch" spacing={6}>
-                  <Text fontSize="md" lineHeight="tall">
-                    {team?.description || "This team is working on research and development projects."}
-                  </Text>
-
-                  {/* Team Progress Overview */}
-                  <Box
-                    bg={sectionBg}
-                    p={5}
-                    borderRadius="lg"
-                    borderLeft="4px solid"
-                    borderColor={accentColor}
-                  >
-                    <Heading size="sm" mb={4}>Current Progress</Heading>
-                    <Grid templateColumns="repeat(3, 1fr)" gap={4}>
-                      <VStack align="center">
-                        <Box
-                          position="relative"
-                          h="80px"
-                          w="80px"
-                          borderRadius="full"
-                          borderWidth="8px"
-                          borderColor="gray.200"
-                        >
-                          <Box
-                            position="absolute"
-                            top="0"
-                            left="0"
-                            h="100%"
-                            w="100%"
-                            borderRadius="full"
-                            borderWidth="8px"
-                            borderColor={accentColor}
-                            clipPath="polygon(0 0, 100% 0, 100% 75%, 0 75%)"
-                          />
-                          <Center h="100%" w="100%">
-                            <Text fontWeight="bold" fontSize="lg">75%</Text>
-                          </Center>
-                        </Box>
-                        <Text fontWeight="medium" mt={2}>Research</Text>
-                      </VStack>
-
-                      <VStack align="center">
-                        <Box
-                          position="relative"
-                          h="80px"
-                          w="80px"
-                          borderRadius="full"
-                          borderWidth="8px"
-                          borderColor="gray.200"
-                        >
-                          <Box
-                            position="absolute"
-                            top="0"
-                            left="0"
-                            h="100%"
-                            w="100%"
-                            borderRadius="full"
-                            borderWidth="8px"
-                            borderColor="blue.400"
-                            clipPath="polygon(0 0, 100% 0, 100% 60%, 0 60%)"
-                          />
-                          <Center h="100%" w="100%">
-                            <Text fontWeight="bold" fontSize="lg">60%</Text>
-                          </Center>
-                        </Box>
-                        <Text fontWeight="medium" mt={2}>Projects</Text>
-                      </VStack>
-
-                      <VStack align="center">
-                        <Box
-                          position="relative"
-                          h="80px"
-                          w="80px"
-                          borderRadius="full"
-                          borderWidth="8px"
-                          borderColor="gray.200"
-                        >
-                          <Box
-                            position="absolute"
-                            top="0"
-                            left="0"
-                            h="100%"
-                            w="100%"
-                            borderRadius="full"
-                            borderWidth="8px"
-                            borderColor="green.400"
-                            clipPath="polygon(0 0, 100% 0, 100% 85%, 0 85%)"
-                          />
-                          <Center h="100%" w="100%">
-                            <Text fontWeight="bold" fontSize="lg">85%</Text>
-                          </Center>
-                        </Box>
-                        <Text fontWeight="medium" mt={2}>Goals</Text>
-                      </VStack>
-                    </Grid>
-                  </Box>
-                </VStack>
-              </CardBody>
-            </Card>
-
-            {/* Research Highlights - Improved Design */}
-            <Card
-              mb={8}
-              bg={cardBg}
-              borderColor={borderColor}
-              borderWidth="1px"
-              borderRadius="xl"
-              overflow="hidden"
-              boxShadow="sm"
-              transition="all 0.2s"
-              _hover={{ boxShadow: "md" }}
-            >
-              <CardHeader
-                pb={2}
-                borderBottom="1px"
-                borderColor={borderColor}
-                bg={sectionBg}
-              >
-                <HStack>
-                  <Icon as={FiFileText} color={accentColor} boxSize={5} mr={2} />
-                  <Heading size="md">Research Highlights</Heading>
-                </HStack>
-              </CardHeader>
-              <CardBody p={6}>
                 <TeamResearchHighlights />
-              </CardBody>
-            </Card>
-
-            {/* Resources - Improved Design */}
-            <Card
-              mb={8}
-              bg={cardBg}
-              borderColor={borderColor}
-              borderWidth="1px"
-              borderRadius="xl"
-              overflow="hidden"
-              boxShadow="sm"
-              transition="all 0.2s"
-              _hover={{ boxShadow: "md" }}
-            >
-              <CardHeader
-                pb={2}
-                borderBottom="1px"
-                borderColor={borderColor}
-                bg={sectionBg}
-              >
-                <HStack>
-                  <Icon as={FiLink} color={accentColor} boxSize={5} mr={2} />
-                  <Heading size="md">Resources</Heading>
-                </HStack>
-              </CardHeader>
-              <CardBody p={6}>
-                <Grid templateColumns={{ base: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }} gap={4}>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <Card
-                      key={i}
-                      p={4}
-                      bg={sectionBg}
-                      borderRadius="md"
-                      height="80px"
-                      _hover={{
-                        transform: 'translateY(-2px)',
-                        boxShadow: 'md',
-                        bg: hoverBg
-                      }}
-                      transition="all 0.2s"
-                      cursor="pointer"
-                    >
-                      <Center h="100%">
-                        <VStack>
-                          <Icon
-                            as={i % 4 === 0 ? FiFileText :
-                                i % 4 === 1 ? FiLink :
-                                i % 4 === 2 ? FiClock : FiBarChart2}
-                            boxSize={6}
-                            color={
-                              i % 4 === 0 ? "blue.500" :
-                              i % 4 === 1 ? "purple.500" :
-                              i % 4 === 2 ? "green.500" : "orange.500"
-                            }
-                          />
-                          <Text fontSize="xs" fontWeight="medium">
-                            {i % 4 === 0 ? "Document" :
-                             i % 4 === 1 ? "Link" :
-                             i % 4 === 2 ? "Timeline" : "Data"}
-                          </Text>
-                        </VStack>
-                      </Center>
-                    </Card>
-                  ))}
-                </Grid>
               </CardBody>
             </Card>
           </GridItem>
 
           {/* Right Column */}
           <GridItem>
-            {/* Core Team - Improved Design */}
+            {/* Core Team */}
             <Card
               mb={8}
               bg={cardBg}
@@ -484,15 +240,8 @@ const TeamPage: React.FC = () => {
               borderRadius="xl"
               overflow="hidden"
               boxShadow="sm"
-              transition="all 0.2s"
-              _hover={{ boxShadow: "md" }}
             >
-              <CardHeader
-                pb={2}
-                borderBottom="1px"
-                borderColor={borderColor}
-                bg={sectionBg}
-              >
+              <CardHeader pb={2} borderBottom="1px" borderColor={borderColor} bg={sectionBg}>
                 <HStack>
                   <Icon as={FiUsers} color={accentColor} boxSize={5} mr={2} />
                   <Heading size="md">Core Team</Heading>
@@ -503,7 +252,7 @@ const TeamPage: React.FC = () => {
               </CardBody>
             </Card>
 
-            {/* Projects - Improved Design */}
+            {/* Projects */}
             <Card
               mb={8}
               bg={cardBg}
@@ -512,15 +261,8 @@ const TeamPage: React.FC = () => {
               borderRadius="xl"
               overflow="hidden"
               boxShadow="sm"
-              transition="all 0.2s"
-              _hover={{ boxShadow: "md" }}
             >
-              <CardHeader
-                pb={2}
-                borderBottom="1px"
-                borderColor={borderColor}
-                bg={sectionBg}
-              >
+              <CardHeader pb={2} borderBottom="1px" borderColor={borderColor} bg={sectionBg}>
                 <HStack>
                   <Icon as={FiFileText} color={accentColor} boxSize={5} mr={2} />
                   <Heading size="md">Projects</Heading>
@@ -530,80 +272,10 @@ const TeamPage: React.FC = () => {
                 <TeamProjectsList projects={projects} />
               </CardBody>
             </Card>
-
-            {/* Goals - Improved Design */}
-            <Card
-              bg={cardBg}
-              borderColor={borderColor}
-              borderWidth="1px"
-              borderRadius="xl"
-              overflow="hidden"
-              boxShadow="sm"
-              transition="all 0.2s"
-              _hover={{ boxShadow: "md" }}
-            >
-              <CardHeader
-                pb={2}
-                borderBottom="1px"
-                borderColor={borderColor}
-                bg={sectionBg}
-              >
-                <HStack>
-                  <Icon as={FiCheckCircle} color={accentColor} boxSize={5} mr={2} />
-                  <Heading size="md">Goals</Heading>
-                </HStack>
-              </CardHeader>
-              <CardBody p={6}>
-                <VStack spacing={4} align="stretch">
-                  {goals.length > 0 ? (
-                    goals.map((goal) => (
-                      <Box
-                        key={goal.id}
-                        p={4}
-                        bg={sectionBg}
-                        borderRadius="md"
-                        borderLeft="3px solid"
-                        borderColor={goal.status === 'on_track' ? 'green.500' : 'orange.500'}
-                        _hover={{
-                          transform: 'translateY(-2px)',
-                          boxShadow: 'sm',
-                          bg: hoverBg
-                        }}
-                        transition="all 0.2s"
-                        cursor="pointer"
-                      >
-                        <HStack mb={2}>
-                          <Icon
-                            as={FiCheckCircle}
-                            color={goal.status === 'on_track' ? 'green.500' : 'orange.500'}
-                          />
-                          <Text fontWeight="medium">{goal.title}</Text>
-                          <Badge ml="auto" colorScheme={goal.status === 'on_track' ? 'green' : 'orange'}>
-                            {goal.status?.replace('_', ' ')}
-                          </Badge>
-                        </HStack>
-
-                        {/* Progress bar */}
-                        <Box bg="gray.200" h="4px" w="100%" borderRadius="full" mt={2}>
-                          <Box
-                            bg={goal.status === 'on_track' ? 'green.500' : 'orange.500'}
-                            h="100%"
-                            w={goal.status === 'on_track' ? "75%" : "45%"}
-                            borderRadius="full"
-                          />
-                        </Box>
-                      </Box>
-                    ))
-                  ) : (
-                    <Text color="gray.500">No goals found</Text>
-                  )}
-                </VStack>
-              </CardBody>
-            </Card>
           </GridItem>
         </Grid>
 
-        {/* Links Section - Improved Design */}
+        {/* Links Section */}
         <Card
           mt={8}
           bg={cardBg}
@@ -612,15 +284,8 @@ const TeamPage: React.FC = () => {
           borderRadius="xl"
           overflow="hidden"
           boxShadow="sm"
-          transition="all 0.2s"
-          _hover={{ boxShadow: "md" }}
         >
-          <CardHeader
-            pb={2}
-            borderBottom="1px"
-            borderColor={borderColor}
-            bg={sectionBg}
-          >
+          <CardHeader pb={2} borderBottom="1px" borderColor={borderColor} bg={sectionBg}>
             <HStack>
               <Icon as={FiLink} color={accentColor} boxSize={5} mr={2} />
               <Heading size="md">Important Links</Heading>
@@ -639,11 +304,7 @@ const TeamPage: React.FC = () => {
                   p={4}
                   bg={sectionBg}
                   borderRadius="md"
-                  _hover={{
-                    transform: 'translateY(-2px)',
-                    boxShadow: 'md',
-                    bg: hoverBg
-                  }}
+                  _hover={{ transform: 'translateY(-2px)', boxShadow: 'md', bg: hoverBg }}
                   transition="all 0.2s"
                   cursor="pointer"
                 >

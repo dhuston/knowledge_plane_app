@@ -4,7 +4,7 @@
  */
 import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
 import { useApiClient } from '../../../hooks/useApiClient';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../../auth/AuthContext';
 import { OrganizationalUnitTypeEnum } from '../../../types/hierarchy';
 
 // Import reducer and service

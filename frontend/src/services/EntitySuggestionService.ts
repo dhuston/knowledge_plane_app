@@ -7,7 +7,7 @@
 import { EntitySuggestion } from '../components/panels/suggestions/EntitySuggestions';
 import { MapNodeTypeEnum } from '../types/map';
 import { useApiClient } from '../hooks/useApiClient';
-import { cacheEntity, getCachedEntity } from '../utils/performance';
+import { cacheEntity, getCachedEntity } from '../utils/performance-light';
 import { EntityDataType, UserEntity, TeamEntity, ProjectEntity, GoalEntity } from '../types/entities';
 
 // Mock data for various entity types

@@ -1,4 +1,6 @@
-"""Integration manager for the integration framework."""
+"""
+Simplified integration manager for external system integration.
+"""
 
 import asyncio
 import logging
@@ -10,40 +12,81 @@ from uuid import UUID, uuid4
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.integrations.base_connector import BaseConnector
-from app.integrations.base_processor import BaseProcessor
-from app.integrations.exceptions import IntegrationError, IntegrationNotFoundError
+from app.integrations.base import BaseConnector, BaseProcessor
 from app.integrations.models import Integration, IntegrationCredential, IntegrationRun
-from app.integrations.registry import connector_registry
+
+# Import connectors
+from app.integrations.connectors.calendar_connector import GoogleCalendarConnector, MicrosoftOutlookConnector
+from app.integrations.connectors.ldap_connector import LDAPConnector
+from app.integrations.connectors.research_connector import PubMedConnector
 
 logger = logging.getLogger(__name__)
 
 
 class IntegrationManager:
     """
-    Manager for integration lifecycle.
+    Simplified manager for integration lifecycle.
     
-    This class provides methods to register, configure, run, and monitor
+    This class provides methods to manage, configure, and run
     integrations with external systems.
-    
-    Attributes:
-        _db: Database session for persisting integration data
-        _tenant_id: ID of the current tenant
     """
     
-    def __init__(self, db: AsyncSession, registry=None, tenant_id: UUID = None):
+    # Static registry of available connectors
+    CONNECTOR_REGISTRY = {
+        "google_calendar": GoogleCalendarConnector,
+        "microsoft_outlook": MicrosoftOutlookConnector,
+        "ldap": LDAPConnector,
+        "pubmed": PubMedConnector
+    }
+    
+    def __init__(self, db: AsyncSession, tenant_id: UUID = None):
         """
         Initialize the integration manager.
         
         Args:
             db: Database session for persisting integration data
-            registry: Optional connector registry (defaults to global singleton)
             tenant_id: ID of the current tenant
         """
         self._db = db
-        self._registry = registry or connector_registry
         self._tenant_id = tenant_id
-        self._processors = {}
+        self._processor_cache = {}
+    
+    def get_connector_class(self, integration_type: str) -> Type[BaseConnector]:
+        """
+        Get connector class for an integration type.
+        
+        Args:
+            integration_type: Type of integration
+            
+        Returns:
+            Connector class
+            
+        Raises:
+            ValueError: If connector not found
+        """
+        connector_class = self.CONNECTOR_REGISTRY.get(integration_type)
+        if not connector_class:
+            raise ValueError(f"No connector found for integration type: {integration_type}")
+        return connector_class
+    
+    def create_connector(self, integration_type: str, config: Dict[str, Any], 
+                        credentials: Dict[str, Any]) -> BaseConnector:
+        """
+        Create a connector instance.
+        
+        Args:
+            integration_type: Type of integration
+            config: Configuration dictionary
+            credentials: Authentication credentials
+            
+        Returns:
+            Initialized connector instance
+            
+        Raises:
+            ValueError: If connector not found
+        """
+        connector_class = self.get_connector_class(integration_type)
+        return connector_class(config, credentials)
     
     async def register_integration(self, config: Dict[str, Any]) -> UUID:
         """
@@ -55,23 +98,23 @@ class IntegrationManager:
                    - description: Optional description
                    - integration_type: Type of integration (e.g., "google_calendar")
                    - config: Configuration specific to this integration type
-                   - credentials: Authentication credentials (will be stored securely)
+                   - credentials: Authentication credentials
                    - schedule: Optional cron expression for scheduling
                    
         Returns:
             ID of the newly created integration
             
         Raises:
-            IntegrationError: If registration fails
+            Exception: If registration fails
         """
         try:
             # Validate integration type
             integration_type = config.get("integration_type")
             if not integration_type:
-                raise IntegrationError("Integration type is required")
+                raise ValueError("Integration type is required")
             
             # Make sure connector class exists for this type
-            self._registry.get_connector_class(integration_type)
+            self.get_connector_class(integration_type)
             
             # Extract credentials for secure storage
             credentials = config.pop("credentials", {})
@@ -90,7 +133,7 @@ class IntegrationManager:
             )
             
             self._db.add(integration)
-            await self._db.commit()
+            await self._db.flush()
             
             # Store credentials if provided
             if credentials:
@@ -101,15 +144,15 @@ class IntegrationManager:
                     expires_at=credentials.get("expires_at")
                 )
                 self._db.add(credential_record)
-                await self._db.commit()
             
+            await self._db.commit()
             logger.info(f"Registered new integration: {integration.id} ({integration.name})")
             return integration.id
             
         except Exception as e:
             await self._db.rollback()
             logger.error(f"Failed to register integration: {e}")
-            raise IntegrationError(f"Failed to register integration: {e}")
+            raise
     
     async def update_integration(self, integration_id: UUID, config: Dict[str, Any]) -> bool:
         """
@@ -123,12 +166,11 @@ class IntegrationManager:
             True if update was successful
             
         Raises:
-            IntegrationNotFoundError: If integration not found
-            IntegrationError: If update fails
+            Exception: If update fails or integration not found
         """
+        integration = await self.get_integration(integration_id)
+        
         try:
-            integration = await self.get_integration(integration_id)
-            
             # Update integration fields
             if "name" in config:
                 integration.name = config["name"]
@@ -175,12 +217,10 @@ class IntegrationManager:
             logger.info(f"Updated integration: {integration_id}")
             return True
             
-        except IntegrationNotFoundError:
-            raise
         except Exception as e:
             await self._db.rollback()
             logger.error(f"Failed to update integration {integration_id}: {e}")
-            raise IntegrationError(f"Failed to update integration: {e}")
+            raise
     
     async def delete_integration(self, integration_id: UUID) -> bool:
         """
@@ -193,24 +233,21 @@ class IntegrationManager:
             True if deletion was successful
             
         Raises:
-            IntegrationNotFoundError: If integration not found
-            IntegrationError: If deletion fails
+            Exception: If deletion fails or integration not found
         """
+        integration = await self.get_integration(integration_id)
+        
         try:
-            integration = await self.get_integration(integration_id)
-            
-            self._db.delete(integration)
+            await self._db.delete(integration)
             await self._db.commit()
             
             logger.info(f"Deleted integration: {integration_id}")
             return True
             
-        except IntegrationNotFoundError:
-            raise
         except Exception as e:
             await self._db.rollback()
             logger.error(f"Failed to delete integration {integration_id}: {e}")
-            raise IntegrationError(f"Failed to delete integration: {e}")
+            raise
     
     async def get_integration(self, integration_id: UUID) -> Integration:
         """
@@ -223,7 +260,7 @@ class IntegrationManager:
             Integration record
             
         Raises:
-            IntegrationNotFoundError: If integration not found
+            Exception: If integration not found
         """
         stmt = select(Integration).where(
             (Integration.id == integration_id) & (Integration.tenant_id == self._tenant_id)
@@ -233,7 +270,7 @@ class IntegrationManager:
         integration = result.scalar_one_or_none()
         
         if not integration:
-            raise IntegrationNotFoundError(f"Integration not found: {integration_id}")
+            raise ValueError(f"Integration not found: {integration_id}")
         
         return integration
     
@@ -266,7 +303,7 @@ class IntegrationManager:
             Credentials dictionary
             
         Raises:
-            IntegrationNotFoundError: If integration or credentials not found
+            Exception: If integration or credentials not found
         """
         stmt = select(IntegrationCredential).where(
             IntegrationCredential.integration_id == integration_id
@@ -276,7 +313,8 @@ class IntegrationManager:
         credential_record = result.scalar_one_or_none()
         
         if not credential_record:
-            raise IntegrationNotFoundError(f"No credentials found for integration: {integration_id}")
+            # Return empty credentials if none found
+            return {}
         
         return credential_record.credentials
     
@@ -298,8 +336,7 @@ class IntegrationManager:
             Dictionary with run results
             
         Raises:
-            IntegrationNotFoundError: If integration not found
-            IntegrationError: If run fails
+            Exception: If run fails or integration not found
         """
         integration = await self.get_integration(integration_id)
         
@@ -311,6 +348,8 @@ class IntegrationManager:
             details={}
         )
         self._db.add(run_record)
+        await self._db.flush()
+        run_id = run_record.id
         await self._db.commit()
         
         try:
@@ -319,22 +358,18 @@ class IntegrationManager:
             config = integration.config
             
             # Get credentials
-            try:
-                credentials = await self.get_credentials(integration_id)
-            except IntegrationNotFoundError:
-                credentials = {}
+            credentials = await self.get_credentials(integration_id)
             
             # Create connector instance
-            connector = self._registry.create_connector(integration_type, config, credentials)
+            connector = self.create_connector(integration_type, config, credentials)
             
             # Connect to external system
             await connector.connect()
             
             # Get entity types to fetch (default to all if not specified)
             if not entity_types:
-                # This should be defined by the connector class
-                connector_class = self._registry.get_connector_class(integration_type)
-                entity_types = getattr(connector_class, "SUPPORTED_ENTITY_TYPES", ["default"])
+                connector_class = self.get_connector_class(integration_type)
+                entity_types = connector_class.SUPPORTED_ENTITY_TYPES
             
             # Get last successful run for incremental sync
             last_sync_time = None
@@ -345,20 +380,19 @@ class IntegrationManager:
             
             # Fetch and process each entity type
             total_entities = 0
-            total_relationships = 0
             errors = []
             
             for entity_type in entity_types:
                 try:
-                    processor = await self.get_processor(integration_type, entity_type)
-                    
                     # Fetch data from external system
                     entity_count = 0
                     async for raw_data in connector.fetch_data(entity_type, last_sync_time):
                         try:
-                            # Process entity
-                            entity = await processor.process_entity(raw_data, entity_type)
+                            # Process entity using connector's built-in processor
+                            entity = await connector.process_entity(raw_data, entity_type)
                             if entity:
+                                # Here you would save the entity to your database
+                                # For this example, we just count it
                                 entity_count += 1
                                 total_entities += 1
                         except Exception as e:
@@ -378,13 +412,13 @@ class IntegrationManager:
                     })
             
             # Update run record
+            run_record = await self._get_run_by_id(run_id)
             run_record.status = "success" if not errors else "partial_success" if total_entities > 0 else "failed"
             run_record.end_time = datetime.now()
             run_record.entity_count = total_entities
-            run_record.relationship_count = total_relationships
             run_record.error_count = len(errors)
             run_record.details = {
-                "entity_counts": {et: 0 for et in entity_types},  # This should be updated with actual counts
+                "entity_counts": {et: 0 for et in entity_types},  # To be updated with actual counts
                 "errors": errors,
                 "incremental": incremental,
                 "last_sync_time": last_sync_time.isoformat() if last_sync_time else None
@@ -393,18 +427,18 @@ class IntegrationManager:
             self._db.add(run_record)
             await self._db.commit()
             
-            logger.info(f"Integration run {run_record.id} completed with status: {run_record.status}")
+            logger.info(f"Integration run {run_id} completed with status: {run_record.status}")
             
             return {
                 "status": run_record.status,
                 "entity_count": total_entities,
-                "relationship_count": total_relationships,
                 "error_count": len(errors),
-                "run_id": run_record.id
+                "run_id": run_id
             }
             
         except Exception as e:
             # Update run record with failure
+            run_record = await self._get_run_by_id(run_id)
             run_record.status = "failed"
             run_record.end_time = datetime.now()
             run_record.error_count = 1
@@ -416,13 +450,14 @@ class IntegrationManager:
             self._db.add(run_record)
             await self._db.commit()
             
-            logger.error(f"Integration run {run_record.id} failed: {e}")
-            
-            return {
-                "status": "failed",
-                "error": str(e),
-                "run_id": run_record.id
-            }
+            logger.error(f"Integration run {run_id} failed: {e}")
+            raise
+    
+    async def _get_run_by_id(self, run_id: UUID) -> IntegrationRun:
+        """Get an integration run by ID."""
+        stmt = select(IntegrationRun).where(IntegrationRun.id == run_id)
+        result = await self._db.execute(stmt)
+        return result.scalar_one()
     
     async def get_integration_status(self, integration_id: UUID) -> Dict[str, Any]:
         """
@@ -433,9 +468,6 @@ class IntegrationManager:
             
         Returns:
             Dictionary with integration status information
-            
-        Raises:
-            IntegrationNotFoundError: If integration not found
         """
         # Get integration details
         integration = await self.get_integration(integration_id)
@@ -482,37 +514,6 @@ class IntegrationManager:
                 for run in recent_runs
             ]
         }
-    
-    async def get_processor(self, integration_type: str, entity_type: str) -> BaseProcessor:
-        """
-        Get an appropriate processor for an integration and entity type.
-        
-        Args:
-            integration_type: Type of integration
-            entity_type: Type of entity
-            
-        Returns:
-            Processor instance
-            
-        Raises:
-            IntegrationError: If no processor found
-        """
-        from app.integrations.processor_registry import processor_registry
-        
-        # Cache processor instances by integration_type and entity_type
-        cache_key = f"{integration_type}:{entity_type}"
-        if cache_key in self._processors:
-            return self._processors[cache_key]
-        
-        # First try to get a processor based on entity type
-        processor = processor_registry.get_processor_for_entity(entity_type, self._db, self._tenant_id)
-        
-        # If that fails, try based on integration type
-        if not processor:
-            processor = processor_registry.get_processor_for_integration(integration_type, self._db, self._tenant_id)
-        
-        self._processors[cache_key] = processor
-        return processor
     
     async def get_last_successful_run(self, integration_id: UUID) -> Optional[IntegrationRun]:
         """

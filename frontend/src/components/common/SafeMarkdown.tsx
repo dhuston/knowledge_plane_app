@@ -48,9 +48,7 @@ import { tomorrow, solarizedlight } from 'react-syntax-highlighter/dist/esm/styl
 import { FiMaximize, FiExternalLink, FiInfo, FiCopy, FiCheckCircle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-
-// URL validation regex - improved to handle more URL formats
-const URL_PATTERN = /^(https?:\/\/)?([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]*)?$/;
+import { isValidUrl } from '../../utils/url-utils';
 
 interface SafeMarkdownProps extends BoxProps {
   content: string;
@@ -179,7 +177,7 @@ const SafeMarkdown: React.FC<SafeMarkdownProps> = ({
       const isExternal = href.startsWith('http') || href.startsWith('https');
       
       // Validate URL before rendering link
-      if (URL_PATTERN.test(href) || href.startsWith('/') || href.startsWith('#')) {
+      if (isValidUrl(href, { allowRelative: true }) || href.startsWith('#')) {
         return (
           <Link 
             href={href} 
@@ -213,7 +211,7 @@ const SafeMarkdown: React.FC<SafeMarkdownProps> = ({
       }
       
       // Validate image URL (handles both absolute and relative URLs)
-      if (URL_PATTERN.test(src) || src.startsWith('/')) {
+      if (isValidUrl(src, { allowRelative: true })) {
         return (
           <Box position="relative" my={3} display="inline-block" maxW="100%">
             <Image 

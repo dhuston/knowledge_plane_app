@@ -9,7 +9,6 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  demoLogin: (tenantId: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -40,19 +39,17 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         
         // Token exists, get user profile
         const userData = await authClient.getCurrentUser();
-        setUser(userData);
-        setIsAuthenticated(true);
+        if (userData.success && userData.user) {
+          setUser(userData.user);
+          setIsAuthenticated(true);
+          console.log("Successfully authenticated user:", userData.user.name);
+        } else {
+          throw new Error(userData.error || 'Failed to get user data');
+        }
       } catch (err) {
         console.error('Authentication check failed:', err);
         setIsAuthenticated(false);
         setUser(null);
-        
-        // Only show error if token exists but is invalid
-        if (tokenManager.hasToken()) {
-          setError('Session expired. Please login again.');
-          // Clean up invalid token
-          tokenManager.removeToken();
-        }
       } finally {
         setIsLoading(false);
       }
@@ -68,15 +65,22 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       setError(null);
       
       // Call login API
-      const response = await authClient.login({ username: email, password });
+      const response = await authClient.login({ email, password });
       
-      // Store token
-      tokenManager.storeToken(response.access_token);
+      if (!response.success || !response.token) {
+        throw new Error(response.error || 'Login failed');
+      }
+      
+      // Token is already stored by the authClient
       
       // Get user data
       const userData = await authClient.getCurrentUser();
-      setUser(userData);
-      setIsAuthenticated(true);
+      if (userData.success && userData.user) {
+        setUser(userData.user);
+        setIsAuthenticated(true);
+      } else {
+        throw new Error(userData.error || 'Failed to get user data after login');
+      }
     } catch (err) {
       console.error('Login failed:', err);
       setError('Login failed. Please check your credentials.');
@@ -89,33 +93,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
   };
   
-  // Demo Login function
-  const demoLogin = async (tenantId: string): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Call demo login API
-      const response = await authClient.demoLogin(tenantId);
-      
-      // Store token
-      tokenManager.storeToken(response.access_token);
-      
-      // Get user data
-      const userData = await authClient.getCurrentUser();
-      setUser(userData);
-      setIsAuthenticated(true);
-    } catch (err) {
-      console.error('Demo login failed:', err);
-      setError('Demo login failed. Please try again.');
-      setIsAuthenticated(false);
-      setUser(null);
-      tokenManager.removeToken();
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
   
   // Logout function
   const logout = async (): Promise<void> => {
@@ -140,7 +117,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     isLoading,
     error,
     login,
-    demoLogin,
     logout,
   };
   

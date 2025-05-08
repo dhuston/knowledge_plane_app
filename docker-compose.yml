@@ -1,15 +1,14 @@
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    # Use existing image instead of building
+    image: biosphere_alpha-backend:latest
     ports:
       - "8001:8000" # Expose backend on host port 8001
     volumes:
       # Only map necessary directories for development
       - ./backend/app:/app/app
-      - ./backend/scripts:/app/scripts
       - ./backend/alembic.ini:/app/alembic.ini
+      - ./scripts:/app/scripts
       # Use a named volume for the venv to prevent overwriting
       - backend_venv:/app/.venv
     env_file:
@@ -20,6 +19,12 @@ services:
       - USE_SPATIAL_FEATURES=true
       - BYPASS_DB_FOR_DEMO=false
       - SKIP_MIGRATION_CHECK=true  # Disable migration checks on startup
+      - OPENAI_MODEL=gpt-4-1-mini  # Explicitly set OpenAI model
+      - VITE_OPENAI_MODEL=gpt-4-1-mini
+      # Disable proxy settings which are causing connection issues
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - NO_PROXY=
     depends_on:
       - db
     # Add health check for backend
@@ -30,11 +35,10 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
-    # Run initial migration, create dev user, then start app
+    # Run initial migration then start app
     command: >
-      bash -c "pip install networkx setuptools &&
+      bash -c "
               alembic upgrade 0001_baseline_schema &&
-              python /app/scripts/create_dev_user.py &&
               uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     # Add resource limits
     deploy:
@@ -45,19 +49,13 @@ services:
 
   db:
     image: postgres:15-alpine # Use official PostgreSQL Alpine image for simplicity
-    platform: linux/arm64/v8  # Match your host platform
+    # Removed platform specification to use default
     volumes:
       - postgres_data:/var/lib/postgresql/data/pgdata # Different mount path
     ports:
       - "5433:5432" # Expose DB on host port 5433 (avoid conflict with local install)
-    # Enhanced configuration merged from override file
-    command: >
-      bash -c "
-        mkdir -p /var/lib/postgresql/data/pgdata &&
-        echo 'host all all all md5' >> /var/lib/postgresql/data/pgdata/pg_hba.conf &&
-        echo 'local all all md5' >> /var/lib/postgresql/data/pgdata/pg_hba.conf &&
-        docker-entrypoint.sh postgres
-      "
+    # Simplified command that just starts PostgreSQL without attempting to modify pg_hba.conf
+    command: ["postgres"]
     environment:
       POSTGRES_HOST_AUTH_METHOD: md5
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -73,8 +71,8 @@ services:
           memory: 512M
 
   frontend:
-    build:
-      context: ./frontend
+    # Use existing image instead of building
+    image: biosphere_alpha-frontend:latest
     ports:
       - "5173:5173" # Expose frontend on host port 5173
     volumes:
@@ -82,8 +80,21 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
       - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
     env_file:
       - ./.env # Use consolidated environment file
+    environment:
+      - RUNNING_IN_DOCKER=true
+      # Use correct API URL for inside Docker
+      - VITE_API_BASE_URL=/api
+      - API_BASE_URL=/api
+      # AI model settings
+      - VITE_OPENAI_MODEL=gpt-4-1-mini
+      - OPENAI_MODEL=gpt-4-1-mini
+      # Disable proxy settings which might interfere
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
+      - NO_PROXY=
     command: npm run dev -- --host
     depends_on:
       - backend

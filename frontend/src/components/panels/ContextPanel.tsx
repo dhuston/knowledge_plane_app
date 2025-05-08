@@ -28,7 +28,6 @@ import {
 } from '@chakra-ui/react';
 import ErrorDisplay from '../common/ErrorDisplay';
 import { motion, AnimatePresence, keyframes, Variants } from 'framer-motion';
-import { useFeatureFlags } from '../../utils/featureFlags';
 import { useApiClient } from '../../hooks/useApiClient';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
 import { 
@@ -39,7 +38,7 @@ import {
   useDelayedExecution,
   areEqual,
   measurePerformance
-} from '../../utils/performance';
+} from '../../utils/performance-light';
 import { 
   extractErrorMessage, 
   logError, 
@@ -62,10 +61,10 @@ import RelationshipList from './RelationshipList';
 import ActivityTimeline from './ActivityTimeline';
 import LazyPanel from '../common/LazyPanel';
 import AnimatedTransition from '../common/AnimatedTransition';
-import { EnhancedAnimatedTransition, AnimatedContainer } from '../common/EnhancedAnimatedTransition';
+// EnhancedAnimatedTransition import removed
 import SafeMarkdown from '../common/SafeMarkdown';
 import SimpleMarkdown from '../common/SimpleMarkdown';
-import { EnhancedEntityActions } from '../actions/EnhancedEntityActions';
+// Import for EnhancedEntityActions removed - file doesn't exist
 import animations from './animations';
 import { InlineTooltip } from '../common/InlineTooltip';
 
@@ -74,7 +73,7 @@ import PanelHeader from './header/PanelHeader';
 import PanelTabs, { PanelTabType } from './tabs/PanelTabs';
 import { EntitySuggestion } from './suggestions/EntitySuggestions';
 import EntitySuggestionsContainer from './suggestions/EntitySuggestionsContainer';
-import EnhancedEntitySuggestions from './suggestions/EnhancedEntitySuggestions';
+// Import for EnhancedEntitySuggestions removed - file doesn't exist
 import BreadcrumbNav, { NavHistoryItem } from './header/BreadcrumbNav';
 import RecentlyViewedEntities from './suggestions/RecentlyViewedEntities';
 
@@ -93,7 +92,6 @@ import {
 
 // Lazily load heavier components
 const LazyEntitySuggestionsContainer = lazy(() => import('./suggestions/EntitySuggestionsContainer'));
-const LazyEnhancedEntitySuggestions = lazy(() => import('./suggestions/EnhancedEntitySuggestions'));
 const LazyRecentlyViewedEntities = lazy(() => import('./suggestions/RecentlyViewedEntities'));
 
 // Constants for performance tuning
@@ -202,9 +200,15 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([]);
   const [previousNodes, setPreviousNodes] = useState<Map<string, EntityDataType>>(new Map());
   const apiClient = useApiClient();
-  const { flags } = useFeatureFlags();
   const isMounted = useIsMounted();
   const toast = useToast();
+  
+  // Feature flags - hardcoded values since feature flags system was removed
+  const enabledFeatures = {
+    enableSuggestions: true,
+    enableActivityTimeline: true,
+    enableMachineLearning: true
+  };
   
   // Track which tabs have been viewed for optimization
   const viewedTabsRef = useRef<Set<PanelTabType>>(new Set(['details']));
@@ -234,8 +238,8 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   // Track when the panel has fully loaded for smoother animations
   const [isPanelMounted, setIsPanelMounted] = useState(false);
 
-  // Track tab changes for animations
-  const [prevTab, setPrevTab] = useState<PanelTabType>(activeTab);
+  // Track tab changes for animations - using ref instead of state
+  const prevTabRef = useRef<PanelTabType>(activeTab);
 
   // Fetch entity data with caching
   useEffect(() => {
@@ -393,15 +397,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     fetchEntityData();
   }, [selectedNode, apiClient, previousNodes, isMounted]);
 
-  // Optimized fetch for relationships data
+  // Optimized fetch for relationships data - always execute hooks in the same order
   useEffect(() => {
-    if (!selectedNode || !entityData) return;
-    
-    // Always check if the tab is active or has been viewed, but don't skip hook execution
-    const shouldFetchData = viewedTabsRef.current.has('related') || activeTab === 'related';
+    // Always execute the same hooks each time regardless of condition
+    const shouldFetchData = selectedNode && entityData && (viewedTabsRef.current.has('related') || activeTab === 'related');
     
     const fetchRelationships = async () => {
-      // Only proceed with data fetching if needed
       if (!shouldFetchData) {
         return;
       }
@@ -458,14 +459,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
     fetchRelationships();
   }, [selectedNode, entityData, activeTab, apiClient, isMounted]);
 
-  // Optimized fetch for activity history
+  // Optimized fetch for activity history - always execute hooks in the same order
   useEffect(() => {
-    if (!selectedNode || !entityData) return;
-    
-    // Determine if we should fetch activity data, but don't skip hook execution
-    const featureEnabled = flags.enableActivityTimeline;
-    const tabActiveOrViewed = viewedTabsRef.current.has('activity') || activeTab === 'activity';
-    const shouldFetchActivity = featureEnabled && tabActiveOrViewed;
+    // Always execute the same hooks in the same order every time
+    const shouldFetchActivity = selectedNode && entityData && 
+      enabledFeatures.enableActivityTimeline && 
+      (viewedTabsRef.current.has('activity') || activeTab === 'activity');
 
     const fetchActivityHistory = async () => {
       // Only proceed with data fetching if needed
@@ -614,8 +613,10 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
   }, [handleNodeNavigation, handleEntityAction]);
 
   // Render the appropriate panel based on entity type using memoization
+  // Always return a component even when data is missing to maintain consistent hook execution
   const renderEntityPanel = useCallback(() => {
-    if (!selectedNode || !entityData) return null;
+    // Always execute the same hooks, even with null data
+    // Return early but with a placeholder instead of null
 
     // Use Profiler for performance tracking in development
     const withProfiler = (id: string, component: JSX.Element): JSX.Element => {
@@ -673,6 +674,16 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
       );
     }
     
+    // If we're missing data but the callback is still running,
+    // return a placeholder component to maintain hook count consistency
+    if (!selectedNode || !entityData) {
+      return withProfiler("EntityDetailsPlaceholder",
+        <Box p={4}>
+          <Text color="gray.500">Loading entity details...</Text>
+        </Box>
+      );
+    }
+
     // Default fallback for other entity types
     return withProfiler("EntityDetails",
       <EntityDetails 
@@ -868,7 +879,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
 
   // Update previous tab reference
   useEffect(() => {
-    setPrevTab(activeTab);
+    prevTabRef.current = activeTab;
   }, [activeTab]);
   
   // Optimized relationships rendering - limit to prevent slowdowns with large datasets
@@ -987,14 +998,13 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
           p={4}
           position="relative"
         >
-          {/* Changed AnimatePresence mode from "wait" to "sync" to fix hook error */}
-          <AnimatePresence mode="sync">
+          {/* Content inside AnimatePresence - each tab content has its own key */}
             {activeTab === 'details' && (
               <LazyPanel
                 active={true}
                 tabId="details"
                 key="details-panel"
-                keepMounted={true}
+                keepMounted={false}
                 animationVariant="fade"
                 transitionDuration={0.4}
                 maintainHeight={false}
@@ -1011,25 +1021,17 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                     align="stretch"
                     id="panel-details"
                   >
-                    {/* Entity-specific details with enhanced animations */}
-                    <EnhancedAnimatedTransition 
-                      in={true}
-                      variant="entityCard"
-                      entityType={selectedNode.type}
-                      customIndex={0}
-                      key={`entity-panel-${selectedNode.id}`}
-                    >
-                      <AnimatedContainer entityType={selectedNode.type} isActive={true}>
-                        {renderEntityPanel()}
-                      </AnimatedContainer>
-                    </EnhancedAnimatedTransition>
+                    {/* Enhanced animations removed */}
+                    <Box>
+                      {renderEntityPanel()}
+                    </Box>
                     
-                    {/* ML-based entity suggestions with enhanced animations */}
-                    {flags.enableSuggestions && shouldLoadSecondary && (
-                      <EnhancedAnimatedTransition in={true} variant="slideInUp" customIndex={1} delay={0.1}>
+                    {/* ML-based entity suggestions - animations removed */}
+                    {enabledFeatures.enableSuggestions && shouldLoadSecondary && (
+                      <Box>
                         <Suspense fallback={<LoadingFallback />}>
-                          {flags.enableMachineLearning ? (
-                            <LazyEnhancedEntitySuggestions
+                          {enabledFeatures.enableMachineLearning ? (
+                            <LazyEntitySuggestionsContainer
                               entityId={selectedNode.id}
                               entityType={selectedNode.type}
                               onSuggestionClick={(id, type, label) => {
@@ -1055,12 +1057,12 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                             />
                           )}
                         </Suspense>
-                      </EnhancedAnimatedTransition>
+                      </Box>
                     )}
                     
-                    {/* Recently viewed entities with enhanced animations */}
+                    {/* Recently viewed entities - animations removed */}
                     {navHistory.length > 1 && shouldLoadTertiary && (
-                      <EnhancedAnimatedTransition in={true} variant="fadeSlideIn" customIndex={2} delay={0.2}>
+                      <Box>
                         <Suspense fallback={<LoadingFallback />}>
                           <LazyRecentlyViewedEntities 
                             items={navHistory} 
@@ -1069,16 +1071,11 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                             currentEntityId={selectedNode.id}
                           />
                         </Suspense>
-                      </EnhancedAnimatedTransition>
+                      </Box>
                     )}
   
-                    {/* Enhanced Entity-Specific Action Buttons with advanced animations */}
-                    <EnhancedAnimatedTransition 
-                      in={true}
-                      variant="scaleIn" 
-                      customIndex={3}
-                      delay={0.3}
-                    >
+                    {/* Entity-Specific Action Buttons - animations removed */}
+                    <Box>
                       <EnhancedEntityActions 
                         entityType={selectedNode.type} 
                         entityId={selectedNode.id}
@@ -1095,13 +1092,13 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                           console.log(`Action ${action} completed:`, result);
                         }}
                       />
-                    </EnhancedAnimatedTransition>
+                    </Box>
                   </VStack>
                 </AnimatedTransition>
               </LazyPanel>
             )}
             
-            {/* Related Tab Content - lazily loaded */}
+            {/* Related Tab Content - lazily loaded - will mount only when active */}
             {activeTab === 'related' && (
               <LazyPanel
                 active={true}
@@ -1132,7 +1129,7 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
               </LazyPanel>
             )}
             
-            {/* Activity Tab Content - lazily loaded */}
+            {/* Activity Tab Content - lazily loaded - will mount only when active */}
             {activeTab === 'activity' && (
               <LazyPanel
                 active={true}
@@ -1161,7 +1158,6 @@ const ContextPanel: React.FC<ContextPanelProps> = ({
                 </AnimatedTransition>
               </LazyPanel>
             )}
-          </AnimatePresence>
         </Box>
       </Box>
     </motion.div>

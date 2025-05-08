@@ -1,16 +1,17 @@
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, Union
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, func
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_tenant_id_from_token
 from app.db.session import get_db_session
 from app import schemas, models, crud
 from app.models.node import Node
 from app.models.edge import Edge
 from app.core.neighbour_cache import get_neighbors, set_neighbors
+from app.models.user import User
 
 router = APIRouter()
 
@@ -647,6 +648,118 @@ async def search_hierarchy(
     
     return results
     
+@router.get("/dev/graph/{tenant_id}", response_model=Dict[str, Any])
+async def get_dev_graph_data(
+    tenant_id: UUID,
+    limit: Optional[int] = 1000,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """
+    Development endpoint to get graph data without authentication.
+    This endpoint is for development purposes only.
+    
+    Parameters:
+    - tenant_id: UUID of the tenant to get graph data for
+    - limit: Optional limit on the number of nodes to return
+    
+    Returns:
+    - Dictionary with nodes and edges for the graph visualization
+    """
+    print(f"DEV ENDPOINT: Processing graph data request for tenant: {tenant_id}")
+    
+    try:
+        # Query nodes - select specific columns to avoid position column issues
+        node_query = select(
+            Node.id,
+            Node.tenant_id,
+            Node.type,
+            Node.props,
+            Node.x,
+            Node.y
+        ).where(Node.tenant_id == tenant_id).limit(limit)
+        
+        node_result = await db.execute(node_query)
+        nodes = node_result.all()
+        
+        print(f"DEV ENDPOINT: Found {len(nodes)} nodes for tenant: {tenant_id}")
+        
+        # Get node IDs for edge query
+        node_ids = [node.id for node in nodes]
+        
+        # Query edges where both source and target are in the selected nodes
+        edge_query = select(Edge).where(
+            and_(
+                Edge.tenant_id == tenant_id,
+                Edge.src.in_(node_ids),
+                Edge.dst.in_(node_ids)
+            )
+        )
+        edge_result = await db.execute(edge_query)
+        edges = edge_result.scalars().all()
+        
+        print(f"DEV ENDPOINT: Found {len(edges)} edges for tenant: {tenant_id}")
+        
+        # Format nodes for response
+        formatted_nodes = []
+        for node in nodes:
+            # Extract the name and entity_id from props
+            props = node.props or {}
+            if isinstance(props, str):
+                # Parse JSON if needed
+                import json
+                try:
+                    props = json.loads(props)
+                except:
+                    props = {}
+                    
+            name = props.get("name", "Unnamed")
+            entity_id = props.get("entity_id", str(node.id))
+            
+            # Create position object for compatibility
+            position = {
+                "x": float(node.x) if node.x is not None else 0,
+                "y": float(node.y) if node.y is not None else 0
+            }
+            
+            formatted_nodes.append({
+                "id": str(node.id),
+                "label": name,
+                "type": node.type,
+                "x": position["x"],  # Add x directly for some visualization libraries
+                "y": position["y"],  # Add y directly for some visualization libraries
+                "position": position, # Add position object for others
+                "data": {
+                    "entity_id": entity_id,
+                    "name": name,
+                    **(props if isinstance(props, dict) else {})
+                }
+            })
+        
+        # Format edges for response
+        formatted_edges = []
+        for edge in edges:
+            formatted_edges.append({
+                "id": str(edge.id),
+                "source": str(edge.src),
+                "target": str(edge.dst),
+                "type": edge.label,  # Add type for compatibility
+                "label": edge.label,
+                "data": edge.props or {}
+            })
+        
+        response_data = {
+            "nodes": formatted_nodes,
+            "edges": formatted_edges
+        }
+        
+        print(f"DEV ENDPOINT: Returning {len(formatted_nodes)} formatted nodes and {len(formatted_edges)} formatted edges")
+        return response_data
+    except Exception as e:
+        import traceback
+        print(f"DEV ENDPOINT: Error processing graph data: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error processing graph data: {str(e)}")
+
 @router.get("/graph", response_model=Dict[str, Any])
 async def get_graph_data(
     limit: Optional[int] = 1000,

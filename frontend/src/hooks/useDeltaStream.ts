@@ -1,8 +1,8 @@
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import { useEffect, useRef, useState } from 'react';
 import { debounce } from 'lodash';
-import { useAuth } from '../context/AuthContext';
-import { useFeatureFlags } from '../utils/featureFlags';
+import { useAuth } from '../auth/AuthContext';
+import { tokenManager } from '../auth/TokenManager';
 
 interface DeltaNode {
   id: string;
@@ -44,9 +44,11 @@ type DeltaStreamSubscriber = {
  */
 const useDeltaStream = (onMessage?: (data: DeltaData) => void) => {
   const wsRef = useRef<ReconnectingWebSocket | null>(null);
-  const { flags } = useFeatureFlags();
-  const { isAuthenticated, token } = useAuth(); // Get token from auth context
+  const { isAuthenticated } = useAuth(); // Get auth state from context
   const [connectionError, setConnectionError] = useState<boolean>(false);
+  
+  // Feature flags removed, use a constant instead
+  const enableDeltaStream = false; // Delta stream is disabled
   
   const debouncedOnMessage = useRef(
     debounce((data: DeltaData) => {
@@ -57,77 +59,17 @@ const useDeltaStream = (onMessage?: (data: DeltaData) => void) => {
   ).current;
 
   useEffect(() => {
-    // Reset connection error when auth changes
-    setConnectionError(false);
+    // Simplified implementation that doesn't attempt WebSocket connections
+    // Log an informative message instead
+    console.log('Delta stream functionality has been disabled');
     
-    // Only try to connect if authenticated and feature is enabled
-    if (!isAuthenticated || !flags.enableDeltaStream) {
-      return;
-    }
-    
-    if (!token) {
-      console.log('Delta stream not connecting: No token available');
-      setConnectionError(true);
-      return;
-    }
-    
-    const wsOptions = {
-      reconnectInterval: 2000,
-      maxReconnectInterval: 10000,
-      reconnectDecay: 1.5,
-      maxRetries: 5, // Reduced max retries
-    };
-
-    // Calculate WebSocket URL
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8001' : window.location.host;
-    const wsUrl = `${protocol}//${host}/api/v1/ws/delta?token=${encodeURIComponent(token || '')}`;
-    
-    // Avoid logging token information, even if redacted
-    const redactedUrl = wsUrl.replace(/token=.*/, 'token=REDACTED');
-    const ws = new ReconnectingWebSocket(wsUrl, [], wsOptions);
-    wsRef.current = ws;
-
-    ws.addEventListener('open', () => {
-      console.log('Delta stream connected');
-      setConnectionError(false); // Reset error state on successful connection
-    });
-
-    ws.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        debouncedOnMessage(data);
-      } catch (err) {
-        console.error('Failed to parse delta stream message:', err);
-      }
-    });
-
-    ws.addEventListener('close', () => {
-      console.log('Delta stream disconnected, attempting to reconnect...');
-    });
-
-    ws.addEventListener('error', (error) => {
-      console.error('Delta stream connection error', error);
-      setConnectionError(true);
-      
-      // Don't keep trying forever if server doesn't support the feature
-      if (wsRef.current && wsRef.current._retryCount > 3) {
-        console.log('Multiple connection failures - disabling reconnect attempts');
-        console.log('This is expected during development if the WebSocket endpoint is not configured.');
-        console.log('The map will still work with polling instead of WebSockets.');
-        wsRef.current.close();
-      }
-    });
-
+    // Return cleanup function
     return () => {
-      debouncedOnMessage.flush();
-      
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+      if (debouncedOnMessage) {
+        debouncedOnMessage.flush();
       }
     };
-  }, [debouncedOnMessage, token, flags.enableDeltaStream, isAuthenticated]);
+  }, [debouncedOnMessage]);
   
   const subscribe = (dataType: string, callback: (data: unknown, operation: string) => void): DeltaStreamSubscriber => {
     // Simpler implementation that just provides the subscription interface

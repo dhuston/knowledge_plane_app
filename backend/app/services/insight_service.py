@@ -5,7 +5,7 @@ from uuid import UUID
 import re
 import json
 from datetime import datetime, timedelta
-import networkx as nx
+# Removed networkx dependency
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 import random  # For mock data generation

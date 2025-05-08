@@ -24,8 +24,9 @@ const env: EnvConfig = {
   AZURE_OPENAI_DEPLOYMENT: import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT as string | undefined,
   OPENAI_MODEL: import.meta.env.VITE_OPENAI_MODEL as string | undefined,
   NODE_ENV: import.meta.env.MODE as 'development' | 'production' | 'test',
-  // Fixed API_BASE_URL to use the proper format with the /api/v1 prefix
-  API_BASE_URL: import.meta.env.VITE_API_BASE_URL as string || '/api/v1',
+  // API_BASE_URL should be just /api when inside Docker with Vite proxy
+  // or a full URL like http://localhost:8001 when running outside Docker
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL as string || '',
   // Debug mode
   DEBUG: import.meta.env.VITE_DEBUG === 'true',
   // Auth type: 'legacy' or 'simple'

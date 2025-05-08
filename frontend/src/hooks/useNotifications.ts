@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { apiClient } from '../api/client';
 import useDeltaStream from './useDeltaStream';
 import { AppError, ErrorCategory } from '../utils/errorHandling';
+import { IS_DEVELOPMENT } from '../config/env';
 
 export interface Notification {
   id: string;
@@ -42,20 +43,20 @@ export default function useNotifications() {
   // Initialize with safe default values
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [preferences, setPreferences] = useState<NotificationPreference[]>(DEFAULT_PREFERENCES);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Start with not loading to avoid spinner flicker
   const [error, setError] = useState<AppError | null>(null);
-  const [apiAvailable, setApiAvailable] = useState<boolean>(true);
+  const [apiAvailable, setApiAvailable] = useState<boolean>(false); // Start pessimistic for better UX
   
   // Always create this ref regardless of other conditions - fixes hook order issue
   const hookOrderRef = useRef('hook-order-fixed');
   
   // Track endpoint availability for specific notification endpoints
   const [endpointStatus, setEndpointStatus] = useState<Record<string, boolean>>({
-    notifications: true,
-    preferences: true,
-    readAll: true,
-    dismissAll: true
+    notifications: false,  // Start with false until we confirm availability
+    preferences: false,    // Start with false until we confirm availability
+    readAll: false,
+    dismissAll: false
   });
   
   // Get delta stream subscription - ALWAYS call this hook, never conditionally
@@ -69,16 +70,68 @@ export default function useNotifications() {
   
   // Check API availability for notifications endpoint
   const checkNotificationEndpointAvailability = useCallback(async () => {
-    const available = await apiClient.isEndpointAvailable('/api/v1/notifications');
-    setEndpointStatus(prev => ({ ...prev, notifications: available }));
-    return available;
+    try {
+      // In development mode, also check the dev endpoint
+      if (IS_DEVELOPMENT) {
+        try {
+          const currentTenant = localStorage.getItem('knowledge_plane_tenant');
+          if (currentTenant) {
+            const devEndpoint = `/api/v1/notifications/dev/${currentTenant}`;
+            const devAvailable = await apiClient.isEndpointAvailable(devEndpoint);
+            if (devAvailable) {
+              console.log("[DEV MODE] Dev notifications endpoint is available");
+              setEndpointStatus(prev => ({ ...prev, notifications: true }));
+              return true;
+            }
+          }
+        } catch (devCheckError) {
+          console.log("[DEV MODE] Error checking dev notifications endpoint: silently handling");
+        }
+      }
+      
+      // Check the standard endpoint
+      const available = await apiClient.isEndpointAvailable('/api/v1/notifications');
+      setEndpointStatus(prev => ({ ...prev, notifications: available }));
+      return available;
+    } catch (error) {
+      // Suppress errors and return false
+      console.log("[useNotifications] Error checking notifications endpoint: silently handling");
+      setEndpointStatus(prev => ({ ...prev, notifications: false }));
+      return false;
+    }
   }, []);
   
   // Check API availability for preferences endpoint
   const checkPreferencesEndpointAvailability = useCallback(async () => {
-    const available = await apiClient.isEndpointAvailable('/api/v1/notifications/preferences');
-    setEndpointStatus(prev => ({ ...prev, preferences: available }));
-    return available;
+    try {
+      // In development mode, also check the dev endpoint
+      if (IS_DEVELOPMENT) {
+        try {
+          const currentTenant = localStorage.getItem('knowledge_plane_tenant');
+          if (currentTenant) {
+            const devEndpoint = `/api/v1/notifications/dev/${currentTenant}/preferences`;
+            const devAvailable = await apiClient.isEndpointAvailable(devEndpoint);
+            if (devAvailable) {
+              console.log("[DEV MODE] Dev notification preferences endpoint is available");
+              setEndpointStatus(prev => ({ ...prev, preferences: true }));
+              return true;
+            }
+          }
+        } catch (devCheckError) {
+          console.log("[DEV MODE] Error checking dev preferences endpoint: silently handling");
+        }
+      }
+      
+      // Check the standard endpoint
+      const available = await apiClient.isEndpointAvailable('/api/v1/notifications/preferences');
+      setEndpointStatus(prev => ({ ...prev, preferences: available }));
+      return available;
+    } catch (error) {
+      // Suppress errors and return false
+      console.log("[useNotifications] Error checking preferences endpoint: silently handling");
+      setEndpointStatus(prev => ({ ...prev, preferences: false }));
+      return false;
+    }
   }, []);
   
   // Fetch notifications with improved error handling
@@ -93,7 +146,7 @@ export default function useNotifications() {
     try {
       // First check if endpoint is available
       const isAvailable = await checkNotificationEndpointAvailability();
-      if (!isAvailable) {
+      if (!isAvailable && !IS_DEVELOPMENT) {
         setApiAvailable(false);
         setNotifications([]);
         setUnreadCount(0);
@@ -101,21 +154,85 @@ export default function useNotifications() {
         return { data: [] };
       }
       
-      // Fetch notifications from API
-      const response = await apiClient.get<{data: Notification[]}>('/notifications');
-      
-      // Process response with defensive checks
-      if (response && Array.isArray(response.data)) {
-        setNotifications(response.data);
-        setUnreadCount(response.data.filter((n: Notification) => !n.read_at).length);
-      } else {
-        // Set safe default values
-        setNotifications([]);
-        setUnreadCount(0);
+      // Check if we're in development mode - use the development endpoint if so
+      if (IS_DEVELOPMENT) {
+        console.log("[DEV MODE] Using unauthenticated dev endpoint for notifications");
+        try {
+          // Get the current tenant from local storage
+          const currentTenant = localStorage.getItem('knowledge_plane_tenant') || '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+          console.log(`[DEV MODE] Using tenant ${currentTenant}`);
+          
+          // Use the development endpoint that doesn't require authentication
+          const devData = await apiClient.getDevNotifications(currentTenant);
+          
+          // Process response
+          if (devData && Array.isArray(devData)) {
+            setNotifications(devData);
+            setUnreadCount(devData.filter((n: Notification) => !n.read_at).length);
+            console.log(`[DEV MODE] Loaded ${devData.length} notifications from dev endpoint`);
+          } else {
+            setNotifications([]);
+            setUnreadCount(0);
+            console.log("[DEV MODE] No notifications returned from dev endpoint");
+          }
+          
+          setIsLoading(false);
+          return { data: devData || [] };
+        } catch (devErr) {
+          console.error("[DEV MODE] Failed to fetch from dev endpoint:", devErr);
+          console.log("[DEV MODE] Falling back to standard endpoints");
+          // Continue to standard endpoint as fallback
+        }
       }
       
-      setIsLoading(false);
-      return response;
+      // Fetch notifications from API with proper authorization
+      try {
+        const response = await apiClient.get<{data: Notification[]}>('/notifications');
+        
+        // Process response with defensive checks
+        if (response && Array.isArray(response.data)) {
+          setNotifications(response.data);
+          setUnreadCount(response.data.filter((n: Notification) => !n.read_at).length);
+        } else {
+          // Set safe default values
+          setNotifications([]);
+          setUnreadCount(0);
+        }
+        
+        setIsLoading(false);
+        return { data: response?.data || [] };
+      } catch (fetchError) {
+        // Handle 401 errors specifically 
+        if (fetchError.status === 401 || (fetchError.message && fetchError.message.includes('401'))) {
+          console.log('[Debug] Notifications API returned 401 Unauthorized');
+          setEndpointStatus(prev => ({ ...prev, notifications: false }));
+          
+          // In dev mode, try the dev endpoint as a fallback
+          if (IS_DEVELOPMENT) {
+            console.log("[DEV MODE] Got 401 from standard endpoint, trying dev endpoint");
+            try {
+              const currentTenant = localStorage.getItem('knowledge_plane_tenant') || '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+              const devData = await apiClient.getDevNotifications(currentTenant);
+              
+              if (devData && Array.isArray(devData)) {
+                setNotifications(devData);
+                setUnreadCount(devData.filter((n: Notification) => !n.read_at).length);
+                console.log(`[DEV MODE] Successfully loaded ${devData.length} notifications from dev endpoint after 401`);
+                setIsLoading(false);
+                return { data: devData || [] };
+              }
+            } catch (devFallbackErr) {
+              console.error("[DEV MODE] Dev endpoint fallback failed:", devFallbackErr);
+            }
+          }
+          
+          setNotifications([]);
+          setUnreadCount(0);
+        }
+        
+        setIsLoading(false);
+        return { data: [] };
+      }
     } catch (err) {
       // Enhanced error handling using AppError
       const appError = err instanceof AppError ? err : new AppError(
@@ -149,25 +266,85 @@ export default function useNotifications() {
     try {
       // First check if endpoint is available
       const isAvailable = await checkPreferencesEndpointAvailability();
-      if (!isAvailable) {
+      if (!isAvailable && !IS_DEVELOPMENT) {
         setApiAvailable(false);
         setPreferences(DEFAULT_PREFERENCES);
         return { data: { preferences: DEFAULT_PREFERENCES } };
       }
       
-      // Fetch preferences from API
-      const response = await apiClient.get<UserNotificationSettings>('/notifications/preferences');
+      // Check if we're in development mode - use the development endpoint if so
+      if (IS_DEVELOPMENT) {
+        console.log("[DEV MODE] Using unauthenticated dev endpoint for notification preferences");
+        try {
+          // Get the current tenant from local storage
+          const currentTenant = localStorage.getItem('knowledge_plane_tenant') || '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+          console.log(`[DEV MODE] Using tenant ${currentTenant}`);
+          
+          // Use the development endpoint that doesn't require authentication
+          const devData = await apiClient.getDevNotificationPreferences(currentTenant);
+          
+          // Process response
+          if (devData?.preferences && Array.isArray(devData.preferences)) {
+            setPreferences(devData.preferences);
+            console.log(`[DEV MODE] Loaded ${devData.preferences.length} notification preferences from dev endpoint`);
+            return { data: devData };
+          } else if (devData && Array.isArray(devData)) {
+            // Handle case where preferences are returned as a direct array
+            setPreferences(devData);
+            console.log(`[DEV MODE] Loaded ${devData.length} notification preferences from dev endpoint (array format)`);
+            return { data: { preferences: devData } };
+          } else {
+            console.log("[DEV MODE] No preferences returned from dev endpoint, using defaults");
+          }
+        } catch (devErr) {
+          console.error("[DEV MODE] Failed to fetch preferences from dev endpoint:", devErr);
+          console.log("[DEV MODE] Falling back to standard endpoints");
+          // Continue to standard endpoint as fallback
+        }
+      }
       
-      // Process response with enhanced defensive checks
-      if (response?.data?.preferences && Array.isArray(response.data.preferences)) {
-        setPreferences(response.data.preferences);
-        return response;
-      } 
-      
-      // Handle case where API returns preferences directly as array
-      if (response?.data && Array.isArray(response.data)) {
-        setPreferences(response.data);
-        return { data: { preferences: response.data } };
+      // Fetch preferences from API with error handling for 401
+      let response;
+      try {
+        response = await apiClient.get<UserNotificationSettings>('/notifications/preferences');
+        
+        // Process response with enhanced defensive checks
+        if (response?.data?.preferences && Array.isArray(response.data.preferences)) {
+          setPreferences(response.data.preferences);
+          return response;
+        } 
+        
+        // Handle case where API returns preferences directly as array
+        if (response?.data && Array.isArray(response.data)) {
+          setPreferences(response.data);
+          return { data: { preferences: response.data } };
+        }
+      } catch (fetchError) {
+        // Handle 401 errors specifically
+        if (fetchError.status === 401 || (fetchError.message && fetchError.message.includes('401'))) {
+          console.log('[Debug] Preferences API returned 401 Unauthorized');
+          setEndpointStatus(prev => ({ ...prev, preferences: false }));
+          
+          // In dev mode, try the dev endpoint as a fallback
+          if (IS_DEVELOPMENT) {
+            console.log("[DEV MODE] Got 401 from standard endpoint, trying dev endpoint for preferences");
+            try {
+              const currentTenant = localStorage.getItem('knowledge_plane_tenant') || '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+              const devData = await apiClient.getDevNotificationPreferences(currentTenant);
+              
+              if (devData?.preferences && Array.isArray(devData.preferences)) {
+                setPreferences(devData.preferences);
+                console.log(`[DEV MODE] Successfully loaded ${devData.preferences.length} preferences from dev endpoint after 401`);
+                return { data: devData };
+              }
+            } catch (devFallbackErr) {
+              console.error("[DEV MODE] Dev endpoint fallback failed for preferences:", devFallbackErr);
+            }
+          }
+          
+          setPreferences(DEFAULT_PREFERENCES);
+        }
+        return { data: { preferences: DEFAULT_PREFERENCES } };
       }
       
       // Handle case where API returns empty or invalid data
@@ -393,55 +570,131 @@ export default function useNotifications() {
   useEffect(() => {
     const checkApiAvailability = async () => {
       try {
-        const isAvailable = await apiClient.isApiAvailable();
+        // Check if the user is authenticated first
+        const authToken = localStorage.getItem('knowledge_plane_token');
+        if (!authToken) {
+          console.log("[useNotifications] No auth token found, skipping API checks");
+          setApiAvailable(false);
+          setEndpointStatus({
+            notifications: false,
+            preferences: false,
+            readAll: false,
+            dismissAll: false
+          });
+          return;
+        }
+        
+        // Try isApiAvailable but don't fail if it throws
+        let isAvailable = false;
+        try {
+          isAvailable = await apiClient.isApiAvailable();
+        } catch (err) {
+          console.log("[useNotifications] Error checking API availability: silently handling");
+          isAvailable = false;
+        }
+        
         setApiAvailable(isAvailable);
         
-        // If API is available, check specific endpoints
-        if (isAvailable) {
-          const [notificationsAvailable, preferencesAvailable] = await Promise.all([
+        // Always try to check endpoint status regardless of general API availability
+        // This helps with partial API availability
+        try {
+          const [notificationsAvailable, preferencesAvailable] = await Promise.allSettled([
             checkNotificationEndpointAvailability(),
             checkPreferencesEndpointAvailability()
           ]);
           
           setEndpointStatus(prev => ({
             ...prev,
-            notifications: notificationsAvailable,
-            preferences: preferencesAvailable
+            notifications: notificationsAvailable.status === 'fulfilled' ? notificationsAvailable.value : false,
+            preferences: preferencesAvailable.status === 'fulfilled' ? preferencesAvailable.value : false
           }));
+        } catch (endpointErr) {
+          // If we can't check endpoints, set all to false
+          setEndpointStatus({
+            notifications: false,
+            preferences: false,
+            readAll: false,
+            dismissAll: false
+          });
         }
       } catch (err) {
+        // Ensure we have a safe default state if anything goes wrong
         setApiAvailable(false);
+        setEndpointStatus({
+          notifications: false,
+          preferences: false,
+          readAll: false,
+          dismissAll: false
+        });
       }
     };
     
-    checkApiAvailability();
+    // Add a small delay to ensure auth token is available
+    const timer = setTimeout(() => {
+      checkApiAvailability();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
   }, [checkNotificationEndpointAvailability, checkPreferencesEndpointAvailability]);
 
   // Initial data loading with error handling
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true);
+      // First check if we're authenticated
+      const authToken = localStorage.getItem('knowledge_plane_token');
+      if (!authToken) {
+        console.log("[useNotifications] No auth token found, skipping data loading");
+        setApiAvailable(false);
+        setNotifications([]);
+        setUnreadCount(0);
+        setPreferences(DEFAULT_PREFERENCES);
+        setIsLoading(false);
+        return;
+      }
+      
       try {
-        // Use Promise.allSettled to try both operations and continue even if one fails
-        const results = await Promise.allSettled([
-          fetchNotifications(),
-          fetchPreferences()
-        ]);
+        setIsLoading(true);
         
-        // Check results to determine if API is available
-        const allRejected = results.every(result => result.status === 'rejected');
-        if (allRejected) {
-          setApiAvailable(false);
+        // Try loading data but suppress any errors that might bubble up
+        try {
+          // Use Promise.allSettled to try both operations and continue even if one fails
+          const results = await Promise.allSettled([
+            fetchNotifications().catch(() => ({ data: [] })), // Catch individual operation errors
+            fetchPreferences().catch(() => ({ data: { preferences: DEFAULT_PREFERENCES } })) // Catch individual operation errors
+          ]);
+          
+          // Check results to determine if API is available
+          const allRejected = results.every(result => result.status === 'rejected');
+          if (allRejected) {
+            console.log("[useNotifications] All data loading operations failed");
+            setApiAvailable(false);
+          }
+        } catch (innerError) {
+          console.log("[useNotifications] Error loading notification data: silently handling");
+          // Do nothing - we've already set default values
         }
       } catch (error) {
+        // Set up safe defaults
         setApiAvailable(false);
+        setNotifications([]);
+        setUnreadCount(0);
+        setPreferences(DEFAULT_PREFERENCES);
+        console.log("[useNotifications] Critical error in loadData: using defaults");
       } finally {
         setIsLoading(false);
       }
     };
     
-    loadData();
-  }, [fetchNotifications, fetchPreferences]);
+    // Add delay to ensure auth token is set
+    const timer = setTimeout(() => {
+      // Only try to load data if we think endpoints are available
+      if (endpointStatus.notifications || endpointStatus.preferences) {
+        loadData();
+      }
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, [fetchNotifications, fetchPreferences, endpointStatus.notifications, endpointStatus.preferences]);
 
   // Set up real-time notification subscription
   useEffect(() => {

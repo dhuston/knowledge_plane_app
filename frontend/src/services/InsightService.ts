@@ -11,133 +11,25 @@ import {
   PatternType 
 } from './PatternDetectionService';
 
-// Mock data generator for development - used as fallback if pattern detection fails
-const generateMockInsights = (count: number, timePeriod: string): Insight[] => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `insight-${i}`,
-    title: getRandomTitle(timePeriod),
-    description: getRandomDescription(timePeriod),
-    category: getRandomCategory(),
-    createdAt: getRandomDate(timePeriod),
-    relevanceScore: Math.random() * 0.5 + 0.5, // Score between 0.5 and 1.0
+// Create a system notice about AI service availability
+const createAIServiceNotice = (timePeriod: InsightTimePeriod): Insight => {
+  return {
+    id: `ai-service-notice-${Date.now()}`,
+    title: 'AI Insights Service Configuration Required',
+    description: 'To enable AI-powered insights, please configure the BMS Azure OpenAI integration. Refer to the documentation at /docs/BMS_AZURE_OPENAI_INTEGRATION.md for setup instructions.',
+    category: InsightCategory.SYSTEM,
+    createdAt: new Date().toISOString(),
+    relevanceScore: 1.0,
     source: {
-      type: getRandomSourceType(),
-      id: `source-${Math.floor(Math.random() * 100)}`
+      type: InsightSourceType.SYSTEM,
+      id: 'system-notice'
     },
-    relatedEntities: generateRandomEntities(1 + Math.floor(Math.random() * 3)),
-    suggestedActions: generateRandomActions(1 + Math.floor(Math.random() * 2))
-  }));
-};
-
-// Helper functions for generating mock data
-const getRandomTitle = (timePeriod: string): string => {
-  const titles = [
-    'Frequent collaboration pattern detected',
-    'Knowledge gap identified in project team',
-    'Communication cluster forming between teams',
-    'Potential project bottleneck detected',
-    'Meeting pattern may impact productivity',
-    'Untapped expertise identified in your network',
-    'Cross-team collaboration opportunity',
-    'Resource allocation might need adjustment',
-    'Successful pattern from previous projects detected'
-  ];
-  
-  const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-  return randomTitle;
-};
-
-const getRandomDescription = (timePeriod: string): string => {
-  const descriptions = [
-    'You\'ve been collaborating frequently with Team Alpha on documentation. Consider formalizing knowledge sharing sessions.',
-    'Your project team might be missing critical expertise in cloud infrastructure that could be needed for upcoming milestones.',
-    'There\'s an emerging communication cluster between Marketing and Design teams that you\'re connected to. This could be leveraged for better cross-functional work.',
-    'Based on activity patterns, the current sprint might be at risk of delays due to dependency bottlenecks.',
-    'Your meeting patterns have changed recently, with 30% more time spent in cross-team meetings than last month.',
-    'There\'s untapped UX design expertise in your extended network that could benefit your current project.',
-    'We\'ve detected a potential opportunity to collaborate with Team Beta based on overlapping project goals.',
-    'Resource allocation on Project X shows potential imbalance, with 70% of tasks assigned to 30% of team members.',
-    'Your most successful previous projects had similar communication patterns to what we\'re seeing in your current work.'
-  ];
-  
-  const randomDescription = descriptions[Math.floor(Math.random() * descriptions.length)];
-  return randomDescription;
-};
-
-const getRandomCategory = (): InsightCategory => {
-  const categories = [
-    InsightCategory.COLLABORATION,
-    InsightCategory.KNOWLEDGE,
-    InsightCategory.PRODUCTIVITY,
-    InsightCategory.PROJECT,
-    InsightCategory.COMMUNICATION
-  ];
-  
-  return categories[Math.floor(Math.random() * categories.length)];
-};
-
-const getRandomSourceType = (): InsightSourceType => {
-  const sourceTypes = [
-    InsightSourceType.ACTIVITY,
-    InsightSourceType.PROJECT,
-    InsightSourceType.TEAM,
-    InsightSourceType.USER,
-    InsightSourceType.DOCUMENT,
-    InsightSourceType.SYSTEM
-  ];
-  
-  return sourceTypes[Math.floor(Math.random() * sourceTypes.length)];
-};
-
-const getRandomDate = (timePeriod: string): string => {
-  const now = new Date();
-  let daysAgo;
-  
-  switch (timePeriod) {
-    case 'daily': daysAgo = Math.random() * 1; break;
-    case 'weekly': daysAgo = Math.random() * 7; break;
-    case 'monthly': daysAgo = Math.random() * 30; break;
-    default: daysAgo = Math.random() * 7;
-  }
-  
-  return new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000)).toISOString();
-};
-
-const generateRandomEntities = (count: number) => {
-  const entityTypes = ['user', 'team', 'project', 'document'];
-  const connectionTypes = [
-    'frequent collaborator', 
-    'team member',
-    'project dependency',
-    'knowledge source',
-    'related work'
-  ];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    id: `entity-${Math.floor(Math.random() * 100)}`,
-    type: entityTypes[Math.floor(Math.random() * entityTypes.length)],
-    name: `Entity ${Math.floor(Math.random() * 20) + 1}`,
-    connection: connectionTypes[Math.floor(Math.random() * connectionTypes.length)]
-  }));
-};
-
-const generateRandomActions = (count: number) => {
-  const actionTypes = ['schedule', 'message', 'task', 'view', 'other'];
-  const actionLabels = [
-    'Schedule a meeting',
-    'Send a message',
-    'Create a task',
-    'View details',
-    'Share with team',
-    'Add to favorites',
-    'Set reminder'
-  ];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    label: actionLabels[Math.floor(Math.random() * actionLabels.length)],
-    type: actionTypes[Math.floor(Math.random() * actionTypes.length)],
-    icon: 'default-icon'
-  }));
+    relatedEntities: [],
+    suggestedActions: [{
+      label: 'View Documentation',
+      type: 'view'
+    }]
+  };
 };
 
 /**
@@ -151,15 +43,21 @@ export const fetchInsights = async (
     // Use pattern detection service to generate insights
     
     // 1. Fetch user activities
+    console.log(`Fetching user activities for user: ${userId}, period: ${timePeriod}`);
     const activities = await fetchUserActivities(userId, timePeriod);
     
+    if (activities.length === 0) {
+      console.log('No activities found, returning service notice');
+      return [createAIServiceNotice(timePeriod)];
+    }
+    
     // 2. Detect patterns based on the activities
+    console.log(`Detecting patterns from ${activities.length} activities`);
     const patternTypes: PatternType[] = [
       'frequent-collaboration',
       'knowledge-gap',
       'project-risk',
       'productivity-trend'
-      // Add more patterns as implemented
     ];
     
     // Additional context data could be passed here (user profile, team info, etc.)
@@ -170,35 +68,33 @@ export const fetchInsights = async (
     
     const insights = await detectPatterns(activities, contextData, patternTypes);
     
-    // 3. If there were any insights from pattern detection, return them
+    // If we got insights, sort and return them
     if (insights.length > 0) {
-      // If we have at least 3 insights, that's enough
-      if (insights.length >= 3) {
-        console.log(`Returning ${insights.length} insights from pattern detection`);
-        // Sort by relevance score
-        return insights.sort((a, b) => b.relevanceScore - a.relevanceScore);
-      }
-      
-      // If we got some insights but not enough, supplement with mock insights
-      console.log(`Got ${insights.length} insights from pattern detection, adding mock insights`);
-      // Generate some additional mock insights (aim for 5 total)
-      const additionalCount = 5 - insights.length;
-      const mockInsights = generateMockInsights(additionalCount, timePeriod);
-      
-      // Combine real and mock insights, then sort by relevance
-      return [...insights, ...mockInsights].sort((a, b) => b.relevanceScore - a.relevanceScore);
+      console.log(`Returning ${insights.length} insights from pattern detection`);
+      return insights.sort((a, b) => b.relevanceScore - a.relevanceScore);
     }
     
-    // 5. Fallback: If pattern detection returned no insights at all, use all mock data
-    console.log('No insights from pattern detection, using all mock data');
-    const count = timePeriod === 'daily' ? 5 : timePeriod === 'weekly' ? 10 : 15;
-    return generateMockInsights(count, timePeriod);
+    // If pattern detection returned no insights, return a service notice
+    console.log('No insights from pattern detection, returning service notice');
+    return [createAIServiceNotice(timePeriod)];
   } catch (error) {
     console.error('Error generating insights:', error);
     
-    // If anything fails, fall back to mock insights
-    const count = timePeriod === 'daily' ? 5 : timePeriod === 'weekly' ? 8 : 12;
-    return generateMockInsights(count, timePeriod);
+    // If anything fails, return a service notice instead of mock insights
+    return [{
+      id: `ai-service-error-${Date.now()}`,
+      title: 'AI Service Status',
+      description: 'The AI insights service encountered an error. Please check your integration configuration or try again later.',
+      category: InsightCategory.SYSTEM,
+      createdAt: new Date().toISOString(),
+      relevanceScore: 1.0,
+      source: {
+        type: InsightSourceType.SYSTEM,
+        id: 'system-error'
+      },
+      relatedEntities: [],
+      suggestedActions: []
+    }];
   }
 };
 

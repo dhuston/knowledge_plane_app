@@ -4,13 +4,11 @@ import {
   Box, Heading, Text, Flex, Button, VStack, useToast, 
   FormControl, FormLabel, Input, InputGroup, 
   InputRightElement, FormErrorMessage,
-  Spinner, Divider
+  Spinner
 } from "@chakra-ui/react"; 
-import { EmailIcon, LockIcon, ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
-import { useAuth } from '../context/AuthContext';
-
-// Get backend API base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001";
+import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
+import { useAuth } from '../auth/AuthContext';
+import { API_BASE_URL } from '../config/env';
 
 interface AuthMode {
   mode: string;
@@ -18,27 +16,30 @@ interface AuthMode {
   password_auth_enabled: boolean;
 }
 
+/**
+ * Handles user registration for the application
+ */
 export default function RegisterPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { setToken } = useAuth();
+  const { login } = useAuth();
   
-  // State for auth mode
+  // State
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [loadingMode, setLoadingMode] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Form state
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    name: "",
+    password: "",
+    confirmPassword: ""
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({ 
-    email: "", name: "", password: "", confirmPassword: ""
+    email: "", name: "", password: "", confirmPassword: "" 
   });
-  
-  // Loading state
-  const [isLoading, setIsLoading] = useState(false);
   
   // Fetch auth mode when component mounts
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function RegisterPage() {
           const data: AuthMode = await response.json();
           setAuthMode(data);
           
-          // Redirect if not in demo mode and registration is not allowed
+          // Redirect if not in demo mode
           if (data.mode !== "demo") {
             toast({
               title: "Registration not available",
@@ -61,11 +62,9 @@ export default function RegisterPage() {
             navigate("/login");
           }
         } else {
-          console.error("Failed to fetch auth mode");
           setAuthMode({ mode: "demo", oauth_enabled: false, password_auth_enabled: true });
         }
       } catch (error) {
-        console.error("Error fetching auth mode:", error);
         setAuthMode({ mode: "demo", oauth_enabled: false, password_auth_enabled: true });
       } finally {
         setLoadingMode(false);
@@ -75,33 +74,39 @@ export default function RegisterPage() {
     fetchAuthMode();
   }, [navigate, toast]);
 
+  // Handle input changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   // Validate form
   const validateForm = () => {
     const errors = { email: "", name: "", password: "", confirmPassword: "" };
     let isValid = true;
     
-    if (!email) {
+    if (!formData.email) {
       errors.email = "Email is required";
       isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = "Email is invalid";
       isValid = false;
     }
     
-    if (!name) {
+    if (!formData.name) {
       errors.name = "Name is required";
       isValid = false;
     }
     
-    if (!password) {
+    if (!formData.password) {
       errors.password = "Password is required";
       isValid = false;
-    } else if (password.length < 8) {
+    } else if (formData.password.length < 8) {
       errors.password = "Password must be at least 8 characters";
       isValid = false;
     }
     
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       errors.confirmPassword = "Passwords do not match";
       isValid = false;
     }
@@ -121,13 +126,11 @@ export default function RegisterPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
-          name,
-          password,
+          email: formData.email,
+          name: formData.name,
+          password: formData.password,
         }),
       });
       
@@ -146,12 +149,11 @@ export default function RegisterPage() {
         isClosable: true,
       });
       
-      // Store the tokens and navigate to the app
-      setToken(data.access_token, data.refresh_token);
+      // Token is stored automatically when logging in
+      await login(formData.email, formData.password);
       navigate("/workspace");
       
     } catch (error) {
-      console.error("Registration error:", error);
       toast({
         title: "Registration failed",
         description: error instanceof Error ? error.message : "Something went wrong",
@@ -176,20 +178,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <Flex 
-      minHeight="100vh" 
-      alignItems="center" 
-      justifyContent="center" 
-      bg="gray.50"
-    >
-      <Box 
-        p={8} 
-        maxWidth="450px" 
-        borderWidth={1} 
-        borderRadius={8} 
-        boxShadow="lg"
-        bg="white"
-      >
+    <Flex minHeight="100vh" alignItems="center" justifyContent="center" bg="gray.50">
+      <Box p={8} maxWidth="450px" borderWidth={1} borderRadius={8} boxShadow="lg" bg="white">
         <Heading mb={2} textAlign="center">Create Account</Heading>
         <Text mb={6} textAlign="center" color="gray.600">
           Register for demo access to Biosphere AI
@@ -200,9 +190,10 @@ export default function RegisterPage() {
             <FormControl isRequired isInvalid={!!formErrors.email}>
               <FormLabel>Email</FormLabel>
               <Input
+                name="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="Enter your email"
               />
               <FormErrorMessage>{formErrors.email}</FormErrorMessage>
@@ -211,9 +202,10 @@ export default function RegisterPage() {
             <FormControl isRequired isInvalid={!!formErrors.name}>
               <FormLabel>Full Name</FormLabel>
               <Input
+                name="name"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={formData.name}
+                onChange={handleChange}
                 placeholder="Enter your full name"
               />
               <FormErrorMessage>{formErrors.name}</FormErrorMessage>
@@ -223,9 +215,10 @@ export default function RegisterPage() {
               <FormLabel>Password</FormLabel>
               <InputGroup>
                 <Input
+                  name="password"
                   type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={handleChange}
                   placeholder="Create a password (min. 8 characters)"
                 />
                 <InputRightElement width="4.5rem">
@@ -244,9 +237,10 @@ export default function RegisterPage() {
             <FormControl isRequired isInvalid={!!formErrors.confirmPassword}>
               <FormLabel>Confirm Password</FormLabel>
               <Input
+                name="confirmPassword"
                 type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                value={formData.confirmPassword}
+                onChange={handleChange}
                 placeholder="Confirm your password"
               />
               <FormErrorMessage>{formErrors.confirmPassword}</FormErrorMessage>

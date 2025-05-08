@@ -1,9 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-# Check terminal working directory
-
-
-Check Terminal Working Directory: Before executing terminal commands, always verify the current working directory, especially when switching between frontend and backend tasks or after previous cd commands. Use cd explicitly if needed.

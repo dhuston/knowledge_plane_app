@@ -17,8 +17,6 @@ from .activity_log import ActivityLog
 from .node import Node
 from .edge import Edge
 from .notification import Notification
-from .emergent_model import RelationshipStrength, EmergentPattern, FeedbackItem, ModelVersion
-
 __all__ = [
     "User",
     "Tenant",
@@ -30,9 +28,5 @@ __all__ = [
     "Node",
     "Edge",
     "ActivityLog",
-    "Notification",
-    "RelationshipStrength",
-    "EmergentPattern",
-    "FeedbackItem",
-    "ModelVersion"
+    "Notification"
 ]

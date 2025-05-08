@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.crud_activity_log import activity_log as crud_activity_log # Use specific import
 from app import models, schemas # Keep models import if needed elsewhere
-from app.services.llm_service import llm_service
+# LLM service removed - no longer needed
 from app.services.entity_recognition_service import entity_recognition_service
 
 # Import calendar service functions from both providers

@@ -22,9 +22,8 @@ import {
   Tooltip,
 } from "@chakra-ui/react";
 import { FiMap } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
-import WebGLMap from '../map/WebGLMap';
-import MapWithAnalytics from '../map/MapWithAnalytics';
+import { useAuth } from '../../auth/AuthContext';
+import { MapWithAnalytics, WebGLMap, BasicMap } from '../map/core';
 import { MapNode, MapNodeTypeEnum } from '../../types/map';
 import ContextPanel from '../panels/ContextPanel';
 import Header from './Header';
@@ -32,10 +31,10 @@ import SkipNavLink from '../ui/SkipNavLink';
 import { useApiClient } from '../../hooks/useApiClient';
 import { useNavigate } from 'react-router-dom';
 import ErrorBoundary from '../error/ErrorBoundary';
-import MyTeamTile from '../tiles/MyTeamTile';
+// MyTeamTile import removed
 import EntityActionButton from '../actions/EntityActionButton';
 import HighlightedText, { HighlightedTextSegment } from '../text/HighlightedText';
-import { useFeatureFlags } from '../../utils/featureFlags';
+// Feature flags import removed
 import { HierarchyNavigator } from '../hierarchy/HierarchyNavigator';
 import InsightsDailySummary from '../insights/InsightsDailySummary';
 
@@ -49,15 +48,13 @@ const HEADER_HEIGHT = '60px';
 
 export default function MainLayout() {
   const navigate = useNavigate();
-  const { isLoading, setToken, user } = useAuth();
+  const { isLoading, logout, user } = useAuth();
 
   // Workspace view state
   const [workspaceView, setWorkspaceView] = useState<WorkspaceViewType>('command-center');
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
   // State for active view
   const [activeView, setActiveView] = useState<'myWork' | 'explore'>('myWork');
-  // Feature flag state
-  const { flags } = useFeatureFlags();
   // Placeholder until overlaps feature re-implemented
   const projectOverlaps: Record<string, string[]> = {};
   const [isMapLoading, setIsMapLoading] = useState(true);
@@ -72,9 +69,14 @@ export default function MainLayout() {
   // Removed unused hoverBgColor variable
   const glassBgColor = useColorModeValue('rgba(241, 242, 234, 0.8)', 'rgba(38, 38, 38, 0.8)'); // Off-white/cream : Button color with transparency
 
-  const handleLogout = () => {
-    setToken(null);
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+      navigate('/login', { replace: true });
+    }
   };
 
   const handleMapNodeClick = (node: MapNode | null) => {
@@ -149,6 +151,7 @@ export default function MainLayout() {
             <Spinner size="xl" color="primary.500" />
           </Center>
         )}
+        {/* Restored main map - now that BasicMap works successfully */}
         <MapWithAnalytics
           onNodeClick={handleMapNodeClick}
           onLoad={handleMapLoad}
@@ -264,7 +267,7 @@ export default function MainLayout() {
                   </Text>
                 </Flex>
 
-                {/* Use client-side InsightsDailySummary component instead of fetching from backend */}
+                {/* Using simplified InsightsDailySummary component */}
                 <Box>
                   <InsightsDailySummary 
                     maxHeight="300px"
@@ -283,11 +286,15 @@ export default function MainLayout() {
           </Card>
         </GridItem>
 
-        {/* My Team Tile - Full width */}
+        {/* MyTeamTile component removed */}
         <GridItem colSpan={{ base: 1, md: 2 }}>
-          <MyTeamTile
-            teamName={user?.team_id ? "My Team" : "Join a Team"}
-            teamId={user?.team_id || undefined}
+          <Card
+            shadow="md"
+            bg={cardBgColor}
+            borderColor={borderColor}
+            borderWidth="1px"
+            borderRadius="xl"
+            transition="all 0.2s"
             onClick={() => {
               if (user?.team_id) {
                 navigate(`/team/${user.team_id}`);
@@ -296,7 +303,14 @@ export default function MainLayout() {
                 alert("You are not currently assigned to a team.");
               }
             }}
-          />
+            cursor="pointer"
+            _hover={{ shadow: "lg" }}
+          >
+            <CardBody p={{ base: 6, md: 8 }}>
+              <Heading size="md">{user?.team_id ? "My Team" : "Join a Team"}</Heading>
+              <Text mt={2}>View team information and projects</Text>
+            </CardBody>
+          </Card>
         </GridItem>
       </Grid>
     </Box>
@@ -305,12 +319,20 @@ export default function MainLayout() {
   // This state is already defined at the top of the component
   // const [activeView, setActiveView] = useState<'myWork' | 'explore' | 'analytics'>('myWork');
 
-  // Handle view change
+  // Handle view change with additional logging to help debug
   const handleViewToggle = (view: 'myWork' | 'explore') => {
+    console.log(`ViewToggle clicked: ${view}`);
+    
     setActiveView(view);
+    
     // Map views to workspace views
     const mappedView: WorkspaceViewType = view === 'myWork' ? 'command-center' : 'map-focus';
+    console.log(`Changing workspace view to: ${mappedView}`);
+    
     handleViewChange(mappedView);
+    
+    // Force the view change directly to ensure it works
+    setWorkspaceView(mappedView);
   };
 
   return (
@@ -337,7 +359,7 @@ export default function MainLayout() {
           mt={HEADER_HEIGHT}
         >
           {/* Hierarchy Navigator - Only shown in My Work view */}
-          {activeView === 'myWork' && workspaceView === 'command-center' && flags.enableHierarchyNavigator && (
+          {activeView === 'myWork' && workspaceView === 'command-center' && (
             <Box height="100%" zIndex="5">
               <HierarchyNavigator 
                 onUnitSelected={(unitId) => {

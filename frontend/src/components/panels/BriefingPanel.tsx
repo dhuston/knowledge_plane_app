@@ -161,7 +161,7 @@ const BriefingPanel: React.FC<BriefingPanelProps> = ({
         setIsNotesLoading(true);
         setNotesError(null);
         try {
-            const response = await apiClient.get<NoteReadRecent[]>(`/notes/project/${projectId}/recent?limit=5`);
+            const response = await apiClient.get<NoteReadRecent[]>(`/notes/projects/${projectId}/recent?limit=5`);
             setRecentNotes(response.data || []);
         } catch (err) {
             console.error(`Error fetching notes for project ${projectId}:`, err);
